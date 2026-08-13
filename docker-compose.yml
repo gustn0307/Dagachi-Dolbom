@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: dagachi-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: dagachi_dolbom
+      POSTGRES_USER: dagachi
+      POSTGRES_PASSWORD: dagachi_local
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - dagachi-postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dagachi -d dagachi_dolbom"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dagachi-postgres-data:
