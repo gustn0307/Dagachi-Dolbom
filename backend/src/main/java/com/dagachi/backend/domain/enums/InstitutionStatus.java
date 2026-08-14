@@ -1,2 +1,3 @@
 package com.dagachi.backend.domain.enums;
-public enum InstitutionStatus { ACTIVE, INACTIVE }
+public enum InstitutionStatus
+{ ACTIVE, INACTIVE }

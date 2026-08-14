@@ -1,2 +1,3 @@
 package com.dagachi.backend.domain.enums;
-public enum UserRole { USER, INSTITUTION, ADMIN }
+public enum UserRole
+{ USER, INSTITUTION, ADMIN }

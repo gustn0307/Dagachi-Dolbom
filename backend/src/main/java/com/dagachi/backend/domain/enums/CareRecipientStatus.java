@@ -1,2 +1,3 @@
 package com.dagachi.backend.domain.enums;
-public enum CareRecipientStatus { ACTIVE, INACTIVE }
+public enum CareRecipientStatus
+{ ACTIVE, INACTIVE }

@@ -1,2 +1,3 @@
 package com.dagachi.backend.domain.enums;
-public enum ApplicationType { DIRECT, AUTO }
+public enum ApplicationType
+{ DIRECT, AUTO }

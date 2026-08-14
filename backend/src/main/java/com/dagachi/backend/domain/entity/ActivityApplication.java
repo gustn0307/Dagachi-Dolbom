@@ -34,5 +34,4 @@ public class ActivityApplication extends BaseTimeEntity {
 
  @Column(name="rejected_reason",columnDefinition="text")
  private String rejectedReason;
-
 }
