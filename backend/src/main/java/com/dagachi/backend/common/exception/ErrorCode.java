@@ -32,6 +32,24 @@ public enum ErrorCode {
             "이미 사용 중인 이메일입니다."
     ),
 
+    INVALID_CREDENTIALS(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_401_INVALID_CREDENTIALS",
+            "이메일 또는 비밀번호가 올바르지 않습니다."
+    ),
+
+    ACCOUNT_SUSPENDED(
+            HttpStatus.FORBIDDEN,
+            "AUTH_403_SUSPENDED",
+            "정지된 계정입니다."
+    ),
+
+    ACCOUNT_WITHDRAWN(
+            HttpStatus.FORBIDDEN,
+            "AUTH_403_WITHDRAWN",
+            "탈퇴한 계정입니다."
+    ),
+
     // Security
     UNAUTHORIZED(
             HttpStatus.UNAUTHORIZED,
