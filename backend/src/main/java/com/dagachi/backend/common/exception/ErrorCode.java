@@ -1,0 +1,44 @@
+package com.dagachi.backend.common.exception;
+
+import lombok.Getter;
+import org.springframework.http.HttpStatus;
+
+@Getter
+public enum ErrorCode {
+
+    // Common
+    INTERNAL_SERVER_ERROR(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "COMMON_500",
+            "서버 내부 오류가 발생했습니다."
+    ),
+
+    INVALID_INPUT_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "COMMON_400",
+            "입력값이 올바르지 않습니다."
+    ),
+
+    // User
+    USER_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "USER_404",
+            "사용자를 찾을 수 없습니다."
+    ),
+
+    EMAIL_ALREADY_EXISTS(
+            HttpStatus.CONFLICT,
+            "USER_409",
+            "이미 사용 중인 이메일입니다."
+    );
+
+    private final HttpStatus status;
+    private final String code;
+    private final String message;
+
+    ErrorCode(HttpStatus status, String code, String message) {
+        this.status = status;
+        this.code = code;
+        this.message = message;
+    }
+}
