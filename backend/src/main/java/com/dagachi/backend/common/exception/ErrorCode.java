@@ -30,6 +30,19 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "USER_409",
             "이미 사용 중인 이메일입니다."
+    ),
+
+    // Security
+    UNAUTHORIZED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_401",
+            "인증이 필요합니다."
+    ),
+
+    FORBIDDEN(
+            HttpStatus.FORBIDDEN,
+            "AUTH_403",
+            "접근 권한이 없습니다."
     );
 
     private final HttpStatus status;
@@ -41,4 +54,5 @@ public enum ErrorCode {
         this.code = code;
         this.message = message;
     }
+
 }
