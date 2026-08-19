@@ -85,10 +85,22 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
+                        // 인증 없이 접근 가능한 현재 구현 API
                         .requestMatchers(
                                 "/api/auth/signup",
-                                "/api/auth/login")
+                                "/api/auth/login"
+                        )
                         .permitAll()
+
+                        // 관리자 전용
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
+
+                        // 기관 담당자 전용
+                        .requestMatchers("/api/institution/**")
+                        .hasRole("INSTITUTION")
+
+                        // 그 외 현재 API는 로그인 필요
                         .anyRequest()
                         .authenticated()
                 )
