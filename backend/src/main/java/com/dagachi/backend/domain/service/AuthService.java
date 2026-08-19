@@ -3,10 +3,7 @@ package com.dagachi.backend.domain.service;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.common.security.jwt.JwtTokenProvider;
-import com.dagachi.backend.domain.dto.auth.LoginRequest;
-import com.dagachi.backend.domain.dto.auth.LoginResponse;
-import com.dagachi.backend.domain.dto.auth.SignupRequest;
-import com.dagachi.backend.domain.dto.auth.SignupResponse;
+import com.dagachi.backend.domain.dto.auth.*;
 import com.dagachi.backend.domain.entity.User;
 import com.dagachi.backend.domain.enums.UserStatus;
 import com.dagachi.backend.domain.repository.UserRepository;
@@ -61,7 +58,7 @@ public class AuthService {
         return SignupResponse.from(savedUser);
     }
 
-//    LoginRequest
+    //    LoginRequest
 //    ↓
 //    email로 User 조회
 //    ↓
@@ -111,5 +108,12 @@ public class AuthService {
         );
 
         return LoginResponse.of(accessToken, user);
+    }
+
+    public MeResponse getMe(Long userId) {
+        User user = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        return MeResponse.from(user);
     }
 }

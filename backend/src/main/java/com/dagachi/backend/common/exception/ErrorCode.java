@@ -61,6 +61,12 @@ public enum ErrorCode {
             HttpStatus.FORBIDDEN,
             "AUTH_403",
             "접근 권한이 없습니다."
+    ),
+
+    RESOURCE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "COMMON_404",
+            "요청한 리소스를 찾을 수 없습니다."
     );
 
     private final HttpStatus status;

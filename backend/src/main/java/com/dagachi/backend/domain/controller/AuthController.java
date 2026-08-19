@@ -1,14 +1,12 @@
 package com.dagachi.backend.domain.controller;
 
 import com.dagachi.backend.common.response.ApiResponse;
-import com.dagachi.backend.domain.dto.auth.LoginRequest;
-import com.dagachi.backend.domain.dto.auth.LoginResponse;
-import com.dagachi.backend.domain.dto.auth.SignupRequest;
-import com.dagachi.backend.domain.dto.auth.SignupResponse;
+import com.dagachi.backend.domain.dto.auth.*;
 import com.dagachi.backend.domain.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -47,6 +45,20 @@ public class AuthController {
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "로그인에 성공했습니다.",
+                        response
+                )
+        );
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<MeResponse>> getMe(
+            @AuthenticationPrincipal Long userId
+    ) {
+        MeResponse response = authService.getMe(userId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "사용자 정보를 조회했습니다.",
                         response
                 )
         );
