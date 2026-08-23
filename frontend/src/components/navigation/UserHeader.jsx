@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext";
 
 const links = [
   { label: "홈", path: "/home" },
@@ -11,6 +12,15 @@ const links = [
 
 function UserHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const navigate = useNavigate();
+
+  const { isAuthenticated, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <header className="topbar">
@@ -29,9 +39,33 @@ function UserHeader() {
         ))}
       </nav>
       <div className="header-tools">
-        <button className="font-control" type="button" aria-label="큰 글씨 사용">글자 크기 <i /><b>A</b></button>
-        <Link to="/login" className="login">로그인</Link>
-        <Link to="/join" className="join">회원가입</Link>
+        <button
+          className="font-control"
+          type="button"
+          aria-label="큰 글씨 사용"
+        >
+          글자 크기 <i /><b>A</b>
+        </button>
+
+        {isAuthenticated ? (
+          <button
+            type="button"
+            className="login"
+            onClick={handleLogout}
+          >
+            로그아웃
+          </button>
+        ) : (
+          <>
+            <Link to="/login" className="login">
+              로그인
+            </Link>
+
+            <Link to="/join" className="join">
+              회원가입
+            </Link>
+          </>
+        )}
       </div>
     </header>
   );
