@@ -63,6 +63,13 @@ public enum ErrorCode {
             "접근 권한이 없습니다."
     ),
 
+    // Report
+    REPORT_GUEST_PHONE_REQUIRED(
+            HttpStatus.BAD_REQUEST,
+            "REPORT_400_GUEST_PHONE_REQUIRED",
+            "비회원 제보 시 연락처는 필수입니다."
+    ),
+
     // S3
     S3_UPLOAD_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
