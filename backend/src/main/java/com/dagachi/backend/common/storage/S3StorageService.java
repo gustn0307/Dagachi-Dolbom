@@ -168,8 +168,16 @@ public class S3StorageService {
             throw new CustomException(ErrorCode.S3_EMPTY_FILE);
         }
 
+        // ReportImage.original_filename 컬럼 길이를 초과하지 않도록 업로드 전에 검증합니다.
+        String originalFilename = file.getOriginalFilename();
+
+        if (originalFilename != null && originalFilename.length() > 255) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
         // 현재 MVP에서는 JPEG, PNG 이미지만 허용한다.
         String contentType = file.getContentType();
+
         if (contentType == null || !ALLOWED_IMAGE_TYPES.contains(contentType)) {
             throw new CustomException(ErrorCode.S3_INVALID_FILE_TYPE);
         }

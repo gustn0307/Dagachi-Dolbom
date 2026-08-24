@@ -11,7 +11,7 @@ import com.dagachi.backend.domain.repository.ReportRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
 import com.dagachi.backend.user.report.dto.ReportCreateRequest;
 import com.dagachi.backend.user.report.dto.ReportCreateResponse;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import com.dagachi.backend.common.response.PageResponse;
@@ -83,7 +83,7 @@ public class ReportService {
         return ReportCreateResponse.from(savedReport);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public PageResponse<ReportListItemResponse> getMyReports(
             Long userId,
             ReportStatus status,
@@ -110,6 +110,13 @@ public class ReportService {
     ) {
         if (images == null || images.isEmpty()) {
             return;
+        }
+
+        // 제보 사진은 팀 정책에 따라 최대 3장까지만 허용합니다.
+        if (images.size() > 3) {
+            throw new CustomException(
+                    ErrorCode.REPORT_IMAGE_LIMIT_EXCEEDED
+            );
         }
 
         List<String> uploadedKeys = new ArrayList<>();

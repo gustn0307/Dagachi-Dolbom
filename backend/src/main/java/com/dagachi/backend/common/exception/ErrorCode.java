@@ -70,6 +70,12 @@ public enum ErrorCode {
             "비회원 제보 시 연락처는 필수입니다."
     ),
 
+    REPORT_IMAGE_LIMIT_EXCEEDED(
+            HttpStatus.BAD_REQUEST,
+            "REPORT_400_IMAGE_LIMIT",
+            "제보 사진은 최대 3장까지 첨부할 수 있습니다."
+    ),
+
     // S3
     S3_UPLOAD_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
