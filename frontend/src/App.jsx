@@ -1,122 +1,110 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import UserLayout from "./layouts/UserLayout";
+import InstitutionLayout from "./layouts/InstitutionLayout";
+import AdminLayout from "./layouts/AdminLayout";
+
+import PublicLanding from "./pages/landing/PublicLanding";
+import Home from "./pages/home/Home";
+import Report from "./pages/report/Report";
+import Volunteer from "./pages/volunteer/Volunteer";
+import MyPage from "./pages/mypage/MyPage";
+import Notice from "./pages/notice/Notice";
+
+import InstitutionDashboard from "./pages/institution/Dashboard";
+import ReportManagement from "./pages/institution/ReportManagement";
+import CareTargetManagement from "./pages/institution/CareTargetManagement";
+import VolunteerManagement from "./pages/institution/VolunteerManagement";
+import ActivityManagement from "./pages/institution/ActivityManagement";
+import InstitutionStatistics from "./pages/institution/Statistics";
+
+import UserManagement from "./pages/admin/UserManagement";
+import InstitutionManagement from "./pages/admin/InstitutionManagement";
+
+import Login from "./auth/login";
+import Join from "./auth/join";
+import RequireRole from "./auth/RequireRole";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+    <BrowserRouter>
+      <Routes>
+        {/* 비회원도 접근 가능한 공개 랜딩 페이지 */}
+        <Route path="/" element={<PublicLanding />} />
+
+        {/* 일반 사용자 영역 */}
+        <Route element={<UserLayout />}>
+          <Route
+            path="/home"
+            element={
+              <RequireRole allowedRoles={["USER"]}>
+                <Home />
+              </RequireRole>
+            }
+          />
+
+          {/* 제보 접수는 회원/비회원 모두 사용할 수 있으므로 공개합니다. */}
+          <Route path="/report" element={<Report />} />
+          <Route path="/report/new" element={<Report />} />
+
+          <Route
+            path="/volunteer"
+            element={
+              <RequireRole allowedRoles={["USER"]}>
+                <Volunteer />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/mypage"
+            element={
+              <RequireRole allowedRoles={["USER"]}>
+                <MyPage />
+              </RequireRole>
+            }
+          />
+
+          {/* 공개된 공지는 로그인하지 않아도 조회할 수 있습니다. */}
+          <Route path="/notice" element={<Notice />} />
+
+          <Route path="/login" element={<Login />} />
+          <Route path="/join" element={<Join />} />
+        </Route>
+
+        {/* 기관 담당자 전용 영역 */}
+        <Route
+          path="/institution"
+          element={
+            <RequireRole allowedRoles={["INSTITUTION"]}>
+              <InstitutionLayout />
+            </RequireRole>
+          }
         >
-          Count is {count}
-        </button>
-      </section>
+          <Route index element={<InstitutionDashboard />} />
+          <Route path="reports" element={<ReportManagement />} />
+          <Route path="care-targets" element={<CareTargetManagement />} />
+          <Route path="volunteers" element={<VolunteerManagement />} />
+          <Route path="activities" element={<ActivityManagement />} />
+          <Route path="statistics" element={<InstitutionStatistics />} />
+        </Route>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        {/* 관리자 전용 영역 */}
+        <Route
+          path="/admin"
+          element={
+            <RequireRole allowedRoles={["ADMIN"]}>
+              <AdminLayout />
+            </RequireRole>
+          }
+        >
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="institutions" element={<InstitutionManagement />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
