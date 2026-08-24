@@ -1,5 +1,10 @@
 package com.dagachi.backend.domain.entity;
-import com.dagachi.backend.common.entity.BaseTimeEntity; import com.dagachi.backend.domain.enums.*; import jakarta.persistence.*; import lombok.*; import java.time.LocalDateTime;
+import com.dagachi.backend.common.entity.BaseTimeEntity;
+import com.dagachi.backend.domain.enums.*;
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name="notices")
 @Getter
@@ -28,4 +33,21 @@ public class Notice extends BaseTimeEntity {
 
  @Column(name="deleted_at")
  private LocalDateTime deletedAt;
+
+ public static Notice create(
+         String title,
+         String content,
+         User author
+ ) {
+  Notice notice = new Notice();
+
+  notice.title = title;
+  notice.content = content;
+  notice.author = author;
+  notice.status = NoticeStatus.DRAFT;
+  notice.deleted = false;
+
+  return notice;
+ }
 }
+
