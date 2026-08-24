@@ -45,7 +45,10 @@ function App() {
 
           {/* 제보 접수는 회원/비회원 모두 사용할 수 있으므로 공개합니다. */}
           <Route path="/report" element={<Report />} />
-          <Route path="/report/new" element={<Report />} />
+          <Route
+            path="/report/new"
+            element={<Navigate to="/report" replace />}
+          />
 
           <Route
             path="/volunteer"
