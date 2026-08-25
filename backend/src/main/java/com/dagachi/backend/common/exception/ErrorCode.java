@@ -19,6 +19,12 @@ public enum ErrorCode {
             "입력값이 올바르지 않습니다."
     ),
 
+    UNSUPPORTED_MEDIA_TYPE(
+            HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+            "COMMON_415",
+            "지원하지 않는 요청 형식입니다."
+    ),
+
     // User
     USER_NOT_FOUND(
             HttpStatus.NOT_FOUND,
@@ -61,6 +67,19 @@ public enum ErrorCode {
             HttpStatus.FORBIDDEN,
             "AUTH_403",
             "접근 권한이 없습니다."
+    ),
+
+    // Report
+    REPORT_GUEST_PHONE_REQUIRED(
+            HttpStatus.BAD_REQUEST,
+            "REPORT_400_GUEST_PHONE_REQUIRED",
+            "비회원 제보 시 연락처는 필수입니다."
+    ),
+
+    REPORT_IMAGE_LIMIT_EXCEEDED(
+            HttpStatus.BAD_REQUEST,
+            "REPORT_400_IMAGE_LIMIT",
+            "제보 사진은 최대 3장까지 첨부할 수 있습니다."
     ),
 
     // S3

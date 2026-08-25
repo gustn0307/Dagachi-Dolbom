@@ -17,6 +17,8 @@ function UserHeader() {
 
   const { isAuthenticated, logout } = useAuth();
 
+  const homePath = isAuthenticated ? "/home" : "/";
+
   const handleLogout = () => {
     logout();
     navigate("/login", { replace: true });
@@ -24,19 +26,41 @@ function UserHeader() {
 
   return (
     <header className="topbar">
-      <Link to="/home" className="brand" aria-label="이웃을 잇다 홈">
-        <span className="brand-symbol" aria-hidden="true">♥</span>
-        <span><b>다함께 돌봄</b><small>함께 만드는 따뜻한 우리 동네</small></span>
+      <Link to={homePath} className="brand" aria-label="다함께 돌봄 홈">
+        <span className="brand-symbol" aria-hidden="true">
+          ♥
+        </span>
+        <span>
+          <b>다함께 돌봄</b>
+          <small>함께 만드는 따뜻한 우리 동네</small>
+        </span>
       </Link>
-      <button className="mobile-menu" type="button" aria-label="메뉴 열기" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
+      <button
+        className="mobile-menu"
+        type="button"
+        aria-label="메뉴 열기"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
         {menuOpen ? "×" : "☰"}
       </button>
       <nav className={menuOpen ? "open" : ""} aria-label="주요 메뉴">
-        {links.map((link) => (
-          <NavLink key={link.path} to={link.path} onClick={() => setMenuOpen(false)} className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-            {link.label}
-          </NavLink>
-        ))}
+        {links.map((link) => {
+          const path = link.path === "/home" ? homePath : link.path;
+
+          return (
+            <NavLink
+              key={link.path}
+              to={path}
+              onClick={() => setMenuOpen(false)}
+              className={({ isActive }) =>
+                isActive ? "nav-link active" : "nav-link"
+              }
+            >
+              {link.label}
+            </NavLink>
+          );
+        })}
       </nav>
       <div className="header-tools">
         <button
@@ -44,15 +68,12 @@ function UserHeader() {
           type="button"
           aria-label="큰 글씨 사용"
         >
-          글자 크기 <i /><b>A</b>
+          글자 크기 <i />
+          <b>A</b>
         </button>
 
         {isAuthenticated ? (
-          <button
-            type="button"
-            className="login"
-            onClick={handleLogout}
-          >
+          <button type="button" className="login" onClick={handleLogout}>
             로그아웃
           </button>
         ) : (
