@@ -32,3 +32,11 @@ aws:
   region: ${AWS_REGION:ap-northeast-2}
   s3:
     bucket: ${AWS_S3_BUCKET:dagachi-dolbom-files-dev}
+
+# FastAPI AI Service
+#
+# 로컬에서는 localhost:8000을 사용하고,
+# 배포 환경에서는 AI_SERVICE_BASE_URL 환경변수로 덮어씁니다.
+ai:
+  service:
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
