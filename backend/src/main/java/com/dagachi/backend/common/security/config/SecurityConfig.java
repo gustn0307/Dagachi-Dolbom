@@ -14,6 +14,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpMethod;
 
 import java.util.List;
 
@@ -89,6 +90,14 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/signup",
                                 "/api/auth/login"
+                        )
+                        .permitAll()
+
+                        // 공개 공지 조회 API
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/notices",
+                                "/api/notices/**"
                         )
                         .permitAll()
 
