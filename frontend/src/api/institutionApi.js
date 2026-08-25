@@ -86,10 +86,12 @@ export const getCareTargets = (params = {}) =>
     : getCareRecipients(params);
 
 export const getVolunteers = (params = {}) =>
-  USE_MOCK
-    ? clone(institutionMockData.volunteers)
-    : unwrapData(api.get("/api/institution/volunteers", { params }));
-
+  unwrapData(
+    api.get(
+      "/api/institution/volunteers",
+      { params },
+    ),
+  );
 export const getActivities = (params = {}) =>
   USE_MOCK
     ? clone(institutionMockData.activities)
