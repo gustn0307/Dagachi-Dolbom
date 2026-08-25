@@ -9,6 +9,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.dagachi.backend.common.security.handler.JwtAuthenticationEntryPoint;
+import org.springframework.security.authentication.BadCredentialsException;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,11 +39,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(
+            JwtTokenProvider jwtTokenProvider,
+            JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint
+    ) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
     }
 
+    // Authorization 헤더 없음
+    // → 인증 없이 계속 진행
+    // → Public API에서는 비회원 가능
+    //
+    // Authorization: Bearer 정상JWT
+    // → SecurityContext에 userId/role 저장
+    // → 회원 처리
+    //
+    // Authorization 헤더 있음 + 잘못된 형식/만료/변조 JWT
+    // → 401 AUTH_401
+    // → Controller 진입 안 함
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -49,21 +67,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String authorizationHeader =
+                request.getHeader(AUTHORIZATION_HEADER);
+
         String token = resolveToken(request);
 
-        if (token != null && jwtTokenProvider.validateToken(token)) {
-            Long userId = jwtTokenProvider.getUserId(token);
-            String role = jwtTokenProvider.getRole(token);
-
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userId,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                    );
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        // Authorization 헤더가 없을 때만 비인증 요청으로 그대로 진행합니다.
+        // 공개 API에서는 이 경우 비회원 요청으로 처리할 수 있습니다.
+        if (authorizationHeader == null) {
+            filterChain.doFilter(request, response);
+            return;
         }
+
+        // Authorization 헤더를 보냈지만 Bearer 형식이 아니거나,
+        // 토큰이 만료·변조된 경우 비회원으로 처리하지 않고 401을 반환합니다.
+        if (token == null || !jwtTokenProvider.validateToken(token)) {
+            jwtAuthenticationEntryPoint.commence(
+                    request,
+                    response,
+                    new BadCredentialsException("Invalid JWT")
+            );
+            return;
+        }
+
+        Long userId = jwtTokenProvider.getUserId(token);
+        String role = jwtTokenProvider.getRole(token);
+
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        userId,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
         filterChain.doFilter(request, response);
     }

@@ -9,6 +9,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 
 @Slf4j
 // 각 컨트롤러 마다 try-catch를 반복하지 않고, REST controller에서 발생하는 예외를 한 곳에서 공통 처리할 수 있게 해주는 어노테이션
@@ -49,12 +53,73 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    // multipart/form-data 요청에서 필수 파일 파트가 누락된 경우 400으로 처리
+    // 쿼리 파라미터 등의 타입 변환에 실패한 경우 400으로 처리
+    // 예: ?status=ABC → ReportStatus enum으로 변환할 수 없음
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException exception
+    ) {
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(
+                        errorCode.getCode(),
+                        errorCode.getMessage()
+                ));
+    }
+
+    // multipart/form-data 요청에서 필수 part가 누락된 경우 400으로 처리
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestPartException(
             MissingServletRequestPartException exception
     ) {
-        ErrorCode errorCode = ErrorCode.S3_EMPTY_FILE;
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(
+                        errorCode.getCode(),
+                        errorCode.getMessage()
+                ));
+    }
+
+    // JSON 요청 본문 또는 multipart의 JSON part를 읽을 수 없는 경우 400으로 처리
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException exception
+    ) {
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(
+                        errorCode.getCode(),
+                        errorCode.getMessage()
+                ));
+    }
+
+    // API가 지원하지 않는 Content-Type으로 요청한 경우 415로 처리
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMediaTypeNotSupportedException(
+            HttpMediaTypeNotSupportedException exception
+    ) {
+        ErrorCode errorCode = ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(
+                        errorCode.getCode(),
+                        errorCode.getMessage()
+                ));
+    }
+
+    // Spring multipart 전체/파일 크기 제한을 초과한 경우 처리
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException exception
+    ) {
+        ErrorCode errorCode = ErrorCode.S3_FILE_TOO_LARGE;
 
         return ResponseEntity
                 .status(errorCode.getStatus())
