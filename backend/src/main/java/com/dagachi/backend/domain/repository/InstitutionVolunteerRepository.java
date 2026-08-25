@@ -1,8 +1,8 @@
 package com.dagachi.backend.domain.repository;
 
 import com.dagachi.backend.domain.entity.ActivityApplication;
-import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ActivityReviewStatus;
+import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,22 +13,21 @@ import org.springframework.data.repository.query.Param;
 /**
  * 기관별 봉사자 목록 조회 Repository.
  *
- * 별도의 Volunteer Entity나 테이블을 만들지 않고,
- * 기존 활동 신청 및 활동 기록을 조합해 봉사자를 조회한다.
+ * 별도의 봉사자 테이블을 만들지 않고,
+ * 활동 신청과 활동 기록을 이용해 기관별 봉사자를 조회한다.
  */
 public interface InstitutionVolunteerRepository
         extends Repository<ActivityApplication, Long> {
 
     /**
-     * 해당 기관의 활동에 실제로 참여 완료한 봉사자 목록을 조회한다.
+     * 기관 봉사자 목록을 조회한다.
      *
-     * 조회 조건:
-     * 1. 로그인 담당자가 소속된 기관의 활동
-     * 2. 활동 신청 상태가 APPROVED
-     * 3. 활동 기록 검토 상태가 APPROVED
-     * 4. 활동 완료 시각이 존재하는 활동
+     * 검색 대상:
+     * - 이름
+     * - 닉네임
+     * - 전화번호
      *
-     * 동일한 사용자가 여러 활동에 참여해도 목록에는 한 번만 반환된다.
+     * keyword가 null이면 검색 조건을 적용하지 않는다.
      */
     @Query(
             value = """
@@ -50,6 +49,15 @@ public interface InstitutionVolunteerRepository
                       AND application.status = :applicationStatus
                       AND record.reviewStatus = :reviewStatus
                       AND record.completedAt IS NOT NULL
+                      AND (
+                          :keyword IS NULL
+                          OR LOWER(volunteer.name)
+                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          OR LOWER(volunteer.nickname)
+                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          OR volunteer.phone
+                              LIKE CONCAT('%', :keyword, '%')
+                      )
                     GROUP BY
                         volunteer.id,
                         volunteer.name,
@@ -59,15 +67,25 @@ public interface InstitutionVolunteerRepository
                     ORDER BY MAX(record.completedAt) DESC
                     """,
             countQuery = """
-                    SELECT COUNT(DISTINCT application.user.id)
+                    SELECT COUNT(DISTINCT volunteer.id)
                     FROM ActivityApplication application
                     JOIN application.activity activity
+                    JOIN application.user volunteer
                     JOIN ActivityRecord record
                         ON record.activity = activity
                     WHERE activity.institution.id = :institutionId
                       AND application.status = :applicationStatus
                       AND record.reviewStatus = :reviewStatus
                       AND record.completedAt IS NOT NULL
+                      AND (
+                          :keyword IS NULL
+                          OR LOWER(volunteer.name)
+                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          OR LOWER(volunteer.nickname)
+                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                          OR volunteer.phone
+                              LIKE CONCAT('%', :keyword, '%')
+                      )
                     """
     )
     Page<InstitutionVolunteerSummaryResponse>
@@ -80,6 +98,9 @@ public interface InstitutionVolunteerRepository
 
             @Param("reviewStatus")
             ActivityReviewStatus reviewStatus,
+
+            @Param("keyword")
+            String keyword,
 
             Pageable pageable
     );

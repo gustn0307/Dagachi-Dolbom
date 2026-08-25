@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -30,15 +31,14 @@ public class InstitutionVolunteerController {
     }
 
     /**
-     * VOL-01 기관 봉사자 목록 조회.
+     * VOL-01, VOL-02 기관 봉사자 목록 및 검색.
      *
      * GET /api/institution/volunteers
      *
-     * 기본 페이징:
-     * - page: 0
-     * - size: 20
-     *
-     * 봉사자는 최근 활동 완료일이 빠른 순서로 조회된다.
+     * 지원 요청값:
+     * - keyword: 이름, 닉네임, 전화번호 검색
+     * - page: 페이지 번호
+     * - size: 한 페이지의 봉사자 수
      */
     @GetMapping
     public ResponseEntity<
@@ -48,6 +48,9 @@ public class InstitutionVolunteerController {
             >
     getInstitutionVolunteers(
             @AuthenticationPrincipal Long userId,
+
+            @RequestParam(required = false)
+            String keyword,
 
             @PageableDefault(
                     page = 0,
@@ -59,6 +62,7 @@ public class InstitutionVolunteerController {
                 institutionVolunteerService
                         .getInstitutionVolunteers(
                                 userId,
+                                keyword,
                                 pageable
                         );
 
