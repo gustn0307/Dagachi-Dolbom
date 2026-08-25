@@ -88,7 +88,7 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        // 인증 없이 접근 가능한 현재 구현 API
+
                         // 인증 없이 접근 가능한 인증 API
                         .requestMatchers(
                                 "/api/auth/signup",
