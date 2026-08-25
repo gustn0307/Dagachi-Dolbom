@@ -4,6 +4,9 @@ import com.dagachi.backend.common.response.ApiResponse;
 import com.dagachi.backend.common.response.PageResponse;
 import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerOverviewResponse;
 import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerSummaryResponse;
+import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerActivityResponse;
+import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerDetailResponse;
+import org.springframework.web.bind.annotation.PathVariable;
 import com.dagachi.backend.institution.volunteer.service.InstitutionVolunteerService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -121,6 +124,75 @@ public class InstitutionVolunteerController {
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "기관 봉사자 현황을 조회했습니다.",
+                        response
+                )
+        );
+    }
+    /**
+     * VOL-06 기관 봉사자 기본 상세 조회.
+     *
+     * GET /api/institution/volunteers/{volunteerId}
+     */
+    @GetMapping("/{volunteerId}")
+    public ResponseEntity<
+            ApiResponse<InstitutionVolunteerDetailResponse>
+            >
+    getInstitutionVolunteer(
+            @AuthenticationPrincipal
+            Long userId,
+
+            @PathVariable
+            Long volunteerId
+    ) {
+        InstitutionVolunteerDetailResponse response =
+                institutionVolunteerService
+                        .getInstitutionVolunteer(
+                                userId,
+                                volunteerId
+                        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "기관 봉사자 상세 정보를 조회했습니다.",
+                        response
+                )
+        );
+    }
+    /**
+     * VOL-06 기관별 봉사자 활동 이력 조회.
+     *
+     * GET /api/institution/volunteers/{volunteerId}/activities
+     */
+    @GetMapping("/{volunteerId}/activities")
+    public ResponseEntity<
+            ApiResponse<
+                    PageResponse<InstitutionVolunteerActivityResponse>
+                    >
+            >
+    getInstitutionVolunteerActivities(
+            @AuthenticationPrincipal
+            Long userId,
+
+            @PathVariable
+            Long volunteerId,
+
+            @PageableDefault(
+                    page = 0,
+                    size = 20
+            )
+            Pageable pageable
+    ) {
+        PageResponse<InstitutionVolunteerActivityResponse> response =
+                institutionVolunteerService
+                        .getInstitutionVolunteerActivities(
+                                userId,
+                                volunteerId,
+                                pageable
+                        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "기관 봉사자의 활동 이력을 조회했습니다.",
                         response
                 )
         );

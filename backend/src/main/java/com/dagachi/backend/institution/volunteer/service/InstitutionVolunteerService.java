@@ -12,6 +12,8 @@ import com.dagachi.backend.domain.repository.InstitutionVolunteerRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
 import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerOverviewResponse;
 import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerSummaryResponse;
+import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerActivityResponse;
+import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerDetailResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -154,6 +156,110 @@ public class InstitutionVolunteerService {
                 activeVolunteerCount,
                 scheduledVolunteerCount
         );
+    }
+
+    /**
+     * VOL-06 기관 봉사자 기본 상세 조회.
+     *
+     * 로그인 담당자의 소속 기관과 봉사자 ID를 함께 검사한다.
+     * 다른 기관에서만 활동한 봉사자는 조회할 수 없다.
+     */
+    @Transactional(readOnly = true)
+    public InstitutionVolunteerDetailResponse
+    getInstitutionVolunteer(
+            Long userId,
+            Long volunteerId
+    ) {
+        // 로그인 사용자 조회
+        User user =
+                findUser(userId);
+
+        // 로그인 사용자의 소속 기관 확인
+        Institution institution =
+                getInstitution(user);
+
+        // 기관 ID와 봉사자 ID를 함께 검사하여 상세 조회
+        return findInstitutionVolunteerDetail(
+                institution.getId(),
+                volunteerId
+        );
+    }
+
+    /**
+     * VOL-06 기관별 봉사자 활동 이력 조회.
+     *
+     * 해당 기관에서 참여 완료하고 검토 승인된
+     * 활동 이력만 페이지로 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<InstitutionVolunteerActivityResponse>
+    getInstitutionVolunteerActivities(
+            Long userId,
+            Long volunteerId,
+            Pageable pageable
+    ) {
+        // 로그인 사용자 조회
+        User user =
+                findUser(userId);
+
+        // 로그인 사용자의 소속 기관 확인
+        Institution institution =
+                getInstitution(user);
+
+        Long institutionId =
+                institution.getId();
+
+        /**
+         * 활동 이력을 조회하기 전에 해당 사용자가
+         * 이 기관의 봉사자가 맞는지 확인한다.
+         *
+         * 다른 기관 봉사자이거나 존재하지 않는 ID라면
+         * RESOURCE_NOT_FOUND 예외가 발생한다.
+         */
+        findInstitutionVolunteerDetail(
+                institutionId,
+                volunteerId
+        );
+
+        // 해당 기관에서의 승인 완료된 활동 이력 조회
+        Page<InstitutionVolunteerActivityResponse> activityPage =
+                institutionVolunteerRepository
+                        .findInstitutionVolunteerActivities(
+                                institutionId,
+                                volunteerId,
+                                ApplicationStatus.APPROVED,
+                                ActivityReviewStatus.APPROVED,
+                                pageable
+                        );
+
+        // 공통 페이지 응답으로 변환
+        return PageResponse.from(
+                activityPage
+        );
+    }
+
+    /**
+     * 기관 ID와 봉사자 ID를 함께 검사하여
+     * 해당 기관에 속한 봉사자 상세정보를 조회한다.
+     */
+    private InstitutionVolunteerDetailResponse
+    findInstitutionVolunteerDetail(
+            Long institutionId,
+            Long volunteerId
+    ) {
+        return institutionVolunteerRepository
+                .findInstitutionVolunteerDetail(
+                        institutionId,
+                        volunteerId,
+                        ApplicationStatus.APPROVED,
+                        ActivityReviewStatus.APPROVED
+                )
+                .orElseThrow(
+                        () ->
+                                new CustomException(
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                )
+                );
     }
 
     /**

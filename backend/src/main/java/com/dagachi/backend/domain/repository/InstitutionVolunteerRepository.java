@@ -10,6 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 import com.dagachi.backend.domain.enums.ActivityStatus;
+import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerActivityResponse;
+import com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerDetailResponse;
+
+import java.util.Optional;
 
 /**
  * 기관별 봉사자 목록 조회 Repository.
@@ -198,5 +202,114 @@ public interface InstitutionVolunteerRepository
 
             @Param("activityStatus")
             ActivityStatus activityStatus
+    );
+
+    /**
+     * VOL-06 기관 봉사자 기본 상세 조회.
+     *
+     * 대상 사용자 ID와 로그인 담당자의 기관 ID를 함께 검사한다.
+     *
+     * 해당 기관에서 승인 완료된 활동에 참여한 기록이 없다면
+     * 조회 결과를 반환하지 않는다.
+     */
+    @Query("""
+        SELECT new com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerDetailResponse(
+            volunteer.id,
+            volunteer.name,
+            volunteer.nickname,
+            volunteer.phone,
+            volunteer.gender,
+            COUNT(DISTINCT activity.id),
+            MAX(record.completedAt)
+        )
+        FROM ActivityApplication application
+        JOIN application.activity activity
+        JOIN application.user volunteer
+        JOIN ActivityRecord record
+            ON record.activity = activity
+        WHERE activity.institution.id = :institutionId
+          AND volunteer.id = :volunteerId
+          AND application.status = :applicationStatus
+          AND record.reviewStatus = :reviewStatus
+          AND record.completedAt IS NOT NULL
+        GROUP BY
+            volunteer.id,
+            volunteer.name,
+            volunteer.nickname,
+            volunteer.phone,
+            volunteer.gender
+        """)
+    Optional<InstitutionVolunteerDetailResponse>
+    findInstitutionVolunteerDetail(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("volunteerId")
+            Long volunteerId,
+
+            @Param("applicationStatus")
+            ApplicationStatus applicationStatus,
+
+            @Param("reviewStatus")
+            ActivityReviewStatus reviewStatus
+    );
+
+    /**
+     * VOL-06 기관별 봉사자 활동 이력 조회.
+     *
+     * 해당 기관에서 참여 완료하고 기관 검토까지 승인된
+     * 활동만 최근 완료일순으로 반환한다.
+     */
+    @Query(
+            value = """
+                SELECT new com.dagachi.backend.institution.volunteer.dto.InstitutionVolunteerActivityResponse(
+                    activity.id,
+                    activity.recipient.name,
+                    activity.scheduledAt,
+                    record.startedAt,
+                    record.completedAt,
+                    record.visitResult,
+                    record.reviewStatus
+                )
+                FROM ActivityApplication application
+                JOIN application.activity activity
+                JOIN ActivityRecord record
+                    ON record.activity = activity
+                WHERE activity.institution.id = :institutionId
+                  AND application.user.id = :volunteerId
+                  AND application.status = :applicationStatus
+                  AND record.reviewStatus = :reviewStatus
+                  AND record.completedAt IS NOT NULL
+                ORDER BY record.completedAt DESC,
+                         activity.id DESC
+                """,
+            countQuery = """
+                SELECT COUNT(DISTINCT activity.id)
+                FROM ActivityApplication application
+                JOIN application.activity activity
+                JOIN ActivityRecord record
+                    ON record.activity = activity
+                WHERE activity.institution.id = :institutionId
+                  AND application.user.id = :volunteerId
+                  AND application.status = :applicationStatus
+                  AND record.reviewStatus = :reviewStatus
+                  AND record.completedAt IS NOT NULL
+                """
+    )
+    Page<InstitutionVolunteerActivityResponse>
+    findInstitutionVolunteerActivities(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("volunteerId")
+            Long volunteerId,
+
+            @Param("applicationStatus")
+            ApplicationStatus applicationStatus,
+
+            @Param("reviewStatus")
+            ActivityReviewStatus reviewStatus,
+
+            Pageable pageable
     );
 }
