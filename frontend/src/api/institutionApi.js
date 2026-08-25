@@ -92,6 +92,14 @@ export const getVolunteers = (params = {}) =>
       { params },
     ),
   );
+  // VOL-05 기관 봉사자 현황 요약
+export const getVolunteerOverview = () =>
+  unwrapData(
+    api.get(
+      "/api/institution/volunteers/summary",
+    ),
+  );
+
 export const getActivities = (params = {}) =>
   USE_MOCK
     ? clone(institutionMockData.activities)
@@ -124,7 +132,11 @@ export const institutionApi = {
   getDashboard,
   getReports,
   getCareTargets,
+
+   // VOL-01~05 기관 봉사자 관리 API
   getVolunteers,
+  getVolunteerOverview,
+
   getActivities,
   getStatistics,
   updateReportStatus,

@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
+import com.dagachi.backend.domain.enums.ActivityStatus;
 
 /**
  * 기관별 봉사자 목록 조회 Repository.
@@ -116,5 +117,86 @@ public interface InstitutionVolunteerRepository
             String sortType,
 
             Pageable pageable
+    );
+
+    /**
+     * 해당 기관의 활동에 한 번 이상 참여 완료한
+     * 전체 봉사자 수를 조회한다.
+     *
+     * 같은 사용자가 여러 활동에 참여해도 한 명으로 계산한다.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT application.user.id)
+        FROM ActivityApplication application
+        JOIN application.activity activity
+        JOIN ActivityRecord record
+            ON record.activity = activity
+        WHERE activity.institution.id = :institutionId
+          AND application.status = :applicationStatus
+          AND record.reviewStatus = :reviewStatus
+          AND record.completedAt IS NOT NULL
+        """)
+    long countTotalVolunteers(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("applicationStatus")
+            ApplicationStatus applicationStatus,
+
+            @Param("reviewStatus")
+            ActivityReviewStatus reviewStatus
+    );
+
+    /**
+     * 현재 진행 중인 활동에 참여하고 있는
+     * 봉사자 수를 조회한다.
+     *
+     * 같은 사용자가 여러 진행 중 활동에 참여해도
+     * 한 명으로 계산한다.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT application.user.id)
+        FROM ActivityApplication application
+        JOIN application.activity activity
+        WHERE activity.institution.id = :institutionId
+          AND application.status = :applicationStatus
+          AND activity.status = :activityStatus
+        """)
+    long countActiveVolunteers(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("applicationStatus")
+            ApplicationStatus applicationStatus,
+
+            @Param("activityStatus")
+            ActivityStatus activityStatus
+    );
+
+    /**
+     * 앞으로 진행될 준비 완료 활동에 승인된
+     * 봉사자 수를 조회한다.
+     *
+     * READY 상태이면서 예정 시각이 현재보다
+     * 뒤에 있는 활동만 포함한다.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT application.user.id)
+        FROM ActivityApplication application
+        JOIN application.activity activity
+        WHERE activity.institution.id = :institutionId
+          AND application.status = :applicationStatus
+          AND activity.status = :activityStatus
+          AND activity.scheduledAt > CURRENT_TIMESTAMP
+        """)
+    long countScheduledVolunteers(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("applicationStatus")
+            ApplicationStatus applicationStatus,
+
+            @Param("activityStatus")
+            ActivityStatus activityStatus
     );
 }

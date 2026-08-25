@@ -28,7 +28,7 @@ const formatParticipatedAt = (value) => {
 };
 
 function VolunteerManagement() {
-  // 검색창에 현재 입력 중인 값
+  // 검색창에 입력 중인 값
   const [keywordInput, setKeywordInput] =
     useState("");
 
@@ -41,7 +41,6 @@ function VolunteerManagement() {
   const [sortType, setSortType] =
     useState("recent");
 
-  // 현재 페이지 번호
   // 백엔드 페이지 번호는 0부터 시작한다.
   const [page, setPage] =
     useState(0);
@@ -50,8 +49,7 @@ function VolunteerManagement() {
   const size = 20;
 
   /**
-   * 검색어, 정렬값 또는 페이지 번호가 바뀌면
-   * 봉사자 목록 API를 다시 호출한다.
+   * VOL-01~03 봉사자 목록, 검색 및 정렬 조회.
    */
   const {
     data,
@@ -74,7 +72,20 @@ function VolunteerManagement() {
   );
 
   /**
-   * 검색 버튼을 눌렀을 때 실행된다.
+   * VOL-05 화면 상단의 봉사자 현황 조회.
+   */
+  const {
+    data: overview,
+    loading: overviewLoading,
+    error: overviewError,
+    reload: reloadOverview,
+  } = useInstitutionData(
+    institutionApi.getVolunteerOverview,
+    [],
+  );
+
+  /**
+   * 검색 버튼을 눌렀을 때 실행한다.
    */
   const handleSearch = (event) => {
     // form의 기본 새로고침을 막는다.
@@ -84,32 +95,55 @@ function VolunteerManagement() {
     setPage(0);
 
     // 검색어 앞뒤 공백을 제거한다.
-    setKeyword(keywordInput.trim());
+    setKeyword(
+      keywordInput.trim(),
+    );
   };
 
   /**
-   * 데이터를 불러오는 중이거나 오류가 발생한 경우
+   * 목록 또는 요약 조회에 실패하면
+   * 두 API를 모두 다시 호출한다.
+   */
+  const handleRetry = () => {
+    reload();
+    reloadOverview();
+  };
+
+  /**
+   * 두 API 중 하나라도 조회 중이거나 오류가 발생하면
    * 공통 상태 화면을 표시한다.
    */
-  if (loading || error) {
+  if (
+    loading ||
+    overviewLoading ||
+    error ||
+    overviewError
+  ) {
     return (
       <div className="institution-page">
         <DataState
-          loading={loading}
-          error={error}
-          onRetry={reload}
+          loading={
+            loading ||
+            overviewLoading
+          }
+          error={
+            error ||
+            overviewError
+          }
+          onRetry={handleRetry}
         />
       </div>
     );
   }
 
   /**
-   * 봉사자 API 응답은 배열이 아니라 PageResponse 객체다.
+   * 목록 API 응답은 배열이 아니라 PageResponse 객체다.
    * 실제 봉사자 배열은 data.content에 들어 있다.
    */
   const volunteers =
     data?.content ?? [];
 
+  // 현재 검색 조건에 맞는 봉사자 수
   const totalElements =
     data?.totalElements ?? 0;
 
@@ -122,18 +156,6 @@ function VolunteerManagement() {
   const isLast =
     data?.last ?? true;
 
-  /**
-   * 현재 페이지에 표시된 봉사자들의
-   * 참여 활동 횟수를 모두 더한다.
-   */
-  const currentPageParticipationCount =
-    volunteers.reduce(
-      (sum, volunteer) =>
-        sum +
-        (volunteer.participationCount ?? 0),
-      0,
-    );
-
   return (
     <div className="institution-page">
       <div className="page-title-row compact">
@@ -145,43 +167,41 @@ function VolunteerManagement() {
           </h1>
 
           <span>
-            기관 활동에 참여 완료한 봉사자와
-            활동 횟수를 확인합니다.
+            기관 활동에 참여한 봉사자와
+            현재 활동 현황을 확인합니다.
           </span>
         </div>
       </div>
 
+      {/* VOL-05 기관 봉사자 현황 */}
       <section className="mini-metrics">
         <article>
-          <span>조회 봉사자</span>
+          <span>전체 봉사자</span>
 
           <strong>
-            {totalElements}명
+            {overview?.totalVolunteerCount ?? 0}명
           </strong>
         </article>
 
         <article>
-          <span>
-            현재 페이지 참여 활동
-          </span>
+          <span>현재 활동 중</span>
 
           <strong className="green-text">
-            {currentPageParticipationCount}회
+            {overview?.activeVolunteerCount ?? 0}명
           </strong>
         </article>
 
         <article>
-          <span>현재 정렬</span>
+          <span>참여 예정</span>
 
           <strong className="orange-text">
-            {sortType === "participation"
-              ? "참여 횟수순"
-              : "최근 활동순"}
+            {overview?.scheduledVolunteerCount ?? 0}명
           </strong>
         </article>
       </section>
 
       <section className="panel table-panel">
+        {/* 검색 및 정렬 영역 */}
         <div className="filter-bar">
           <form
             className="care-list-search"
@@ -237,6 +257,7 @@ function VolunteerManagement() {
           </select>
         </div>
 
+        {/* 봉사자 목록 */}
         {volunteers.length === 0 ? (
           <div className="data-state">
             조건에 맞는 봉사자가 없습니다.
@@ -315,7 +336,7 @@ function VolunteerManagement() {
 
                   {/*
                     봉사자 상세 버튼은
-                    VOL-05 이후 연결한다.
+                    이후 상세 API와 연결한다.
                   */}
                   <span aria-hidden="true" />
                 </article>
@@ -324,6 +345,7 @@ function VolunteerManagement() {
           </div>
         )}
 
+        {/* 페이지 이동 */}
         {totalPages > 0 && (
           <div
             className={
@@ -331,7 +353,7 @@ function VolunteerManagement() {
             }
           >
             <span>
-              전체 {totalElements}명 ·{" "}
+              검색 결과 {totalElements}명 ·{" "}
               {page + 1}/{totalPages} 페이지
             </span>
 
