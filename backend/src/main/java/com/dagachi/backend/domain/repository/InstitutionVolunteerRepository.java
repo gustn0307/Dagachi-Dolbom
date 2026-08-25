@@ -27,7 +27,7 @@ public interface InstitutionVolunteerRepository
      * - 닉네임
      * - 전화번호
      *
-     * keyword가 null이면 검색 조건을 적용하지 않는다.
+     * keyword가 빈 문자열이면 검색 조건을 적용하지 않는다.
      */
     @Query(
             value = """
@@ -50,11 +50,11 @@ public interface InstitutionVolunteerRepository
                       AND record.reviewStatus = :reviewStatus
                       AND record.completedAt IS NOT NULL
                       AND (
-                          :keyword IS NULL
+                          :keyword = ''
                           OR LOWER(volunteer.name)
-                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                              LIKE CONCAT('%', :keyword, '%')
                           OR LOWER(volunteer.nickname)
-                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                              LIKE CONCAT('%', :keyword, '%')
                           OR volunteer.phone
                               LIKE CONCAT('%', :keyword, '%')
                       )
@@ -64,7 +64,17 @@ public interface InstitutionVolunteerRepository
                         volunteer.nickname,
                         volunteer.phone,
                         volunteer.gender
-                    ORDER BY MAX(record.completedAt) DESC
+                    ORDER BY
+                        CASE
+                            WHEN :sortType = 'participation'
+                            THEN COUNT(DISTINCT activity.id)
+                        END DESC,
+                        CASE
+                            WHEN :sortType = 'recent'
+                            THEN MAX(record.completedAt)
+                        END DESC,
+                        MAX(record.completedAt) DESC,
+                        volunteer.id ASC
                     """,
             countQuery = """
                     SELECT COUNT(DISTINCT volunteer.id)
@@ -78,11 +88,11 @@ public interface InstitutionVolunteerRepository
                       AND record.reviewStatus = :reviewStatus
                       AND record.completedAt IS NOT NULL
                       AND (
-                          :keyword IS NULL
+                          :keyword = ''
                           OR LOWER(volunteer.name)
-                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                              LIKE CONCAT('%', :keyword, '%')
                           OR LOWER(volunteer.nickname)
-                              LIKE LOWER(CONCAT('%', :keyword, '%'))
+                              LIKE CONCAT('%', :keyword, '%')
                           OR volunteer.phone
                               LIKE CONCAT('%', :keyword, '%')
                       )
@@ -101,6 +111,9 @@ public interface InstitutionVolunteerRepository
 
             @Param("keyword")
             String keyword,
+
+            @Param("sortType")
+            String sortType,
 
             Pageable pageable
     );

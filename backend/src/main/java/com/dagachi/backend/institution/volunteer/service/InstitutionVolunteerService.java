@@ -15,6 +15,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
+
 /**
  * 기관 봉사자 관리 기능을 처리하는 Service.
  */
@@ -45,6 +47,7 @@ public class InstitutionVolunteerService {
     getInstitutionVolunteers(
             Long userId,
             String keyword,
+            String sortType,
             Pageable pageable
     ) {
         // 삭제되지 않은 로그인 사용자 조회
@@ -58,6 +61,9 @@ public class InstitutionVolunteerService {
         String normalizedKeyword =
                 normalizeKeyword(keyword);
 
+        String normalizedSortType =
+                normalizeSortType(sortType);
+
         // 해당 기관의 봉사자 목록 조회
         Page<InstitutionVolunteerSummaryResponse> volunteerPage =
                 institutionVolunteerRepository
@@ -66,6 +72,7 @@ public class InstitutionVolunteerService {
                                 ApplicationStatus.APPROVED,
                                 ActivityReviewStatus.APPROVED,
                                 normalizedKeyword,
+                                normalizedSortType,
                                 pageable
                         );
 
@@ -109,13 +116,25 @@ public class InstitutionVolunteerService {
      */
     private String normalizeKeyword(String keyword) {
         if (keyword == null) {
-            return null;
+            return "";
         }
 
-        String trimmedKeyword = keyword.trim();
+        return keyword
+                .trim()
+                .toLowerCase(Locale.ROOT);
+    }
 
-        return trimmedKeyword.isEmpty()
-                ? null
-                : trimmedKeyword;
+    /**
+     * 정렬 요청값을 검사한다.
+     *
+     * participation이면 참여 횟수 많은 순을 사용하고,
+     * 나머지 값은 최근 활동순을 사용한다.
+     */
+    private String normalizeSortType(String sortType) {
+        if ("participation".equalsIgnoreCase(sortType)) {
+            return "participation";
+        }
+
+        return "recent";
     }
 }

@@ -31,12 +31,13 @@ public class InstitutionVolunteerController {
     }
 
     /**
-     * VOL-01, VOL-02 기관 봉사자 목록 및 검색.
+     * VOL-01~03 기관 봉사자 목록, 검색 및 정렬.
      *
      * GET /api/institution/volunteers
      *
      * 지원 요청값:
      * - keyword: 이름, 닉네임, 전화번호 검색
+     * - sortType: recent 또는 participation
      * - page: 페이지 번호
      * - size: 한 페이지의 봉사자 수
      */
@@ -49,8 +50,17 @@ public class InstitutionVolunteerController {
     getInstitutionVolunteers(
             @AuthenticationPrincipal Long userId,
 
+            // 이름, 닉네임 또는 전화번호 검색어
             @RequestParam(required = false)
             String keyword,
+
+            // recent: 최근 활동순
+            // participation: 참여 횟수 많은 순
+            @RequestParam(
+                    required = false,
+                    defaultValue = "recent"
+            )
+            String sortType,
 
             @PageableDefault(
                     page = 0,
@@ -63,6 +73,7 @@ public class InstitutionVolunteerController {
                         .getInstitutionVolunteers(
                                 userId,
                                 keyword,
+                                sortType,
                                 pageable
                         );
 
