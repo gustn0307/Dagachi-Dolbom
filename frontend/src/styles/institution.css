@@ -123,3 +123,338 @@
   .metric-card strong { font-size: 27px; }
   .panel-title h2 { font-size: 17px; }
 }
+
+/* 돌봄 대상자 상세 */
+.care-tag.ACTIVE,.care-tag.AGREED { background:#eaf6eb; color:#478b55; }
+.care-tag.INACTIVE,.care-tag.WITHDRAWN { background:#f1efec; color:#746d67; }
+.care-tag.PENDING { background:#fff0e6; color:#e36927; }
+.detail-back { margin:0 0 18px; padding:0; border:0; background:none; color:#746d67; font-size:13px; font-weight:700; cursor:pointer; }
+.detail-badges { display:flex; gap:8px; }
+.detail-badges .care-tag { padding:7px 11px; font-size:11px; }
+.detail-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
+.detail-summary-grid article { padding:20px; }
+.detail-summary-grid span { display:block; color:#8d857e; font-size:12px; }
+.detail-summary-grid strong { display:block; margin-top:8px; font-size:19px; }
+.care-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.detail-section { overflow:hidden; }
+.detail-section .panel-title { border-bottom:1px solid var(--inst-border); }
+.detail-info-list { margin:0; padding:4px 24px 18px; }
+.detail-info-list > div { min-height:52px; display:grid; grid-template-columns:110px 1fr; align-items:center; border-bottom:1px solid #f0ede9; }
+.detail-info-list > div:last-child { border-bottom:0; }
+.detail-info-list dt { color:#918981; font-size:12px; }
+.detail-info-list dd { margin:0; color:#3d3732; font-size:13px; font-weight:700; word-break:break-word; }
+.detail-wide { grid-column:1/-1; }
+.linked-summary { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; padding:20px 24px 24px; }
+.linked-summary article { padding:18px; border-radius:11px; background:#faf8f5; }
+.linked-summary span { color:#8d857e; font-size:12px; }
+.linked-summary strong { display:block; margin:7px 0; font-size:22px; }
+.linked-summary p { margin:0; color:#918981; font-size:11px; }
+
+@media(max-width:760px) {
+  .detail-summary-grid,.care-detail-grid,.linked-summary { grid-template-columns:1fr; }
+  .detail-wide { grid-column:auto; }
+  .detail-info-list > div { grid-template-columns:90px 1fr; }
+}
+.care-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  padding: 30px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(37, 31, 27, 0.5);
+  overflow-y: auto;
+}
+
+.care-modal {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--inst-border);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(45, 31, 20, 0.22);
+}
+
+.care-modal-header {
+  min-height: 84px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--inst-border);
+}
+
+.care-modal-header p {
+  margin: 0 0 5px;
+  color: var(--inst-orange);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.care-modal-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.care-modal-header > button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: #f5f2ef;
+  font-size: 23px;
+  cursor: pointer;
+}
+
+.care-recipient-form {
+  padding: 24px;
+}
+
+.care-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.care-form-grid label {
+  display: grid;
+  gap: 8px;
+}
+
+.care-form-grid label > span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.care-form-grid input,
+.care-form-grid select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid #ded8d2;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.care-form-wide {
+  grid-column: 1 / -1;
+}
+
+.care-form-actions {
+  margin-top: 26px;
+  padding-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--inst-border);
+}
+
+.care-form-cancel {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid #ded8d2;
+  border-radius: 9px;
+  background: #fff;
+  font-weight: 700;
+}
+
+.care-form-error {
+  margin: 20px 24px 0;
+  padding: 13px 15px;
+  border: 1px solid #f2c8b3;
+  border-radius: 9px;
+  background: #fff3ed;
+  color: #c2521c;
+}
+
+@media (max-width: 760px) {
+  .care-modal-backdrop {
+    padding: 12px;
+  }
+
+  .care-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .care-form-wide {
+    grid-column: auto;
+  }
+}
+
+.detail-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .detail-title-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .detail-title-actions .orange-action {
+    justify-content: center;
+  }
+}
+
+.care-consent-modal {
+  width: min(460px, 100%);
+}
+
+.care-consent-body {
+  padding: 24px;
+}
+
+.care-consent-body > label {
+  display: grid;
+  gap: 8px;
+}
+
+.care-consent-body > label > span {
+  color: #514a44;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.care-consent-body select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid #ded8d2;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.care-consent-body select:focus {
+  outline: none;
+  border-color: var(--inst-orange);
+  box-shadow:
+    0 0 0 3px rgba(243, 111, 43, 0.1);
+}
+
+.care-consent-body .consent-error {
+  margin: 16px 0 0;
+}
+
+.close-care-action {
+  min-height: 46px;
+  padding: 0 17px;
+  border: 1px solid #d8d1ca;
+  border-radius: 9px;
+  background: #fff;
+  color: #716861;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.close-care-action:hover {
+  border-color: #b8afa7;
+  background: #f7f5f3;
+}
+
+.close-care-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (max-width: 760px) {
+  .close-care-action {
+    width: 100%;
+  }
+}
+
+/* 돌봄 대상자 검색 영역 */
+.care-list-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* select에도 기존 필터 버튼과 같은 크기를 적용한다. */
+.care-filter-select {
+  min-width: 120px;
+  padding-right: 30px;
+  cursor: pointer;
+}
+
+/* 이전·다음 버튼은 글자가 잘리지 않도록 넓게 표시한다. */
+.care-pagination button {
+  width: auto;
+  min-width: 31px;
+  padding: 0 9px;
+}
+
+.care-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 760px) {
+  .care-list-search {
+    width: 100%;
+  }
+
+  .care-list-search .table-search {
+    flex: 1;
+  }
+
+  .care-filter-select {
+    flex: 1;
+    min-width: 135px;
+  }
+
+  .care-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 18px;
+  }
+
+  .care-pagination > div {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* CARE-07 관리 재개 버튼 */
+.reopen-care-action {
+  min-height: 46px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 9px;
+  background: #4d9a61;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 7px 16px rgba(77, 154, 97, 0.25);
+  cursor: pointer;
+}
+
+.reopen-care-action:hover {
+  background: #438954;
+}
+
+.reopen-care-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 관리 종료·재개 오류 메시지 */
+.detail-action-error {
+  margin: 0 0 18px;
+}
+
+@media (max-width: 760px) {
+  .reopen-care-action {
+    width: 100%;
+  }
+}
