@@ -18,10 +18,15 @@ import com.dagachi.backend.common.response.PageResponse;
 import com.dagachi.backend.domain.enums.ReportStatus;
 import com.dagachi.backend.user.report.dto.ReportListItemResponse;
 import org.springframework.data.domain.Pageable;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.dagachi.backend.domain.enums.UserStatus;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 public class ReportService {
 
@@ -52,10 +57,22 @@ public class ReportService {
         String guestPhone = request.guestPhone();
 
         if (userId != null) {
-            reporter = userRepository.findById(userId)
+            reporter = userRepository.findByIdAndDeletedFalse(userId)
                     .orElseThrow(() ->
                             new CustomException(ErrorCode.USER_NOT_FOUND)
                     );
+
+            if (reporter.getStatus() == UserStatus.SUSPENDED) {
+                throw new CustomException(
+                        ErrorCode.ACCOUNT_SUSPENDED
+                );
+            }
+
+            if (reporter.getStatus() == UserStatus.WITHDRAWN) {
+                throw new CustomException(
+                        ErrorCode.ACCOUNT_WITHDRAWN
+                );
+            }
 
             guestPhone = null;
         } else {
@@ -64,6 +81,8 @@ public class ReportService {
                         ErrorCode.REPORT_GUEST_PHONE_REQUIRED
                 );
             }
+
+            guestPhone = guestPhone.trim();
         }
 
         Report report = Report.create(
@@ -121,41 +140,78 @@ public class ReportService {
 
         List<String> uploadedKeys = new ArrayList<>();
 
-        try {
-            List<ReportImage> reportImages = new ArrayList<>();
+        /*
+         * S3는 DB 트랜잭션에 참여하지 않으므로,
+         * DB 트랜잭션이 최종적으로 rollback되면
+         * 이번 요청에서 업로드한 S3 객체를 보상 삭제합니다.
+         *
+         * saveAllAndFlush() 이후 최종 commit 단계에서 실패하는 경우까지
+         * 처리하기 위해 메서드 내부 catch가 아니라
+         * transaction afterCompletion을 사용합니다.
+         */
+        registerRollbackCleanup(uploadedKeys);
 
-            for (MultipartFile image : images) {
-                String s3Key = s3StorageService.upload(image, "reports");
-                uploadedKeys.add(s3Key);
+        List<ReportImage> reportImages = new ArrayList<>();
 
-                ReportImage reportImage = ReportImage.create(
-                        report,
-                        s3Key,
-                        image.getOriginalFilename(),
-                        image.getContentType(),
-                        image.getSize()
-                );
+        for (MultipartFile image : images) {
+            String s3Key = s3StorageService.upload(
+                    image,
+                    "reports"
+            );
 
-                reportImages.add(reportImage);
-            }
+            uploadedKeys.add(s3Key);
 
-            reportImageRepository.saveAllAndFlush(reportImages);
+            ReportImage reportImage = ReportImage.create(
+                    report,
+                    s3Key,
+                    image.getOriginalFilename(),
+                    image.getContentType(),
+                    image.getSize()
+            );
 
-        } catch (RuntimeException e) {
-            // DB 트랜잭션이 롤백되더라도 S3 파일은 자동 삭제되지 않으므로
-            // 현재 요청에서 이미 업로드된 파일을 직접 정리합니다.
-            deleteUploadedFiles(uploadedKeys);
-
-            throw e;
+            reportImages.add(reportImage);
         }
+
+        /*
+         * DB 오류를 가능한 한 commit 이전에 발생시켜
+         * 트랜잭션 rollback 및 S3 보상 삭제가 수행되도록 합니다.
+         */
+        reportImageRepository.saveAllAndFlush(reportImages);
     }
 
-    private void deleteUploadedFiles(List<String> uploadedKeys) {
+    private void registerRollbackCleanup(
+            List<String> uploadedKeys
+    ) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException(
+                    "S3 업로드 보상 처리를 위한 트랜잭션이 활성화되어 있지 않습니다."
+            );
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                            deleteUploadedFiles(uploadedKeys);
+                        }
+                    }
+                }
+        );
+    }
+
+    private void deleteUploadedFiles(
+            List<String> uploadedKeys
+    ) {
         for (String key : uploadedKeys) {
             try {
                 s3StorageService.delete(key);
-            } catch (RuntimeException ignored) {
-                // 보상 삭제 실패가 원래 업로드/저장 예외를 덮어쓰지 않도록 합니다.
+            } catch (RuntimeException e) {
+                log.error(
+                        "S3 보상 삭제에 실패했습니다. key={}",
+                        key,
+                        e
+                );
             }
         }
     }

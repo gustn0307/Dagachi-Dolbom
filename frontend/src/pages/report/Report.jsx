@@ -6,10 +6,7 @@ import { createReport } from "../../api/userApi";
 const MAX_IMAGES = 3;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
-const ALLOWED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-];
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png"];
 
 const CameraIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -44,13 +41,21 @@ function Report() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const [imageError, setImageError] = useState("");
+
+  const previewsRef = useRef([]);
+
+  useEffect(() => {
+    previewsRef.current = previews;
+  }, [previews]);
+
   useEffect(() => {
     return () => {
-      previews.forEach((preview) => {
+      previewsRef.current.forEach((preview) => {
         URL.revokeObjectURL(preview.url);
       });
     };
-  }, [previews]);
+  }, []);
 
   const validateFiles = (selectedFiles) => {
     if (selectedFiles.length > MAX_IMAGES) {
@@ -71,16 +76,18 @@ function Report() {
   };
 
   const handleFiles = (selectedFiles) => {
-    const nextFiles = Array.from(selectedFiles);
+    const addedFiles = Array.from(selectedFiles);
 
-    if (nextFiles.length === 0) {
+    if (addedFiles.length === 0) {
       return;
     }
+
+    const nextFiles = [...files, ...addedFiles];
 
     const validationError = validateFiles(nextFiles);
 
     if (validationError) {
-      setError(validationError);
+      setImageError(validationError);
 
       if (fileRef.current) {
         fileRef.current.value = "";
@@ -89,18 +96,19 @@ function Report() {
       return;
     }
 
-    previews.forEach((preview) => {
-      URL.revokeObjectURL(preview.url);
-    });
-
-    const nextPreviews = nextFiles.map((file) => ({
+    const addedPreviews = addedFiles.map((file) => ({
       name: file.name,
       url: URL.createObjectURL(file),
     }));
 
     setFiles(nextFiles);
-    setPreviews(nextPreviews);
-    setError("");
+    setPreviews((current) => [...current, ...addedPreviews]);
+
+    setImageError("");
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
   };
 
   const removeImage = (index) => {
@@ -117,6 +125,8 @@ function Report() {
     setPreviews((current) =>
       current.filter((_, previewIndex) => previewIndex !== index),
     );
+
+    setImageError("");
 
     if (fileRef.current) {
       fileRef.current.value = "";
@@ -137,6 +147,7 @@ function Report() {
     setSubmitted(false);
     setResult(null);
     setError("");
+    setImageError("");
 
     if (fileRef.current) {
       fileRef.current.value = "";
@@ -175,7 +186,7 @@ function Report() {
     const validationError = validateFiles(files);
 
     if (validationError) {
-      setError(validationError);
+      setImageError(validationError);
       return;
     }
 
@@ -191,12 +202,9 @@ function Report() {
 
     formData.append(
       "request",
-      new Blob(
-        [JSON.stringify(requestData)],
-        {
-          type: "application/json",
-        },
-      ),
+      new Blob([JSON.stringify(requestData)], {
+        type: "application/json",
+      }),
     );
 
     files.forEach((file) => {
@@ -217,8 +225,8 @@ function Report() {
       });
     } catch (requestError) {
       const message =
-        requestError?.response?.data?.message
-        ?? "제보 접수 중 오류가 발생했습니다.";
+        requestError?.response?.data?.message ??
+        "제보 접수 중 오류가 발생했습니다.";
 
       setError(message);
     } finally {
@@ -232,13 +240,9 @@ function Report() {
         <section className="success-panel" aria-live="polite">
           <span className="success-check">✓</span>
 
-          <p className="success-kicker">
-            접수 완료
-          </p>
+          <p className="success-kicker">접수 완료</p>
 
-          <h1>
-            소중한 제보가 접수되었어요
-          </h1>
+          <h1>소중한 제보가 접수되었어요</h1>
 
           <p className="success-copy">
             담당 기관에서 내용을 확인한 뒤 도움이 필요한 이웃에게 신속하게
@@ -248,17 +252,13 @@ function Report() {
           <div className="receipt-card">
             <div>
               <span>접수 번호</span>
-              <strong>
-                {result.reportId}
-              </strong>
+              <strong>{result.reportId}</strong>
             </div>
 
             <div>
               <span>처리 상태</span>
               <strong className="status-pill">
-                {result.status === "SUBMITTED"
-                  ? "확인 대기"
-                  : result.status}
+                {result.status === "SUBMITTED" ? "확인 대기" : result.status}
               </strong>
             </div>
           </div>
@@ -288,17 +288,10 @@ function Report() {
       />
 
       <div className="report-layout">
-        <aside
-          className="report-guide"
-          aria-label="제보 안내"
-        >
-          <span className="guide-badge">
-            안심 제보
-          </span>
+        <aside className="report-guide" aria-label="제보 안내">
+          <span className="guide-badge">안심 제보</span>
 
-          <h2>
-            제보 전 확인해 주세요
-          </h2>
+          <h2>제보 전 확인해 주세요</h2>
 
           <ol>
             <li>
@@ -328,26 +321,17 @@ function Report() {
 
           <div className="emergency-note">
             <span>긴급한 상황인가요?</span>
-            생명이나 안전이 위급한 경우에는{" "}
-            <strong>112 또는 119</strong>로 먼저 연락해 주세요.
+            생명이나 안전이 위급한 경우에는 <strong>112 또는 119</strong>로 먼저
+            연락해 주세요.
           </div>
         </aside>
 
-        <form
-          className="form-card report-form"
-          onSubmit={handleSubmit}
-        >
+        <form className="form-card report-form" onSubmit={handleSubmit}>
           <div className="form-intro">
             <div>
-              <span>
-                {isAuthenticated
-                  ? "회원 제보서"
-                  : "비회원 제보서"}
-              </span>
+              <span>{isAuthenticated ? "회원 제보서" : "비회원 제보서"}</span>
 
-              <h2>
-                이웃의 상황을 알려주세요
-              </h2>
+              <h2>이웃의 상황을 알려주세요</h2>
             </div>
 
             <small>
@@ -360,9 +344,7 @@ function Report() {
               발견 위치 <em>*</em>
             </label>
 
-            <p>
-              건물명이나 주변의 눈에 띄는 장소를 함께 적어주세요.
-            </p>
+            <p>건물명이나 주변의 눈에 띄는 장소를 함께 적어주세요.</p>
 
             <div className="input-with-icon">
               <LocationIcon />
@@ -374,9 +356,7 @@ function Report() {
                 required
                 maxLength="255"
                 value={location}
-                onChange={(event) =>
-                  setLocation(event.target.value)
-                }
+                onChange={(event) => setLocation(event.target.value)}
                 placeholder="예: 행복구 한마음로 123, 온누리 약국 앞"
               />
             </div>
@@ -388,14 +368,10 @@ function Report() {
                 상황 설명 <em>*</em>
               </label>
 
-              <span>
-                {description.length}/500
-              </span>
+              <span>{description.length}/500</span>
             </div>
 
-            <p>
-              도움이 필요해 보인 이유와 현재 상황을 구체적으로 적어주세요.
-            </p>
+            <p>도움이 필요해 보인 이유와 현재 상황을 구체적으로 적어주세요.</p>
 
             <textarea
               id="report-description"
@@ -404,24 +380,17 @@ function Report() {
               maxLength="500"
               required
               value={description}
-              onChange={(event) =>
-                setDescription(event.target.value)
-              }
+              onChange={(event) => setDescription(event.target.value)}
               placeholder="예: 며칠째 같은 장소에서 식사를 거르고 계신 어르신을 보았습니다. 오늘은 거동도 불편해 보였습니다."
             />
           </div>
 
           <div className="field-group">
             <label>
-              사진 첨부{" "}
-              <span className="optional">
-                선택
-              </span>
+              사진 첨부 <span className="optional">선택</span>
             </label>
 
-            <p>
-              JPG 또는 PNG 이미지를 최대 3장까지 첨부할 수 있습니다.
-            </p>
+            <p>JPG 또는 PNG 이미지를 최대 3장까지 첨부할 수 있습니다.</p>
 
             <input
               ref={fileRef}
@@ -429,36 +398,24 @@ function Report() {
               type="file"
               accept="image/png,image/jpeg"
               multiple
-              onChange={(event) =>
-                handleFiles(event.target.files)
-              }
+              onChange={(event) => handleFiles(event.target.files)}
             />
 
             <button
               className={`upload ${previews.length > 0 ? "has-preview" : ""}`}
               type="button"
-              onClick={() =>
-                fileRef.current?.click()
-              }
-              onDragOver={(event) =>
-                event.preventDefault()
-              }
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
-                handleFiles(
-                  event.dataTransfer.files,
-                );
+                handleFiles(event.dataTransfer.files);
               }}
             >
               {previews.length > 0 ? (
                 <span className="upload-copy">
-                  <strong>
-                    사진 {previews.length}장 선택됨
-                  </strong>
+                  <strong>사진 {previews.length}장 선택됨</strong>
 
-                  <small>
-                    JPG, PNG · 최대 3장 · 파일당 최대 10MB
-                  </small>
+                  <small>JPG, PNG · 최대 3장 · 파일당 최대 10MB</small>
                 </span>
               ) : (
                 <>
@@ -467,20 +424,14 @@ function Report() {
                   </span>
 
                   <span className="upload-copy">
-                    <strong>
-                      사진을 선택하거나 이곳에 끌어놓으세요
-                    </strong>
+                    <strong>사진을 선택하거나 이곳에 끌어놓으세요</strong>
 
-                    <small>
-                      JPG, PNG · 최대 3장 · 파일당 최대 10MB
-                    </small>
+                    <small>JPG, PNG · 최대 3장 · 파일당 최대 10MB</small>
                   </span>
                 </>
               )}
 
-              <span className="upload-button">
-                파일 선택
-              </span>
+              <span className="upload-button">파일 선택</span>
             </button>
 
             {previews.length > 0 && (
@@ -490,22 +441,19 @@ function Report() {
                     key={`${preview.name}-${index}`}
                     className="report-image-preview"
                   >
-                    <img
-                      src={preview.url}
-                      alt={`첨부 사진 ${index + 1}`}
-                    />
+                    <img src={preview.url} alt={`첨부 사진 ${index + 1}`} />
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeImage(index)
-                      }
-                    >
+                    <button type="button" onClick={() => removeImage(index)}>
                       삭제
                     </button>
                   </div>
                 ))}
               </div>
+            )}
+            {imageError && (
+              <p className="report-image-error" role="alert">
+                {imageError}
+              </p>
             )}
           </div>
 
@@ -524,12 +472,11 @@ function Report() {
                 name="contact"
                 type="tel"
                 inputMode="tel"
-                maxLength="30"
+                maxLength="13"
+                pattern="01[016789]-?[0-9]{3,4}-?[0-9]{4}"
                 required
                 value={contact}
-                onChange={(event) =>
-                  setContact(event.target.value)
-                }
+                onChange={(event) => setContact(event.target.value)}
                 placeholder="010-0000-0000"
               />
             </div>
@@ -537,12 +484,11 @@ function Report() {
 
           {isAuthenticated && (
             <div className="field-group">
-              <label>
-                연락처
-              </label>
+              <label>연락처</label>
 
               <p>
-                로그인 회원은 회원 정보로 제보자가 식별되므로 별도의 연락처 입력이 필요하지 않습니다.
+                로그인 회원은 회원 정보로 제보자가 식별되므로 별도의 연락처
+                입력이 필요하지 않습니다.
               </p>
             </div>
           )}
@@ -551,15 +497,12 @@ function Report() {
             <input
               type="checkbox"
               checked={agreed}
-              onChange={(event) =>
-                setAgreed(event.target.checked)
-              }
+              onChange={(event) => setAgreed(event.target.checked)}
             />
 
             <span>
               <strong>
-                개인정보 수집 및 이용에 동의합니다.{" "}
-                <em>*</em>
+                개인정보 수집 및 이용에 동의합니다. <em>*</em>
               </strong>
 
               <small>
@@ -569,10 +512,7 @@ function Report() {
           </label>
 
           {error && (
-            <p
-              className="auth-error"
-              role="alert"
-            >
+            <p className="auth-error" role="alert">
               {error}
             </p>
           )}

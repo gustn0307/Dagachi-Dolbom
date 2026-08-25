@@ -16,6 +16,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Set;
@@ -39,24 +40,52 @@ public class S3StorageService {
             "image/png"
     );
 
-    // 사진, 서명 업로드 메서드
-    public String upload(MultipartFile file, String prefix) {
-        // S3에 업로드하기 전에 빈 파일, 형식, 크기를 검증한다.
-        validateFile(file);
+    private enum ImageFormat {
+        JPEG("image/jpeg", "jpg"),
+        PNG("image/png", "png");
 
-        // S3에 저장할 Object Key 생성
-        String key = createObjectKey(file, prefix);
+        private final String contentType;
+        private final String extension;
+
+        ImageFormat(
+                String contentType,
+                String extension
+        ) {
+            this.contentType = contentType;
+            this.extension = extension;
+        }
+    }
+
+    // 사진, 서명 업로드 메서드
+    public String upload(
+            MultipartFile file,
+            String prefix
+    ) {
+        /*
+         * 빈 파일, 크기, 클라이언트 MIME 타입뿐 아니라
+         * 실제 파일의 magic byte까지 확인합니다.
+         */
+        ImageFormat imageFormat = validateFile(file);
+
+        // 검증된 실제 이미지 형식을 기준으로 Object Key를 생성합니다.
+        String key = createObjectKey(
+                prefix,
+                imageFormat
+        );
 
         try {
-            // 업로드할 파일의 메타데이터 설정
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucket)
-                    .key(key)
-                    .contentType(file.getContentType())
-                    .contentLength(file.getSize())
-                    .build();
+            PutObjectRequest putObjectRequest =
+                    PutObjectRequest.builder()
+                            .bucket(bucket)
+                            .key(key)
+                            /*
+                             * 클라이언트가 전달한 Content-Type을 그대로 사용하지 않고
+                             * 실제 파일 검증 결과를 사용합니다.
+                             */
+                            .contentType(imageFormat.contentType)
+                            .contentLength(file.getSize())
+                            .build();
 
-            // 실제 파일 데이터를 S3에 업로드
             s3Client.putObject(
                     putObjectRequest,
                     RequestBody.fromInputStream(
@@ -65,11 +94,12 @@ public class S3StorageService {
                     )
             );
 
-            // DB에는 전체 URL이 아닌 S3 Object Key를 저장할 수 있도록 반환
             return key;
 
         } catch (IOException | S3Exception e) {
-            throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
+            throw new CustomException(
+                    ErrorCode.S3_UPLOAD_FAILED
+            );
         }
     }
 
@@ -137,54 +167,139 @@ public class S3StorageService {
         }
     }
 
-    private String createObjectKey(MultipartFile file, String prefix) {
+    private String createObjectKey(
+            String prefix,
+            ImageFormat imageFormat
+    ) {
         LocalDate now = LocalDate.now();
-
-        String extension = getExtension(file.getOriginalFilename());
 
         return "%s/%d/%02d/%s.%s".formatted(
                 prefix,
                 now.getYear(),
                 now.getMonthValue(),
                 UUID.randomUUID(),
-                extension
+                imageFormat.extension
         );
     }
 
-    private String getExtension(String originalFilename) {
-        if (originalFilename == null || !originalFilename.contains(".")) {
-            return "bin";
-        }
-
-        return originalFilename
-                .substring(originalFilename.lastIndexOf('.') + 1)
-                .toLowerCase();
-    }
-
     // 업로드 가능한 이미지인지 공통 검증
-    private void validateFile(MultipartFile file) {
-        // 파일이 없거나 내용이 비어 있는 경우 업로드하지 않는다.
+    private ImageFormat validateFile(
+            MultipartFile file
+    ) {
+        // 파일이 없거나 내용이 비어 있으면 업로드하지 않습니다.
         if (file == null || file.isEmpty()) {
-            throw new CustomException(ErrorCode.S3_EMPTY_FILE);
+            throw new CustomException(
+                    ErrorCode.S3_EMPTY_FILE
+            );
         }
 
-        // ReportImage.original_filename 컬럼 길이를 초과하지 않도록 업로드 전에 검증합니다.
-        String originalFilename = file.getOriginalFilename();
+        /*
+         * ReportImage.original_filename 컬럼 길이를 초과하지 않도록
+         * 업로드 전에 검증합니다.
+         */
+        String originalFilename =
+                file.getOriginalFilename();
 
-        if (originalFilename != null && originalFilename.length() > 255) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        if (originalFilename != null
+                && originalFilename.length() > 255) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
         }
 
-        // 현재 MVP에서는 JPEG, PNG 이미지만 허용한다.
+        /*
+         * 1차 검증:
+         * multipart 요청에 들어온 Content-Type을 확인합니다.
+         *
+         * 단, 이 값만 신뢰하지 않고 아래에서 실제 파일 내용도
+         * 다시 검증합니다.
+         */
         String contentType = file.getContentType();
 
-        if (contentType == null || !ALLOWED_IMAGE_TYPES.contains(contentType)) {
-            throw new CustomException(ErrorCode.S3_INVALID_FILE_TYPE);
+        if (contentType == null
+                || !ALLOWED_IMAGE_TYPES.contains(contentType)) {
+            throw new CustomException(
+                    ErrorCode.S3_INVALID_FILE_TYPE
+            );
         }
 
-        // 지나치게 큰 파일 업로드를 방지한다.
+        // 지나치게 큰 파일 업로드를 방지합니다.
         if (file.getSize() > MAX_IMAGE_SIZE) {
-            throw new CustomException(ErrorCode.S3_FILE_TOO_LARGE);
+            throw new CustomException(
+                    ErrorCode.S3_FILE_TOO_LARGE
+            );
         }
+
+        /*
+         * 2차 검증:
+         * 실제 파일의 magic byte를 확인해
+         * JPEG/PNG 파일인지 검증합니다.
+         */
+        ImageFormat detectedFormat =
+                detectImageFormat(file);
+
+        /*
+         * 클라이언트가 전달한 Content-Type과 실제 파일 형식도
+         * 서로 일치해야 합니다.
+         */
+        if (!detectedFormat.contentType.equals(contentType)) {
+            throw new CustomException(
+                    ErrorCode.S3_INVALID_FILE_TYPE
+            );
+        }
+
+        return detectedFormat;
+    }
+
+    private ImageFormat detectImageFormat(
+            MultipartFile file
+    ) {
+        byte[] header = new byte[8];
+
+        try (InputStream inputStream =
+                     file.getInputStream()) {
+
+            int bytesRead = inputStream.read(header);
+
+            /*
+             * JPEG
+             *
+             * FF D8 FF
+             */
+            if (bytesRead >= 3
+                    && (header[0] & 0xFF) == 0xFF
+                    && (header[1] & 0xFF) == 0xD8
+                    && (header[2] & 0xFF) == 0xFF) {
+
+                return ImageFormat.JPEG;
+            }
+
+            /*
+             * PNG
+             *
+             * 89 50 4E 47 0D 0A 1A 0A
+             */
+            if (bytesRead >= 8
+                    && (header[0] & 0xFF) == 0x89
+                    && (header[1] & 0xFF) == 0x50
+                    && (header[2] & 0xFF) == 0x4E
+                    && (header[3] & 0xFF) == 0x47
+                    && (header[4] & 0xFF) == 0x0D
+                    && (header[5] & 0xFF) == 0x0A
+                    && (header[6] & 0xFF) == 0x1A
+                    && (header[7] & 0xFF) == 0x0A) {
+
+                return ImageFormat.PNG;
+            }
+
+        } catch (IOException e) {
+            throw new CustomException(
+                    ErrorCode.S3_INVALID_FILE_TYPE
+            );
+        }
+
+        throw new CustomException(
+                ErrorCode.S3_INVALID_FILE_TYPE
+        );
     }
 }

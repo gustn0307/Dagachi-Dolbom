@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 
@@ -27,6 +28,10 @@ public record ReportCreateRequest(
         BigDecimal longitude,
 
         @Size(max = 30, message = "연락처는 30자 이하여야 합니다.")
+        @Pattern(
+                regexp = "^(?:\\s*|\\s*01[016789]-?\\d{3,4}-?\\d{4}\\s*)$",
+                message = "연락처는 올바른 휴대전화 번호 형식이어야 합니다."
+        )
         String guestPhone
 ) {
 }

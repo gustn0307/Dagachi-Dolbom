@@ -12,6 +12,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 
 @Slf4j
 // 각 컨트롤러 마다 try-catch를 반복하지 않고, REST controller에서 발생하는 예외를 한 곳에서 공통 처리할 수 있게 해주는 어노테이션
@@ -68,12 +69,12 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    // multipart/form-data 요청에서 필수 파일 파트가 누락된 경우 400으로 처리
+    // multipart/form-data 요청에서 필수 part가 누락된 경우 400으로 처리
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestPartException(
             MissingServletRequestPartException exception
     ) {
-        ErrorCode errorCode = ErrorCode.S3_EMPTY_FILE;
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
 
         return ResponseEntity
                 .status(errorCode.getStatus())
@@ -89,6 +90,21 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException exception
     ) {
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.error(
+                        errorCode.getCode(),
+                        errorCode.getMessage()
+                ));
+    }
+
+    // API가 지원하지 않는 Content-Type으로 요청한 경우 415로 처리
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMediaTypeNotSupportedException(
+            HttpMediaTypeNotSupportedException exception
+    ) {
+        ErrorCode errorCode = ErrorCode.UNSUPPORTED_MEDIA_TYPE;
 
         return ResponseEntity
                 .status(errorCode.getStatus())

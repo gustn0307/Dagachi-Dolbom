@@ -43,7 +43,6 @@ function PublicLanding() {
             <Link
               className="public-report-button"
               to="/report"
-              state={{ guest: true }}
             >
               로그인 없이 제보하기 <b>→</b>
             </Link>
@@ -93,7 +92,7 @@ function PublicLanding() {
             알려주세요
           </h2>
           <p>회원가입 없이 바로 작성할 수 있습니다.</p>
-          <Link to="/report" state={{ guest: true }}>
+          <Link to="/report">
             비회원 제보 시작하기 <b>→</b>
           </Link>
           <small>
