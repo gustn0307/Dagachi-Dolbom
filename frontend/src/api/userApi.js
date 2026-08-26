@@ -21,12 +21,21 @@ export const createReport = (formData) =>
 // 로그인 사용자의 제보 목록 조회
 export const getMyReports = (params = {}) =>
   unwrapData(api.get("/api/users/me/reports", { params }));
+// 공개 공지 목록 조회 API
+export const getNotices = (params = {}) =>
+  unwrapData(api.get("/api/notices", { params }));
+
+// 공개 공지 상세 조회 API
+export const getNotice = (noticeId) =>
+  unwrapData(api.get(`/api/notices/${noticeId}`));
 
 export const userApi = {
   getActivities,
   getActivity,
   createReport,
   getMyReports,
+  getNotices,
+  getNotice,
 };
 
 // 돌봄 대상자 리스트 목록 조회 (지역/연령대/성별/거리순 필터링 포함)

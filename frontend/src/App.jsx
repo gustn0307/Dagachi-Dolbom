@@ -24,6 +24,7 @@ import ActivityDetail from "./pages/institution/ActivityDetail";
 
 import UserManagement from "./pages/admin/UserManagement";
 import InstitutionManagement from "./pages/admin/InstitutionManagement";
+import NoticeManagement from "./pages/admin/NoticeManagement";
 
 import Login from "./auth/login";
 import Join from "./auth/join";
@@ -74,6 +75,7 @@ function App() {
 
           {/* 공개된 공지는 로그인하지 않아도 조회할 수 있습니다. */}
           <Route path="/notice" element={<Notice />} />
+          <Route path="notice/:noticeId" element={<Notice />} />
 
           <Route path="/login" element={<Login />} />
           <Route path="/join" element={<Join />} />
@@ -117,6 +119,7 @@ function App() {
           <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="institutions" element={<InstitutionManagement />} />
+          <Route path="notices" element={<NoticeManagement />} />
         </Route>
       </Routes>
     </BrowserRouter>
