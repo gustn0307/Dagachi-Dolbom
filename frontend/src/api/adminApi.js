@@ -15,6 +15,14 @@ export const getAdminNotices = (params = {}) =>
 export const createAdminNotice = (payload) =>
   unwrapData(api.post("/api/admin/notices", payload));
 
+// 관리자 공지 수정 및 상태 변경 API
+export const updateAdminNotice = (noticeId, payload) =>
+  unwrapData(api.patch(`/api/admin/notices/${noticeId}`, payload));
+
+// 관리자 공지 Soft Delete API
+export const deleteAdminNotice = (noticeId) =>
+  unwrapData(api.delete(`/api/admin/notices/${noticeId}`));
+
 export const getUsers = (params = {}) =>
   USE_MOCK
     ? clone(adminMockData.users)
@@ -40,6 +48,8 @@ export const updateInstitutionStatus = (id, status) =>
 export const adminApi = {
   getAdminNotices,
   createAdminNotice,
+  updateAdminNotice,
+  deleteAdminNotice,
   getUsers,
   updateUserStatus,
   getInstitutions,

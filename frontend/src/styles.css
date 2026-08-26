@@ -979,6 +979,186 @@ footer {
   color: #55a147;
 } /* "완료" 뱃지 */
 
+/* ---- Notice > 공지사항 목록 ------------------------------------ */
+.notice-list {
+  width: 100%;
+}
+
+.notice-list-head,
+.notice-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  align-items: center;
+  gap: 18px;
+}
+
+.notice-list-head {
+  padding: 12px 8px;
+  border-bottom: 2px solid #eee8e0;
+  color: #786e64;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.notice-list-head span:last-child {
+  text-align: center;
+}
+
+.notice-list-row {
+  min-height: 58px;
+  padding: 13px 8px;
+  border-bottom: 1px solid #eee8e0;
+}
+
+.notice-list-title {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #42352b;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-list-title:hover {
+  color: #f4771c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.notice-list-row time {
+  color: #786f66;
+  font-size: 13px;
+  text-align: center;
+}
+
+.notice-list-empty {
+  padding: 35px 10px;
+  color: #897f74;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 공지사항 페이지네이션 */
+.notice-pagination {
+  margin-top: 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.notice-pagination button {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid #e6ddd5;
+  border-radius: 8px;
+  background: #fff;
+  color: #6f655d;
+  font-size: 13px;
+}
+
+.notice-pagination button:hover:not(:disabled) {
+  border-color: #f4771c;
+  color: #f4771c;
+}
+
+.notice-pagination button.active {
+  border-color: #f4771c;
+  background: #f4771c;
+  color: #fff;
+  font-weight: 700;
+}
+
+.notice-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- Notice > 공지 상세 ---------------------------------------- */
+.notice-detail {
+  max-width: 816px;
+  margin: 28px auto;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #eee7df;
+  border-radius: 16px;
+}
+
+.notice-detail-head {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #eee8e0;
+}
+
+.notice-detail-head h2 {
+  margin: 0 0 10px;
+  color: #42352b;
+  font-size: 23px;
+  line-height: 1.4;
+}
+
+.notice-detail-head time {
+  color: #897f74;
+  font-size: 13px;
+}
+
+.notice-detail-content {
+  min-height: 180px;
+  padding: 28px 4px;
+  color: #5f554d;
+  font-size: 15px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 공개할 수 없는 공지 상세 안내 */
+.notice-detail-error {
+  padding: 42px 10px;
+  text-align: center;
+}
+
+.notice-detail-error strong {
+  display: block;
+  color: #42352b;
+  font-size: 17px;
+}
+
+.notice-detail-error p {
+  margin: 9px 0 0;
+  color: #897f74;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.notice-detail-actions {
+  padding-top: 18px;
+  border-top: 1px solid #eee8e0;
+  text-align: right;
+}
+
+.notice-detail-actions button,
+.notice-detail > button {
+  padding: 10px 18px;
+  border: 1px solid #ddd4cc;
+  border-radius: 9px;
+  background: #fff;
+  color: #5f554d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.notice-detail-actions button:hover,
+.notice-detail > button:hover {
+  border-color: #f4771c;
+  color: #f4771c;
+}
+
 /* ---- Notice (공지사항 · FAQ 아코디언) ---------------------------- */
 .faq {
   width: 100%;
@@ -1232,5 +1412,44 @@ footer {
   }
   .large-text {
     font-size: 17px;
+  }
+
+   /* Notice 모바일 */
+  .notice-list-head,
+  .notice-list-row {
+    grid-template-columns: minmax(0, 1fr) 92px;
+    gap: 10px;
+  }
+
+  .notice-list-head {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .notice-list-row {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .notice-list-title {
+    font-size: 14px;
+  }
+
+  .notice-list-row time {
+    font-size: 12px;
+  }
+
+  .notice-detail {
+    margin: 20px auto;
+    padding: 20px;
+  }
+
+  .notice-detail-head h2 {
+    font-size: 20px;
+  }
+
+  .notice-detail-content {
+    padding: 22px 2px;
+    font-size: 14px;
   }
 }
