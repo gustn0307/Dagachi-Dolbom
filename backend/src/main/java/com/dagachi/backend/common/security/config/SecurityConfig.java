@@ -100,18 +100,34 @@ public class SecurityConfig {
                                 "/api/notices/**"
                         )
                         .permitAll()
+                                // 인증 없이 접근 가능한 현재 구현 API
+                                // 인증 없이 접근 가능한 인증 API
+                                .requestMatchers(
+                                        "/api/auth/signup",
+                                        "/api/auth/login"
+                                )
+                                .permitAll()
 
-                        // 관리자 전용
-                        .requestMatchers("/api/admin/**")
-                        .hasRole("ADMIN")
+                                // 회원/비회원 모두 제보할 수 있으므로 제보 등록 POST만 공개
+                                .requestMatchers(HttpMethod.POST, "/api/reports")
+                                .permitAll()
 
-                        // 기관 담당자 전용
-                        .requestMatchers("/api/institution/**")
-                        .hasRole("INSTITUTION")
+                                // 공지 목록/상세 조회는 공개하되,
+                                // 향후 등록·수정·삭제 API까지 열리지 않도록 GET만 허용
+                                .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**")
+                                .permitAll()
 
-                        // 그 외 현재 API는 로그인 필요
-                        .anyRequest()
-                        .authenticated()
+                                // 관리자 전용
+                                .requestMatchers("/api/admin/**")
+                                .hasRole("ADMIN")
+
+                                // 기관 담당자 전용
+                                .requestMatchers("/api/institution/**")
+                                .hasRole("INSTITUTION")
+
+                                // 그 외 현재 API는 로그인 필요
+                                .anyRequest()
+                                .authenticated()
                 )
 
                 .exceptionHandling(exception -> exception

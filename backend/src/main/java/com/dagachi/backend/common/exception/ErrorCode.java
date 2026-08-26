@@ -19,6 +19,12 @@ public enum ErrorCode {
             "입력값이 올바르지 않습니다."
     ),
 
+    UNSUPPORTED_MEDIA_TYPE(
+            HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+            "COMMON_415",
+            "지원하지 않는 요청 형식입니다."
+    ),
+
     // User
     USER_NOT_FOUND(
             HttpStatus.NOT_FOUND,
