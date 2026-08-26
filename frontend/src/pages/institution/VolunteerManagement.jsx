@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { institutionApi } from "../../api/institutionApi";
 import {
   DataState,
@@ -10,11 +11,14 @@ const GENDER_LABEL = {
   FEMALE: "여",
 };
 
-/**
- * 최근 활동 완료 시각을 한국 형식으로 표시한다.
- */
 const formatParticipatedAt = (value) => {
   if (!value) {
+    return "활동 기록 없음";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
     return "활동 기록 없음";
   }
 
@@ -24,10 +28,12 @@ const formatParticipatedAt = (value) => {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(value));
+  }).format(date);
 };
 
 function VolunteerManagement() {
+  const navigate = useNavigate();
+
   // 검색창에 입력 중인 값
   const [keywordInput, setKeywordInput] =
     useState("");
@@ -45,7 +51,6 @@ function VolunteerManagement() {
   const [page, setPage] =
     useState(0);
 
-  // 한 페이지에 표시할 봉사자 수
   const size = 20;
 
   /**
@@ -72,7 +77,7 @@ function VolunteerManagement() {
   );
 
   /**
-   * VOL-05 화면 상단의 봉사자 현황 조회.
+   * VOL-05 화면 상단 봉사자 현황 조회.
    */
   const {
     data: overview,
@@ -85,34 +90,23 @@ function VolunteerManagement() {
   );
 
   /**
-   * 검색 버튼을 눌렀을 때 실행한다.
+   * 검색 버튼 처리.
    */
   const handleSearch = (event) => {
-    // form의 기본 새로고침을 막는다.
     event.preventDefault();
 
-    // 새로운 검색은 첫 페이지부터 조회한다.
     setPage(0);
-
-    // 검색어 앞뒤 공백을 제거한다.
-    setKeyword(
-      keywordInput.trim(),
-    );
+    setKeyword(keywordInput.trim());
   };
 
   /**
-   * 목록 또는 요약 조회에 실패하면
-   * 두 API를 모두 다시 호출한다.
+   * 목록과 현황을 모두 다시 조회한다.
    */
   const handleRetry = () => {
     reload();
     reloadOverview();
   };
 
-  /**
-   * 두 API 중 하나라도 조회 중이거나 오류가 발생하면
-   * 공통 상태 화면을 표시한다.
-   */
   if (
     loading ||
     overviewLoading ||
@@ -136,14 +130,10 @@ function VolunteerManagement() {
     );
   }
 
-  /**
-   * 목록 API 응답은 배열이 아니라 PageResponse 객체다.
-   * 실제 봉사자 배열은 data.content에 들어 있다.
-   */
+  // PageResponse의 실제 목록
   const volunteers =
     data?.content ?? [];
 
-  // 현재 검색 조건에 맞는 봉사자 수
   const totalElements =
     data?.totalElements ?? 0;
 
@@ -238,12 +228,10 @@ function VolunteerManagement() {
             value={sortType}
             aria-label="봉사자 정렬"
             onChange={(event) => {
-              // 정렬값 변경
               setSortType(
                 event.target.value,
               );
 
-              // 정렬 변경 후 첫 페이지로 이동
               setPage(0);
             }}
           >
@@ -334,11 +322,20 @@ function VolunteerManagement() {
                     참여 완료
                   </i>
 
-                  {/*
-                    봉사자 상세 버튼은
-                    이후 상세 API와 연결한다.
-                  */}
-                  <span aria-hidden="true" />
+                  {/* VOL-07 봉사자 상세 이동 */}
+                  <button
+                    type="button"
+                    aria-label={
+                      `${volunteer.name} 상세 보기`
+                    }
+                    onClick={() =>
+                      navigate(
+                        `/institution/volunteers/${volunteer.userId}`,
+                      )
+                    }
+                  >
+                    ›
+                  </button>
                 </article>
               ),
             )}
