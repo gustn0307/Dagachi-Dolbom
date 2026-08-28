@@ -22,3 +22,23 @@ export const userApi = {
   createReport,
   getMyReports,
 };
+
+// 돌봄 대상자 리스트 목록 조회
+export const fetchActivities = async ({ page = 0, size = 20 } = {}) => {
+  const response = await api.get("/api/activities", { params: { page, size } });
+  return response.data.data;
+};
+
+export const fetchActivityDetail = async (activityId) => {
+  const response = await api.get(`/api/activities/${activityId}`);
+  return response.data.data;
+};
+
+export const fetchExecutionDetail = async (activityId) => {
+  const response = await api.get(`/api/activities/${activityId}/execution-details`);
+  return response.data.data;
+};
+
+// 신청 버튼 활성화
+export const applyForActivity = (activityId) =>
+  unwrapData(api.post(`/api/activities/${activityId}/applications`));
