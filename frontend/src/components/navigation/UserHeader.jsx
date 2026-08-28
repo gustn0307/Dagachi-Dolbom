@@ -16,7 +16,7 @@ function UserHeader() {
     <header className="topbar">
       <Link to="/home" className="brand" aria-label="이웃을 잇다 홈">
         <span className="brand-symbol" aria-hidden="true">♥</span>
-        <span><b>다함께 돌봄</b><small>함께 만드는 따뜻한 우리 동네</small></span>
+        <span><b>다같이 돌봄</b><small>함께 만드는 따뜻한 우리 동네</small></span>
       </Link>
       <button className="mobile-menu" type="button" aria-label="메뉴 열기" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
         {menuOpen ? "×" : "☰"}
