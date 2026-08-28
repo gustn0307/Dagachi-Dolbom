@@ -19,6 +19,57 @@ export const getCareRecipient = (recipientId) =>
     api.get(`/api/institution/care-recipients/${recipientId}`),
   );
 
+// CARE-03 돌봄 대상자 등록
+export const createCareRecipient = (request) =>
+  unwrapData(
+    api.post(
+      "/api/institution/care-recipients",
+      request,
+    ),
+  );
+
+// CARE-04 돌봄 대상자 기본정보 수정
+export const updateCareRecipient = (
+  recipientId,
+  request,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/care-recipients/${recipientId}`,
+      request,
+    ),
+  );
+
+// CARE-05 돌봄 대상자 동의 상태 변경
+export const updateCareRecipientConsent = (
+  recipientId,
+  consentStatus,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/care-recipients/${recipientId}/consent`,
+      { consentStatus },
+    ),
+  );
+
+// CARE-06 돌봄 대상자 관리 종료
+export const closeCareRecipient = (recipientId) =>
+  unwrapData(
+    api.post(
+      `/api/institution/care-recipients/${recipientId}/close`,
+    ),
+  );
+
+// CARE-07 돌봄 대상자 관리 재개
+export const reopenCareRecipient = (
+  recipientId,
+) =>
+  unwrapData(
+    api.post(
+      `/api/institution/care-recipients/${recipientId}/reopen`,
+    ),
+  );
+
 export const getDashboard = () =>
   USE_MOCK
     ? clone(institutionMockData.dashboard)
@@ -59,6 +110,15 @@ export const updateReportStatus = (id, status) =>
 export const institutionApi = {
   getCareRecipients,
   getCareRecipient,
+
+  // CARE-03~07 돌봄 대상자 관리 API
+  createCareRecipient,
+  updateCareRecipient,
+  updateCareRecipientConsent,
+  closeCareRecipient,
+  reopenCareRecipient,
+
+
   getDashboard,
   getReports,
   getCareTargets,

@@ -544,14 +544,50 @@ footer {
 .simple-auth-page { min-height: calc(100dvh - 150px); padding: 55px 20px; display: grid; place-items: center; background: #fcfaf7; }
 .simple-auth-card { width: min(420px, 100%); padding: 38px; display: grid; background: #fff; border: 1px solid #ebe3db; border-radius: 20px; box-shadow: 0 16px 40px rgba(72,51,33,.08); }
 .auth-mark { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; color: #fff; background: #f4771c; font-size: 23px; }
-.simple-auth-card > p { margin: 13px 0 2px; color: #f4771c; font-size: 12px; font-weight: 800; }
+.simple-auth-card > p:not(.auth-error) {
+  margin: 13px 0 2px;
+  color: #f4771c;
+  font-size: 12px;
+  font-weight: 800;
+}
 .simple-auth-card h1 { margin: 0 0 25px; font-size: 29px; }
 .simple-auth-card label { margin-bottom: 17px; color: #443c35; font-size: 13px; font-weight: 700; }
 .simple-auth-card input { width: 100%; margin-top: 7px; padding: 13px; border: 1px solid #ded7cf; border-radius: 9px; }
+.simple-auth-card select {
+  width: 100%;
+  margin-top: 7px;
+  padding: 13px;
+  border: 1px solid #ded7cf;
+  border-radius: 9px;
+  background: #fff;
+  color: #443c35;
+  cursor: pointer;
+}
+
+.simple-auth-card select:focus {
+  outline: 0;
+  border-color: #f4771c;
+  box-shadow: 0 0 0 4px #f4771c12;
+}
+.simple-auth-card select:invalid {
+  color: #8a8179;
+}
+
+.simple-auth-card select option {
+  color: #443c35;
+}
 .simple-auth-card input:focus { outline: 0; border-color: #f4771c; box-shadow: 0 0 0 4px #f4771c12; }
 .simple-auth-card button { min-height: 49px; border: 0; border-radius: 10px; background: #f4771c; color: #fff; font-weight: 800; }
 .simple-auth-card small { margin-top: 18px; text-align: center; color: #8a8179; }
 .simple-auth-card small a { color: #e96c20; font-weight: 700; }
+.auth-error {
+  display: block;
+  color: #dc2626;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
 .report-entry-hero {
   padding: 72px 24px 116px;
   text-align: center;
@@ -709,7 +745,59 @@ footer {
 .upload-copy strong { font-size: 13px; }
 .upload-copy small { color: #958b83; font-size: 11px; margin-top: 5px; }
 .upload-button { padding: 9px 12px; border: 1px solid #e1d7ce; border-radius: 8px; background: white; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.upload.has-preview img { width: 76px; height: 76px; flex: 0 0 auto; object-fit: cover; border-radius: 10px; }
+/* 선택한 제보 이미지 미리보기 목록 */
+.report-image-preview-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* 이미지 한 장의 미리보기 카드 */
+.report-image-preview {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--report-line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* 원본 이미지 크기와 관계없이 미리보기 크기를 고정 */
+.report-image-preview img {
+  display: block;
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* 개별 이미지 삭제 버튼 */
+.report-image-preview button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid #e1d7ce;
+  border-radius: 7px;
+  background: #fff;
+  color: #6f6258;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.report-image-preview button:hover {
+  border-color: var(--report-orange);
+  color: var(--report-orange);
+}
+.field-group > p.report-image-error {
+  margin: 8px 0 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #fff1f1;
+  color: #d92d20;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
 .consent-card { display: flex !important; gap: 12px; align-items: flex-start; margin: 4px 0 0 !important; padding: 17px; border-radius: 12px; background: #f8f6f3; cursor: pointer; }
 .consent-card input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--report-orange); }
 .consent-card span { flex: 1; }
@@ -758,6 +846,13 @@ footer {
   .upload-button { margin-left: 63px; }
   .report-complete .success-panel { padding: 38px 22px; }
   .receipt-card { flex-direction: column; }
+  .report-image-preview-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-image-preview img {
+    height: 105px;
+  }
 }
 
 /* 제보 완료 후 보여지는 완료 화면 (Report의 submitted === true) */

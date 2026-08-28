@@ -2,6 +2,11 @@ spring:
   application:
     name: backend
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 32MB
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/dagachi_dolbom}
     username: ${DB_USERNAME}
@@ -22,3 +27,26 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 3600000
+
+aws:
+  region: ${AWS_REGION:ap-northeast-2}
+  s3:
+    bucket: ${AWS_S3_BUCKET:dagachi-dolbom-files-dev}
+
+# FastAPI AI Service
+#
+# 로컬에서는 localhost:8000을 사용하고,
+# 배포 환경에서는 AI_SERVICE_BASE_URL 환경변수로 덮어씁니다.
+ai:
+  service:
+    # FastAPI AI 서비스 주소
+    # 로컬에서는 localhost:8000,
+    # 배포 환경에서는 AI_SERVICE_BASE_URL 환경변수로 변경합니다.
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+
+    # FastAPI 서버와 연결을 맺을 때 기다릴 최대 시간(ms)
+    connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:3000}
+
+    # FastAPI가 응답할 때까지 기다릴 최대 시간(ms)
+    # AI 요청은 일반 API보다 오래 걸릴 수 있어 기본값을 30초로 둡니다.
+    read-timeout: ${AI_SERVICE_READ_TIMEOUT:30000}
