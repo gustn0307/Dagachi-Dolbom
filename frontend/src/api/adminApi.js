@@ -2,8 +2,8 @@ import { adminMockData } from "../data/adminMockData";
 import api, { unwrapData } from "./api";
 
 const USE_MOCK =
-  import.meta.env.VITE_USE_MOCK_API !== "false" ||
-  !import.meta.env.VITE_API_BASE_URL;
+  import.meta.env.VITE_USE_MOCK_API === "true";
+
 const clone = (value) =>
   new Promise((resolve) =>
     setTimeout(() => resolve(structuredClone(value)), 180),
@@ -34,8 +34,8 @@ export const updateInstitutionStatus = (id, status) =>
   USE_MOCK
     ? clone({ id, status })
     : unwrapData(
-        api.patch(`/api/admin/institutions/${id}/status`, { status }),
-      );
+      api.patch(`/api/admin/institutions/${id}/status`, { status }),
+    );
 
 export const adminApi = {
   getAdminNotices,

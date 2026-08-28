@@ -9,10 +9,11 @@ RUN npm ci
 
 COPY . .
 
-# 배포 빌드에서는 API를 같은 도메인의 /api 경로로 호출합니다.
-# 실제 /api 요청은 Nginx가 Spring Boot로 프록시합니다.
 ARG VITE_API_BASE_URL=""
+ARG VITE_USE_MOCK_API="false"
+
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_USE_MOCK_API=${VITE_USE_MOCK_API}
 
 RUN npm run build
 
