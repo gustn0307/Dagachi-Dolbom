@@ -14,7 +14,9 @@ import Notice from "./pages/notice/Notice";
 import InstitutionDashboard from "./pages/institution/Dashboard";
 import ReportManagement from "./pages/institution/ReportManagement";
 import CareTargetManagement from "./pages/institution/CareTargetManagement";
+import CareTargetDetail from "./pages/institution/CareTargetDetail";
 import VolunteerManagement from "./pages/institution/VolunteerManagement";
+import VolunteerDetail from "./pages/institution/VolunteerDetail";
 import ActivityManagement from "./pages/institution/ActivityManagement";
 import InstitutionStatistics from "./pages/institution/Statistics";
 
@@ -45,7 +47,10 @@ function App() {
 
           {/* 제보 접수는 회원/비회원 모두 사용할 수 있으므로 공개합니다. */}
           <Route path="/report" element={<Report />} />
-          <Route path="/report/new" element={<Report />} />
+          <Route
+            path="/report/new"
+            element={<Navigate to="/report" replace />}
+          />
 
           <Route
             path="/volunteer"
@@ -84,7 +89,13 @@ function App() {
           <Route index element={<InstitutionDashboard />} />
           <Route path="reports" element={<ReportManagement />} />
           <Route path="care-targets" element={<CareTargetManagement />} />
+          <Route
+            path="care-targets/:recipientId"
+            element={<CareTargetDetail />}
+          />
           <Route path="volunteers" element={<VolunteerManagement />} />
+          <Route path="volunteers/:volunteerId" element={<VolunteerDetail />} />
+
           <Route path="activities" element={<ActivityManagement />} />
           <Route path="statistics" element={<InstitutionStatistics />} />
         </Route>
