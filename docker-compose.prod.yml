@@ -1,0 +1,100 @@
+name: dagachi-dolbom-prod
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: dagachi-prod-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dagachi_dolbom}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - dagachi-postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-dagachi_dolbom}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+
+    container_name: dagachi-prod-ai-service
+    restart: unless-stopped
+
+    environment:
+      APP_NAME: Dagachi Dolbom AI Service
+      APP_VERSION: 0.1.0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    container_name: dagachi-prod-backend
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dagachi_dolbom}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      JWT_SECRET: ${JWT_SECRET}
+
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      AI_SERVICE_BASE_URL: http://ai-service:8000
+      AI_SERVICE_CONNECT_TIMEOUT: ${AI_SERVICE_CONNECT_TIMEOUT:-3000}
+      AI_SERVICE_READ_TIMEOUT: ${AI_SERVICE_READ_TIMEOUT:-30000}
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_USE_MOCK_API: "false"
+
+    container_name: dagachi-prod-frontend
+    restart: unless-stopped
+
+    depends_on:
+      - backend
+
+    ports:
+      - "80:80"
+
+volumes:
+  dagachi-postgres-data:
