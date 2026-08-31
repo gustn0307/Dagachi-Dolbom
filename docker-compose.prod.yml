@@ -95,6 +95,11 @@ services:
 
     ports:
       - "80:80"
+      - "443:443"
+
+    volumes:
+      - /etc/cloudflare/dolbom-origin.pem:/etc/nginx/ssl/dolbom-origin.pem:ro
+      - /etc/cloudflare/dolbom-origin-key.pem:/etc/nginx/ssl/dolbom-origin-key.pem:ro
 
 volumes:
   dagachi-postgres-data:
