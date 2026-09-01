@@ -34,6 +34,13 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
             @Param("status") ApplicationStatus status
     );
 
+    // 특정 활동에 대해 사용자가 특정 신청 상태인지 확인한다.
+    boolean existsByActivityIdAndUserIdAndStatus(
+            Long activityId,
+            Long userId,
+            ApplicationStatus status
+    );
+
     interface ActivityApplicationCountProjection {
         Long getActivityId();
         Long getCount();
