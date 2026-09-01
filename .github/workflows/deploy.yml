@@ -1,0 +1,40 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            cd ~/apps/Dagachi-Dolbom
+
+            git fetch origin
+            git checkout main
+            git pull --ff-only origin main
+
+            docker compose \
+              -f infra/docker-compose.prod.yml \
+              --env-file .env \
+              up -d --build
+
+            docker compose \
+              -f infra/docker-compose.prod.yml \
+              --env-file .env \
+              ps
