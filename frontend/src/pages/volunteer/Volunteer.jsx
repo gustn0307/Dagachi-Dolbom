@@ -112,6 +112,7 @@ function Volunteer() {
   useEffect(() => {
     setCurrentPage(0);
     setSelectedActivityId(null);
+    setApplyError(null)
   }, [activeTab]);
 
   useEffect(() => {

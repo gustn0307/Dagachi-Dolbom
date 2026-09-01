@@ -123,6 +123,19 @@ public enum ErrorCode {
             HttpStatus.NOT_FOUND,
             "COMMON_404",
             "요청한 리소스를 찾을 수 없습니다."
+    ),
+
+    ACTIVITY_NOT_RECRUITING(
+            HttpStatus.CONFLICT,
+        "ACTIVITY_409_NOT_RECRUITING",
+                "모집 중인 활동이 아닙니다."
+    ),
+
+    // ActivityApplication
+    APPLICATION_ALREADY_EXISTS(
+            HttpStatus.CONFLICT,
+        "APPLICATION_409_DUPLICATE",
+                "이미 신청한 활동입니다."
     );
 
     private final HttpStatus status;
