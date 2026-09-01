@@ -28,3 +28,47 @@ export const userApi = {
   createReport,
   getMyReports,
 };
+
+// 돌봄 대상자 리스트 목록 조회 (지역/연령대/성별/거리순 필터링 포함)
+export const fetchActivities = async ({
+  page = 0,
+  size = 20,
+  region,
+  ageGroups,
+  gender,
+  latitude,
+  longitude,
+} = {}) => {
+  const params = { page, size };
+
+  if (region) {
+    params.region = region;
+  }
+  if (ageGroups && ageGroups.length > 0) {
+    params.ageGroups = ageGroups;
+  }
+  if (gender) {
+    params.gender = gender;
+  }
+  if (latitude != null && longitude != null) {
+    params.latitude = latitude;
+    params.longitude = longitude;
+  }
+
+  const response = await api.get("/api/activities", { params });
+  return response.data.data;
+};
+
+export const fetchActivityDetail = async (activityId) => {
+  const response = await api.get(`/api/activities/${activityId}`);
+  return response.data.data;
+};
+
+export const fetchExecutionDetail = async (activityId) => {
+  const response = await api.get(`/api/activities/${activityId}/execution-details`);
+  return response.data.data;
+};
+
+// 신청 버튼 활성화
+export const applyForActivity = (activityId) =>
+  unwrapData(api.post(`/api/activities/${activityId}/applications`));
