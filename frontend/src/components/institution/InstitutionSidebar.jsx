@@ -7,7 +7,7 @@ function InstitutionSidebar() {
     <aside className="institution-sidebar">
       <div className="institution-logo">
         <span className="institution-logo-mark">♥</span>
-        <div><h2>이웃을 잇다</h2><p>기관 파트너</p></div>
+        <div><h2>다같이 돌봄</h2><p>기관 파트너</p></div>
       </div>
       <nav>
         <NavLink to="/institution" end><Icon>▦</Icon><span>대시보드</span></NavLink>

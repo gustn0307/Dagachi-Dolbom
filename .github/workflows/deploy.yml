@@ -1,0 +1,82 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
+          command_timeout: 15m
+          script: |
+            set -e
+
+            cd ~/apps/Dagachi-Dolbom
+
+            git status --porcelain --untracked-files=normal | grep -q . && {
+              echo "EC2 working tree is not clean. Deployment aborted."
+              git status --short
+              exit 1
+            }
+
+            git fetch origin main
+            git checkout -B main ${{ github.sha }}
+
+            test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+
+            echo "Deploying commit: $(git rev-parse HEAD)"
+
+            docker compose \
+              -f infra/docker-compose.prod.yml \
+              --env-file .env \
+              up -d --build
+
+            docker compose \
+              -f infra/docker-compose.prod.yml \
+              --env-file .env \
+              ps
+
+            echo "Waiting for application readiness..."
+
+            i=1
+            while [ "$i" -le 12 ]; do
+              if curl \
+                --fail \
+                --silent \
+                --show-error \
+                --connect-timeout 5 \
+                --max-time 10 \
+                https://dolbom.hskang.dev/api/health/ready > /dev/null; then
+                echo "Backend readiness check passed."
+                exit 0
+              fi
+
+              echo "Backend is not ready yet. Retry $i/12..."
+              sleep 5
+              i=$((i + 1))
+            done
+
+            echo "Backend readiness check failed."
+            docker compose \
+              -f infra/docker-compose.prod.yml \
+              --env-file .env \
+              ps --all
+
+            exit 1

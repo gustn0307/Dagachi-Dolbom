@@ -1,3 +1,5 @@
+name: dagachi-dolbom
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -10,7 +12,7 @@ services:
       POSTGRES_PASSWORD: dagachi_local
 
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
 
     volumes:
       - dagachi-postgres-data:/var/lib/postgresql/data

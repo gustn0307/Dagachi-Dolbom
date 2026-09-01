@@ -16,6 +16,7 @@ import ReportManagement from "./pages/institution/ReportManagement";
 import CareTargetManagement from "./pages/institution/CareTargetManagement";
 import CareTargetDetail from "./pages/institution/CareTargetDetail";
 import VolunteerManagement from "./pages/institution/VolunteerManagement";
+import VolunteerDetail from "./pages/institution/VolunteerDetail";
 import ActivityManagement from "./pages/institution/ActivityManagement";
 import InstitutionStatistics from "./pages/institution/Statistics";
 
@@ -90,8 +91,13 @@ function App() {
           <Route index element={<InstitutionDashboard />} />
           <Route path="reports" element={<ReportManagement />} />
           <Route path="care-targets" element={<CareTargetManagement />} />
-          <Route path="care-targets/:recipientId" element={<CareTargetDetail />} />
+          <Route
+            path="care-targets/:recipientId"
+            element={<CareTargetDetail />}
+          />
           <Route path="volunteers" element={<VolunteerManagement />} />
+          <Route path="volunteers/:volunteerId" element={<VolunteerDetail />} />
+
           <Route path="activities" element={<ActivityManagement />} />
           <Route path="statistics" element={<InstitutionStatistics />} />
         </Route>
