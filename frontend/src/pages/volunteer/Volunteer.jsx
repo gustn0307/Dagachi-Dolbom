@@ -4,6 +4,12 @@ import { fetchActivities, applyForActivity } from "../../api/userApi";
 
 const PAGE_SIZE = 10;
 const NARROW_BREAKPOINT = 380;
+const AGE_GROUPS = ["50대 이하", "60대", "70대", "80대", "90대 이상"];
+const GENDER_OPTIONS = [
+  { value: "", label: "전체" },
+  { value: "MALE", label: "남성" },
+  { value: "FEMALE", label: "여성" },
+];
 
 const STATUS_LABEL = {
   RECRUITING: "모집중",
@@ -21,7 +27,6 @@ function formatSchedule(isoString) {
   });
 }
 
-// 현재 페이지 기준 앞뒤 siblingCount개만 보여주고 나머지는 "..."으로 축약
 function getPageNumbers(currentPage, totalPages, siblingCount) {
   const pages = [];
   const start = Math.max(0, currentPage - siblingCount);
@@ -57,6 +62,15 @@ function Volunteer() {
   const [toastMessage, setToastMessage] = useState(null);
   const [hoveredPageBtn, setHoveredPageBtn] = useState(null);
 
+  // ---- 필터/정렬 state ----
+  const [regionInput, setRegionInput] = useState("");
+  const [appliedRegion, setAppliedRegion] = useState("");
+  const [selectedAgeGroups, setSelectedAgeGroups] = useState([]);
+  const [selectedGender, setSelectedGender] = useState(""); // "" | "MALE" | "FEMALE"
+  const [sortMode, setSortMode] = useState("latest"); // "latest" | "distance"
+  const [coords, setCoords] = useState(null); // { latitude, longitude }
+  const [geoLoading, setGeoLoading] = useState(false);
+
   useEffect(() => {
     if (activeTab !== "direct") return;
 
@@ -64,14 +78,21 @@ function Volunteer() {
     setIsLoading(true);
     setError(null);
 
-    fetchActivities({ page: currentPage, size: PAGE_SIZE })
+    fetchActivities({
+      page: currentPage,
+      size: PAGE_SIZE,
+      region: appliedRegion || undefined,
+      ageGroups: selectedAgeGroups,
+      gender: selectedGender || undefined,
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
+    })
       .then((data) => {
         if (ignore) return;
         setActivities(data.content);
         setTotalPages(data.totalPages);
         setTotalElements(data.totalElements);
 
-        // 서버가 반환한 page가 요청한 page와 다르면(마지막 페이지 초과 등) 보정
         if (data.page !== currentPage) {
           setCurrentPage(data.page);
         }
@@ -86,15 +107,13 @@ function Volunteer() {
     return () => {
       ignore = true;
     };
-  }, [activeTab, currentPage]);
+  }, [activeTab, currentPage, appliedRegion, selectedAgeGroups, selectedGender, coords]);
 
-  // 탭 전환 시 페이지/선택 초기화
   useEffect(() => {
     setCurrentPage(0);
     setSelectedActivityId(null);
   }, [activeTab]);
 
-  // 목록이 바뀌면(새로고침 등) 더 이상 없는 항목이 선택돼있지 않도록 정리
   useEffect(() => {
     if (
       selectedActivityId &&
@@ -110,7 +129,6 @@ function Volunteer() {
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
-  // 화면 폭 변화(회전 포함) 감지 → 좁은 화면에서는 페이지네이션을 축약 표시
   useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${NARROW_BREAKPOINT}px)`);
     const handler = (e) => setIsNarrow(e.matches);
@@ -147,8 +165,15 @@ function Volunteer() {
       setToastMessage("신청이 완료되었습니다. 기관 승인을 기다려주세요.");
       setSelectedActivityId(null);
 
-      // 신청 상태 반영: 현재 보고 있던 페이지 그대로 새로고침
-      const data = await fetchActivities({ page: currentPage, size: PAGE_SIZE });
+      const data = await fetchActivities({
+        page: currentPage,
+        size: PAGE_SIZE,
+        region: appliedRegion || undefined,
+        ageGroups: selectedAgeGroups,
+        gender: selectedGender || undefined,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
+      });
       setActivities(data.content);
       setTotalPages(data.totalPages);
       setTotalElements(data.totalElements);
@@ -161,7 +186,89 @@ function Volunteer() {
     }
   };
 
-  // ---- 페이지네이션 버튼 스타일 헬퍼 (인라인, 별도 파일/CSS 없음) ----
+  // ---- 필터 핸들러 ----
+  const resetPageAndSelection = () => {
+    setCurrentPage(0);
+    setSelectedActivityId(null);
+  };
+
+  const handleSubmitRegion = (e) => {
+    e.preventDefault();
+    resetPageAndSelection();
+    setAppliedRegion(regionInput.trim());
+  };
+
+  const handleClearRegion = () => {
+    resetPageAndSelection();
+    setRegionInput("");
+    setAppliedRegion("");
+  };
+
+  const handleToggleAgeGroup = (ageGroup) => {
+    resetPageAndSelection();
+    setSelectedAgeGroups((prev) =>
+      prev.includes(ageGroup) ? prev.filter((a) => a !== ageGroup) : [...prev, ageGroup]
+    );
+  };
+
+  const handleChangeGender = (gender) => {
+    resetPageAndSelection();
+    if (gender === "") {
+      setSelectedGender("");
+      return;
+    }
+    setSelectedGender((prev) => (prev === gender ? "" : gender));
+  };
+
+  const handleChangeSort = (mode) => {
+    if (mode === "latest") {
+      resetPageAndSelection();
+      setSortMode("latest");
+      setCoords(null);
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setToastMessage("이 브라우저에서는 위치 정보를 사용할 수 없습니다.");
+      return;
+    }
+
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resetPageAndSelection();
+        setSortMode("distance");
+        setCoords({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+        setGeoLoading(false);
+      },
+      () => {
+        setToastMessage("위치 정보를 가져올 수 없습니다. 위치 권한을 확인해주세요.");
+        setGeoLoading(false);
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    );
+  };
+
+  const handleResetAllFilters = () => {
+    resetPageAndSelection();
+    setRegionInput("");
+    setAppliedRegion("");
+    setSelectedAgeGroups([]);
+    setSelectedGender("");
+    setSortMode("latest");
+    setCoords(null);
+  };
+
+  const hasActiveFilters =
+    Boolean(appliedRegion) ||
+    selectedAgeGroups.length > 0 ||
+    Boolean(selectedGender) ||
+    sortMode === "distance";
+
+  // ---- 페이지네이션 버튼 스타일 헬퍼 ----
   const pageBtnStyle = (key, { active = false, disabled = false, wide = false } = {}) => ({
     minWidth: isNarrow ? 36 : 40,
     minHeight: isNarrow ? 36 : 40,
@@ -187,7 +294,6 @@ function Volunteer() {
   });
 
   const renderPagination = () => {
-    // totalPages가 0(데이터 없음 등 예외)이어도 최소 1로 취급해 버튼이 항상 렌더링되게 함
     const effectiveTotalPages = Math.max(totalPages, 1);
     const siblingCount = isNarrow ? 1 : 2;
     const startIdx = totalElements === 0 ? 0 : currentPage * PAGE_SIZE + 1;
@@ -289,6 +395,218 @@ function Volunteer() {
     );
   };
 
+  const renderFilterBar = () => (
+    <section
+      className="activity-filter-bar"
+      aria-label="활동 목록 필터 및 정렬"
+      style={{
+        maxWidth: 860,
+        margin: "0 auto 18px",
+        padding: "14px 16px",
+        border: "1px solid #ece5dd",
+        borderRadius: 14,
+        background: "#fff",
+        display: "grid",
+        gap: 14,
+      }}
+    >
+      {/* 지역 검색 */}
+      <form
+        onSubmit={handleSubmitRegion}
+        role="search"
+        aria-label="지역으로 검색"
+        style={{ display: "flex", gap: 8 }}
+      >
+        <label htmlFor="region-search" className="sr-only">
+          지역 검색
+        </label>
+        <input
+          id="region-search"
+          type="text"
+          inputMode="search"
+          placeholder="지역으로 검색 (예: 잠실동)"
+          value={regionInput}
+          onChange={(e) => setRegionInput(e.target.value)}
+          style={{
+            flex: 1,
+            minHeight: 44,
+            padding: "0 14px",
+            border: "1px solid #ece5dd",
+            borderRadius: 10,
+            fontSize: 15,
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            minHeight: 44,
+            minWidth: 64,
+            border: "1px solid #f4771c",
+            borderRadius: 10,
+            background: "#f4771c",
+            color: "#fff",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          검색
+        </button>
+        {appliedRegion && (
+          <button
+            type="button"
+            onClick={handleClearRegion}
+            aria-label="지역 검색 초기화"
+            style={{
+              minHeight: 44,
+              minWidth: 44,
+              border: "1px solid #ece5dd",
+              borderRadius: 10,
+              background: "#fff",
+              color: "#897e75",
+              cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+        )}
+      </form>
+
+      {/* 연령대 필터 */}
+      <div>
+        <p style={{ margin: "0 0 8px", fontSize: 13, color: "#897e75", fontWeight: 700 }}>
+          연령대
+        </p>
+        <div
+          role="group"
+          aria-label="연령대 선택"
+          style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+        >
+          {AGE_GROUPS.map((ag) => {
+            const active = selectedAgeGroups.includes(ag);
+            return (
+              <button
+                key={ag}
+                type="button"
+                aria-pressed={active}
+                onClick={() => handleToggleAgeGroup(ag)}
+                style={{
+                  minHeight: 40,
+                  padding: "0 16px",
+                  borderRadius: 20,
+                  border: `1px solid ${active ? "#f4771c" : "#ece5dd"}`,
+                  background: active ? "#fff3ea" : "#fff",
+                  color: active ? "#f4771c" : "#685d52",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                {ag}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 성별 필터 */}
+      <div>
+        <p style={{ margin: "0 0 8px", fontSize: 13, color: "#897e75", fontWeight: 700 }}>
+          성별
+        </p>
+        <div role="group" aria-label="성별 선택" style={{ display: "flex", gap: 8 }}>
+          {GENDER_OPTIONS.map(({ value, label }) => {
+            const active = selectedGender === value;
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={active}
+                onClick={() => handleChangeGender(value)}
+                style={{
+                  minHeight: 40,
+                  padding: "0 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${active ? "#f4771c" : "#ece5dd"}`,
+                  background: active ? "#f4771c" : "#fff",
+                  color: active ? "#fff" : "#685d52",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 정렬 */}
+      <div>
+        <p style={{ margin: "0 0 8px", fontSize: 13, color: "#897e75", fontWeight: 700 }}>
+          정렬
+        </p>
+        <div role="group" aria-label="정렬 방식 선택" style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            aria-pressed={sortMode === "latest"}
+            onClick={() => handleChangeSort("latest")}
+            style={{
+              minHeight: 40,
+              padding: "0 16px",
+              borderRadius: 10,
+              border: `1px solid ${sortMode === "latest" ? "#f4771c" : "#ece5dd"}`,
+              background: sortMode === "latest" ? "#f4771c" : "#fff",
+              color: sortMode === "latest" ? "#fff" : "#685d52",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            최신순
+          </button>
+          <button
+            type="button"
+            aria-pressed={sortMode === "distance"}
+            disabled={geoLoading}
+            onClick={() => handleChangeSort("distance")}
+            style={{
+              minHeight: 40,
+              padding: "0 16px",
+              borderRadius: 10,
+              border: `1px solid ${sortMode === "distance" ? "#f4771c" : "#ece5dd"}`,
+              background: sortMode === "distance" ? "#f4771c" : "#fff",
+              color: sortMode === "distance" ? "#fff" : "#685d52",
+              fontWeight: 700,
+              cursor: geoLoading ? "wait" : "pointer",
+              opacity: geoLoading ? 0.6 : 1,
+            }}
+          >
+            {geoLoading ? "위치 확인 중..." : "거리순"}
+          </button>
+        </div>
+      </div>
+
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={handleResetAllFilters}
+          style={{
+            justifySelf: "start",
+            padding: "6px 10px",
+            border: "none",
+            background: "transparent",
+            color: "#897e75",
+            fontSize: 13,
+            textDecoration: "underline",
+            cursor: "pointer",
+          }}
+        >
+          필터 초기화
+        </button>
+      )}
+    </section>
+  );
+
   return (
     <>
       <PageHeader
@@ -316,40 +634,24 @@ function Volunteer() {
 
       {activeTab === "direct" && (
         <>
+          {renderFilterBar()}
+
           <section className="visit-list">
             {isLoading && (
-              <p
-                style={{
-                  textAlign: "center",
-                  color: "#897e75",
-                  padding: "24px 0",
-                }}
-              >
+              <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
                 불러오는 중입니다...
               </p>
             )}
 
             {!isLoading && error && (
-              <p
-                style={{
-                  textAlign: "center",
-                  color: "#897e75",
-                  padding: "24px 0",
-                }}
-              >
+              <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
                 {error}
               </p>
             )}
 
             {!isLoading && !error && activities.length === 0 && (
-              <p
-                style={{
-                  textAlign: "center",
-                  color: "#897e75",
-                  padding: "24px 0",
-                }}
-              >
-                현재 등록된 방문 활동이 없습니다.
+              <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
+                조건에 맞는 방문 활동이 없습니다.
               </p>
             )}
 
@@ -409,15 +711,12 @@ function Volunteer() {
 
       {activeTab === "auto" && (
         <section className="visit-list">
-          <p
-            style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}
-          >
+          <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
             자동배정 기능은 준비 중입니다.
           </p>
         </section>
       )}
 
-      {/* 선택/신청 안내 섹션 - 탭/로딩/에러 상태와 무관하게 항상 하단에 표시 */}
       <section className="visit-detail">
         <h2>안부 확인 전 확인하세요</h2>
 

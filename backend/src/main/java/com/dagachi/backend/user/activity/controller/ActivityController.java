@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 일반 USER의 모집 활동 탐색(목록·상세·수행정보) API를 제공한다.
@@ -42,11 +43,13 @@ public class ActivityController {
             @RequestParam(required = false) String region,
             @RequestParam(required = false) LocalDate dateFrom,
             @RequestParam(required = false) LocalDate dateTo,
+            @RequestParam(required = false) List<String> ageGroups,
+            @RequestParam(required = false) String gender,
             @PageableDefault(page = 0, size = 20, sort = "scheduledAt", direction = Sort.Direction.ASC)
             Pageable pageable
     ) {
         ActivitySearchCondition condition =
-                new ActivitySearchCondition(latitude, longitude, region, dateFrom, dateTo);
+                new ActivitySearchCondition(latitude, longitude, region, dateFrom, dateTo, ageGroups, gender);
 
         PageResponse<ActivityResponse> response = activityService.getActivities(condition, pageable);
 

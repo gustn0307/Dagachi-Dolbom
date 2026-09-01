@@ -3,9 +3,11 @@ package com.dagachi.backend.user.activity.service;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.common.response.PageResponse;
+import com.dagachi.backend.common.util.AddressUtils;
 import com.dagachi.backend.domain.entity.ActivityApplication;
 import com.dagachi.backend.domain.entity.CareActivity;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
+import com.dagachi.backend.domain.enums.UserGender;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
 import com.dagachi.backend.user.activity.dto.ActivityDetailResponse;
@@ -33,6 +35,8 @@ public class ActivityService {
     private static final LocalDateTime MIN_DATE = LocalDateTime.of(2000, 1, 1, 0, 0);
     /** dateTo 필터가 없을 때 사용하는 사실상 무제한 상한. */
     private static final LocalDateTime MAX_DATE = LocalDateTime.of(2100, 1, 1, 0, 0);
+    /** ageGroups 필터가 없을 때 사용하는, 실제 버킷값(50/60/70/80/90)과 겹치지 않는 sentinel. */
+    private static final List<Integer> NO_AGE_GROUP_FILTER = List.of(-1);
 
     private final CareActivityRepository careActivityRepository;
     private final ActivityApplicationRepository activityApplicationRepository;
@@ -49,8 +53,18 @@ public class ActivityService {
             ActivitySearchCondition condition,
             Pageable pageable
     ) {
+        boolean hasAgeGroups = condition.hasAgeGroups();
+        List<Integer> ageBuckets = resolveAgeBuckets(condition.ageGroups());
+        int currentYear = LocalDate.now().getYear();
+        boolean hasGender = condition.hasGender();
+        UserGender gender = resolveGender(condition.gender());
+
         if (condition.hasCoordinates()) {
-            return PageResponse.from(getActivitiesSortedByDistance(condition, pageable));
+            return PageResponse.from(
+                    getActivitiesSortedByDistance(
+                            condition, pageable, hasAgeGroups, ageBuckets, currentYear, hasGender, gender
+                    )
+            );
         }
 
         String region = normalizeRegion(condition.region());
@@ -58,7 +72,7 @@ public class ActivityService {
         LocalDateTime dateTo = resolveDateTo(condition.dateTo());
 
         Page<CareActivity> activityPage = careActivityRepository.findRecruitingActivitiesPaged(
-                region, dateFrom, dateTo, pageable
+                region, dateFrom, dateTo, hasAgeGroups, ageBuckets, currentYear, hasGender, gender, pageable
         );
 
         Map<Long, Long> approvedCountMap = getApprovedCountMap(activityPage.getContent());
@@ -77,14 +91,19 @@ public class ActivityService {
 
     private Page<ActivityResponse> getActivitiesSortedByDistance(
             ActivitySearchCondition condition,
-            Pageable pageable
+            Pageable pageable,
+            boolean hasAgeGroups,
+            List<Integer> ageBuckets,
+            int currentYear,
+            boolean hasGender,
+            UserGender gender
     ) {
         String region = normalizeRegion(condition.region());
         LocalDateTime dateFrom = resolveDateFrom(condition.dateFrom());
         LocalDateTime dateTo = resolveDateTo(condition.dateTo());
 
         List<CareActivity> activities = careActivityRepository.findRecruitingActivitiesForDistanceSort(
-                region, dateFrom, dateTo
+                region, dateFrom, dateTo, hasAgeGroups, ageBuckets, currentYear, hasGender, gender
         );
 
         Map<Long, Long> approvedCountMap = getApprovedCountMap(activities);
@@ -125,6 +144,43 @@ public class ActivityService {
 
     private LocalDateTime resolveDateTo(LocalDate dateTo) {
         return dateTo != null ? dateTo.plusDays(1).atStartOfDay() : MAX_DATE;
+    }
+
+    /**
+     * "60대" 등 라벨을 버킷 대표값(60) 리스트로 변환한다.
+     * 허용되지 않는 라벨이 하나라도 있으면 400.
+     * 선택된 연령대가 없으면 절대 매칭되지 않는 sentinel을 반환해
+     * Repository에서 빈 컬렉션을 IN 파라미터로 바인딩하는 문제를 피한다.
+     */
+    private List<Integer> resolveAgeBuckets(List<String> ageGroups) {
+        if (ageGroups == null || ageGroups.isEmpty()) {
+            return NO_AGE_GROUP_FILTER;
+        }
+
+        List<Integer> buckets = ageGroups.stream()
+                .map(AddressUtils::parseAgeGroupBucket)
+                .collect(Collectors.toList());
+
+        if (buckets.contains(null)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        return buckets;
+    }
+
+    /**
+     * 성별 필터 문자열("MALE"/"FEMALE")을 UserGender로 변환한다.
+     * 값이 없으면 null(hasGender=false일 때만 호출부에서 무시됨).
+     * 허용되지 않는 값이면 400.
+     */
+    private UserGender resolveGender(String gender) {
+        if (gender == null || gender.isBlank()) {
+            return null;
+        }
+        try {
+            return UserGender.valueOf(gender);
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
     }
 
     // ---- ACT-02, ACT-03은 기존 그대로 ----
