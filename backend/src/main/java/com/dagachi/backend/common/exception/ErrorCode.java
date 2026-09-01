@@ -82,6 +82,13 @@ public enum ErrorCode {
             "제보 사진은 최대 3장까지 첨부할 수 있습니다."
     ),
 
+    // Checklist
+    CHECKLIST_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "CHECKLIST_404",
+            "해당 버전의 체크리스트를 찾을 수 없습니다."
+    ),
+
     // S3
     S3_UPLOAD_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
