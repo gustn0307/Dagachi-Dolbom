@@ -82,6 +82,12 @@ public enum ErrorCode {
             "제보 사진은 최대 3장까지 첨부할 수 있습니다."
     ),
 
+    REPORT_ALREADY_ASSIGNED(
+            HttpStatus.CONFLICT,
+            "REPORT_409_ALREADY_ASSIGNED",
+            "이미 다른 기관에 배정된 제보입니다."
+    ),
+
     // S3
     S3_UPLOAD_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
