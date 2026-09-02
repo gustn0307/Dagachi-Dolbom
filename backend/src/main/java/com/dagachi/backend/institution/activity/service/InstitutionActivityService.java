@@ -3,13 +3,16 @@ package com.dagachi.backend.institution.activity.service;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.common.response.PageResponse;
+import com.dagachi.backend.domain.entity.ActivityRecord;
 import com.dagachi.backend.domain.entity.CareActivity;
 import com.dagachi.backend.domain.entity.Institution;
 import com.dagachi.backend.domain.entity.User;
 import com.dagachi.backend.domain.enums.ActivityStatus;
+import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.InstitutionActivityRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
+import com.dagachi.backend.institution.activity.dto.InstitutionActivityDetailResponse;
 import com.dagachi.backend.institution.activity.dto.InstitutionActivitySummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,34 +25,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 기관 담당자의 활동 관리 기능을 처리하는 Service.
+ * 기관 활동 관리 기능을 처리하는 Service.
  */
 @Service
 public class InstitutionActivityService {
-
-    /**
-     * 날짜 필터가 없을 때 사용하는 기본 조회 시작일.
-     */
-    private static final LocalDateTime MIN_DATE =
-            LocalDateTime.of(
-                    2000,
-                    1,
-                    1,
-                    0,
-                    0
-            );
-
-    /**
-     * 날짜 필터가 없을 때 사용하는 기본 조회 종료일.
-     */
-    private static final LocalDateTime MAX_DATE =
-            LocalDateTime.of(
-                    2100,
-                    1,
-                    1,
-                    0,
-                    0
-            );
 
     private final UserRepository userRepository;
 
@@ -75,10 +54,7 @@ public class InstitutionActivityService {
     }
 
     /**
-     * ACT-04 기관 활동 목록을 조회한다.
-     *
-     * 로그인 담당자의 소속 기관 활동만 조회하며,
-     * 상태·대상자·기간 필터를 지원한다.
+     * ACT-04 기관 활동 목록 조회.
      */
     @Transactional(readOnly = true)
     public PageResponse<InstitutionActivitySummaryResponse>
@@ -90,69 +66,84 @@ public class InstitutionActivityService {
             LocalDate dateTo,
             Pageable pageable
     ) {
-        // 삭제되지 않은 로그인 사용자 조회
+        // 로그인 사용자 조회
         User user =
                 findUser(userId);
 
-        // 로그인 사용자의 소속 기관 확인
+        // 로그인 담당자의 소속 기관 확인
         Institution institution =
                 getInstitution(user);
 
-        // 시작일과 종료일 순서 검증
+        // 시작일이 종료일보다 늦으면 잘못된 요청으로 처리
         validateDateRange(
                 dateFrom,
                 dateTo
         );
 
         /*
-         * 상태값이 있으면 상태 필터를 적용한다.
+         * 필터가 사용됐는지 별도의 값으로 전달한다.
          *
-         * 상태값이 없을 때도 Repository 파라미터가
-         * null이 되지 않도록 RECRUITING을 기본값으로 전달한다.
-         * hasStatus가 false이므로 실제 필터에는 적용되지 않는다.
+         * PostgreSQL에서 null 값의 자료형을 판단하지 못해
+         * 오류가 발생하는 것을 방지하기 위한 처리다.
          */
         boolean hasStatus =
                 status != null;
 
+        boolean hasRecipient =
+                recipientId != null;
+
+        /*
+         * 필터를 사용하지 않더라도 쿼리에는
+         * null이 아닌 임시 값을 전달한다.
+         *
+         * hasStatus 또는 hasRecipient가 false이면
+         * 실제 조회 조건에는 적용되지 않는다.
+         */
         ActivityStatus normalizedStatus =
                 hasStatus
                         ? status
                         : ActivityStatus.RECRUITING;
-
-        /*
-         * 대상자 ID가 있으면 대상자 필터를 적용한다.
-         *
-         * 값이 없을 때는 실제 ID와 겹치지 않는 -1을 전달한다.
-         */
-        boolean hasRecipient =
-                recipientId != null;
 
         Long normalizedRecipientId =
                 hasRecipient
                         ? recipientId
                         : -1L;
 
-        // 시작일이 있으면 해당 날짜 00시부터 조회한다.
+        /*
+         * 시작일이 없으면 아주 과거부터 조회한다.
+         * 시작일이 있으면 해당 날짜의 00시부터 조회한다.
+         */
         LocalDateTime normalizedDateFrom =
-                dateFrom != null
-                        ? dateFrom.atStartOfDay()
-                        : MIN_DATE;
+                dateFrom == null
+                        ? LocalDateTime.of(
+                        1970,
+                        1,
+                        1,
+                        0,
+                        0
+                )
+                        : dateFrom.atStartOfDay();
 
         /*
-         * 종료일을 포함하기 위해 다음 날 00시 미만으로 조회한다.
+         * 종료일이 없으면 먼 미래까지 조회한다.
          *
-         * 예:
-         * dateTo = 2026-09-05
-         * 실제 조건 = 2026-09-06 00:00 미만
+         * 종료일이 있다면 그다음 날 00시 미만으로 조회하여
+         * 사용자가 입력한 종료일 전체를 포함한다.
          */
         LocalDateTime normalizedDateTo =
-                dateTo != null
-                        ? dateTo
+                dateTo == null
+                        ? LocalDateTime.of(
+                        9999,
+                        12,
+                        31,
+                        0,
+                        0
+                )
+                        : dateTo
                           .plusDays(1)
-                          .atStartOfDay()
-                        : MAX_DATE;
+                          .atStartOfDay();
 
-        // 로그인 담당자의 기관 활동 목록 조회
+        // 해당 기관의 활동 목록 조회
         Page<CareActivity> activityPage =
                 institutionActivityRepository
                         .findInstitutionActivities(
@@ -166,58 +157,118 @@ public class InstitutionActivityService {
                                 pageable
                         );
 
-        /*
-         * 현재 페이지에 활동이 없다면
-         * 승인 인원 조회 Query를 실행하지 않는다.
-         */
-        Map<Long, Long> approvedCountMap =
-                getApprovedCountMap(
-                        activityPage.getContent()
-                );
+        // 현재 페이지에 포함된 활동 번호 수집
+        List<Long> activityIds =
+                activityPage
+                        .getContent()
+                        .stream()
+                        .map(CareActivity::getId)
+                        .toList();
 
         /*
-         * CareActivity Entity를 기관 활동 목록 DTO로 변환한다.
+         * 각 활동의 승인 인원을 한 번에 조회한다.
          *
-         * 활동 ID를 기준으로 승인 인원수를 함께 넣는다.
+         * 활동이 없을 때 IN () 형태의 잘못된 쿼리가
+         * 실행되지 않도록 빈 Map을 사용한다.
          */
+        Map<Long, Long> approvedCountMap =
+                activityIds.isEmpty()
+                        ? Map.of()
+                        : activityApplicationRepository
+                          .countApprovedMap(
+                                  activityIds
+                          );
+
+        // Entity를 목록 응답 DTO로 변환
         Page<InstitutionActivitySummaryResponse> responsePage =
                 activityPage.map(
                         activity ->
                                 InstitutionActivitySummaryResponse.of(
                                         activity,
-                                        approvedCountMap.getOrDefault(
-                                                activity.getId(),
-                                                0L
-                                        )
+                                        approvedCountMap
+                                                .getOrDefault(
+                                                        activity.getId(),
+                                                        0L
+                                                )
                                 )
                 );
 
-        // 공통 페이지 응답으로 변환
         return PageResponse.from(
                 responsePage
         );
     }
 
     /**
-     * 활동 목록에 포함된 활동 ID를 이용해
-     * APPROVED 상태의 신청 인원을 한 번에 조회한다.
+     * ACT-05 기관 활동 상세 조회.
      */
-    private Map<Long, Long> getApprovedCountMap(
-            List<CareActivity> activities
+    @Transactional(readOnly = true)
+    public InstitutionActivityDetailResponse
+    getInstitutionActivity(
+            Long userId,
+            Long activityId
     ) {
-        if (activities.isEmpty()) {
-            return Map.of();
-        }
+        // 로그인 사용자 조회
+        User user =
+                findUser(userId);
 
-        List<Long> activityIds =
-                activities.stream()
-                        .map(CareActivity::getId)
-                        .toList();
+        // 로그인 담당자의 소속 기관 확인
+        Institution institution =
+                getInstitution(user);
 
-        return activityApplicationRepository
-                .countApprovedMap(
-                        activityIds
-                );
+        /*
+         * 활동 번호와 기관 번호를 함께 사용한다.
+         *
+         * 다른 기관의 활동이거나 존재하지 않는 활동이면
+         * RESOURCE_NOT_FOUND 예외가 발생한다.
+         */
+        CareActivity activity =
+                institutionActivityRepository
+                        .findDetailActivity(
+                                institution.getId(),
+                                activityId
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new CustomException(
+                                                ErrorCode.RESOURCE_NOT_FOUND
+                                        )
+                        );
+
+        // 승인된 신청 인원
+        long approvedCount =
+                institutionActivityRepository
+                        .countApplications(
+                                activityId,
+                                ApplicationStatus.APPROVED
+                        );
+
+        // 승인 대기 중인 신청 인원
+        long pendingCount =
+                institutionActivityRepository
+                        .countApplications(
+                                activityId,
+                                ApplicationStatus.PENDING
+                        );
+
+        /*
+         * 활동 결과 기록 조회.
+         *
+         * 아직 결과가 없으면 null을 사용하고
+         * DTO에서 hasRecord를 false로 변환한다.
+         */
+        ActivityRecord record =
+                institutionActivityRepository
+                        .findActivityRecord(
+                                activityId
+                        )
+                        .orElse(null);
+
+        return InstitutionActivityDetailResponse.from(
+                activity,
+                approvedCount,
+                pendingCount,
+                record
+        );
     }
 
     /**
@@ -257,7 +308,7 @@ public class InstitutionActivityService {
     }
 
     /**
-     * 시작일이 종료일보다 늦으면 잘못된 요청으로 처리한다.
+     * 활동 조회 시작일과 종료일을 검사한다.
      */
     private void validateDateRange(
             LocalDate dateFrom,
