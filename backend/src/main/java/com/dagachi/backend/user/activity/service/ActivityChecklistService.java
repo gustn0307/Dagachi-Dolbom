@@ -111,7 +111,7 @@ public class ActivityChecklistService {
                             item.getCode(),
                             item.getQuestion(),
                             item.getItemType(),
-                            item.getOptionsJson(),
+                            convertOptions(item),
                             item.getRequired(),
                             item.getSortOrder(),
                             selectedValue,
@@ -126,5 +126,21 @@ public class ActivityChecklistService {
                 checklistVersion,
                 itemResponses
         );
+    }
+
+    // 체크리스트의 optionsJson 배열을 프론트에 전달할 문자열 목록으로 변환합니다.
+    private List<String> convertOptions(ChecklistItem checklistItem) {
+        List<String> options = new ArrayList<>();
+
+        if (checklistItem.getOptionsJson() == null
+                || !checklistItem.getOptionsJson().isArray()) {
+            return options;
+        }
+
+        for (var option : checklistItem.getOptionsJson()) {
+            options.add(option.asText());
+        }
+
+        return options;
     }
 }

@@ -27,4 +27,30 @@ public class ChecklistResponse extends BaseTimeEntity {
 
  @Column(name="text_value",columnDefinition="text")
  private String textValue;
+
+ // 새로운 체크리스트 응답을 생성합니다.
+ public static ChecklistResponse create(
+         ActivityRecord activityRecord,
+         ChecklistItem checklistItem,
+         String selectedValue,
+         String textValue
+ ) {
+  ChecklistResponse response = new ChecklistResponse();
+
+  response.activityRecord = activityRecord;
+  response.checklistItem = checklistItem;
+  response.selectedValue = selectedValue;
+  response.textValue = textValue;
+
+  return response;
+ }
+
+ // 기존 체크리스트 응답 값을 수정합니다.
+ public void updateAnswer(
+         String selectedValue,
+         String textValue
+ ) {
+  this.selectedValue = selectedValue;
+  this.textValue = textValue;
+ }
 }

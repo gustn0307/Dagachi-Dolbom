@@ -1,14 +1,14 @@
 package com.dagachi.backend.user.activity.dto;
 
 import com.dagachi.backend.domain.enums.ChecklistItemType;
-import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
 
 public record ChecklistItemResponse(
         Long id,
         String code,
         String question,
         ChecklistItemType itemType,
-        JsonNode options,
+        List<String> options,
         Boolean required,
         Integer sortOrder,
         String selectedValue,

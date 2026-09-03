@@ -1,5 +1,10 @@
 package com.dagachi.backend.domain.entity;
-import com.dagachi.backend.common.entity.BaseTimeEntity; import com.dagachi.backend.domain.enums.*; import jakarta.persistence.*; import lombok.*; import java.time.LocalDateTime;
+import com.dagachi.backend.common.entity.BaseTimeEntity;
+import com.dagachi.backend.domain.enums.*;
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name="activity_records")
 @Getter
@@ -52,4 +57,30 @@ public class ActivityRecord extends BaseTimeEntity {
 
  @Column(name="review_note",columnDefinition="text")
  private String reviewNote;
+
+ // 공동 Draft의 활동 결과 내용을 수정합니다.
+ public void updateDraft(
+         VisitResult visitResult,
+         LocalDateTime completedAt,
+         String specialNote
+ ) {
+  this.visitResult = visitResult;
+  this.completedAt = completedAt;
+  this.specialNote = specialNote;
+ }
+
+ // 대상자 서명 파일과 서명 시각을 함께 변경합니다.
+ public void updateSignature(
+         String signatureS3Key,
+         LocalDateTime signedAt
+ ) {
+  this.signatureS3Key = signatureS3Key;
+  this.signedAt = signedAt;
+ }
+
+ // 활동 결과를 최종 제출 상태로 변경합니다.
+ public void submit(User submittedBy) {
+  this.submittedBy = submittedBy;
+  this.reviewStatus = ActivityReviewStatus.SUBMITTED;
+ }
 }
