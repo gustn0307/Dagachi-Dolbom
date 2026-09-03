@@ -72,3 +72,18 @@ export const fetchExecutionDetail = async (activityId) => {
 // 신청 버튼 활성화
 export const applyForActivity = (activityId) =>
   unwrapData(api.post(`/api/activities/${activityId}/applications`));
+
+// 내 신청 목록 조회 (APP-03)
+export const fetchMyApplications = async ({
+  page = 0,
+  size = 10,
+  status,
+  applicationType,
+} = {}) => {
+  const params = { page, size };
+  if (status) params.status = status;
+  if (applicationType) params.applicationType = applicationType;
+
+  const response = await api.get("/api/users/me/activity-applications", { params });
+  return response.data.data;
+};

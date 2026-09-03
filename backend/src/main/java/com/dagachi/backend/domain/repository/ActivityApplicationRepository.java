@@ -2,6 +2,9 @@ package com.dagachi.backend.domain.repository;
 
 import com.dagachi.backend.domain.entity.ActivityApplication;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
+import com.dagachi.backend.domain.enums.ApplicationType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -47,4 +50,27 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
                         ActivityApplicationCountProjection::getCount
                 ));
     }
+
+    /**
+     * APP-03 내 신청 목록 조회.
+     * status/applicationType 필터는 CareActivityRepository의 hasX 플래그 패턴을 그대로 따른다.
+     */
+    @Query("""
+            SELECT aa
+            FROM ActivityApplication aa
+            JOIN FETCH aa.activity ca
+            JOIN FETCH ca.recipient cr
+            WHERE aa.user.id = :userId
+              AND (:hasStatus = false OR aa.status = :status)
+              AND (:hasType = false OR aa.applicationType = :type)
+            ORDER BY aa.createdAt DESC
+            """)
+    Page<ActivityApplication> findMyApplications(
+            @Param("userId") Long userId,
+            @Param("hasStatus") boolean hasStatus,
+            @Param("status") ApplicationStatus status,
+            @Param("hasType") boolean hasType,
+            @Param("type") ApplicationType type,
+            Pageable pageable
+    );
 }

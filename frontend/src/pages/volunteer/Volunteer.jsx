@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import PageHeader from "../../components/common/PageHeader";
-import { fetchActivities, applyForActivity } from "../../api/userApi";
+import {
+  fetchActivities,
+  applyForActivity,
+  fetchMyApplications,
+} from "../../api/userApi";
 
 const PAGE_SIZE = 10;
 const NARROW_BREAKPOINT = 380;
@@ -14,6 +18,20 @@ const GENDER_OPTIONS = [
 const STATUS_LABEL = {
   RECRUITING: "모집중",
   READY: "모집완료",
+};
+
+const APPLICATION_STATUS_LABEL = {
+  PENDING: "대기중",
+  APPROVED: "승인됨",
+  REJECTED: "거절됨",
+  CANCELED: "취소됨",
+};
+
+const APPLICATION_STATUS_COLOR = {
+  PENDING: "#f4771c",
+  APPROVED: "#3a9d5d",
+  REJECTED: "#897e75",
+  CANCELED: "#b3aba4",
 };
 
 function formatSchedule(isoString) {
@@ -63,7 +81,7 @@ function Volunteer() {
   const [toastMessage, setToastMessage] = useState(null);
   const [hoveredPageBtn, setHoveredPageBtn] = useState(null);
 
-  // ---- 필터/정렬 state ----
+  // ---- 필터/정렬 state (내가 직접 선택 탭) ----
   const [regionInput, setRegionInput] = useState("");
   const [appliedRegion, setAppliedRegion] = useState("");
   const [selectedAgeGroups, setSelectedAgeGroups] = useState([]);
@@ -71,6 +89,15 @@ function Volunteer() {
   const [sortMode, setSortMode] = useState("latest"); // "latest" | "distance"
   const [coords, setCoords] = useState(null); // { latitude, longitude }
   const [geoLoading, setGeoLoading] = useState(false);
+
+  // ---- 내 신청 현황 탭 state ----
+  const [myApplications, setMyApplications] = useState([]);
+  const [myLoading, setMyLoading] = useState(false);
+  const [myError, setMyError] = useState(null);
+  const [myStatusFilter, setMyStatusFilter] = useState(""); // "" | PENDING | APPROVED | REJECTED | CANCELED
+  const [myPage, setMyPage] = useState(0);
+  const [myTotalPages, setMyTotalPages] = useState(0);
+  const [myTotalElements, setMyTotalElements] = useState(0);
 
   useEffect(() => {
     if (activeTab !== "direct") return;
@@ -117,10 +144,43 @@ function Volunteer() {
     coords,
   ]);
 
+  // 내 신청 현황 조회 (APP-03)
+  useEffect(() => {
+    if (activeTab !== "my") return;
+
+    let ignore = false;
+    setMyLoading(true);
+    setMyError(null);
+
+    fetchMyApplications({
+      page: myPage,
+      size: PAGE_SIZE,
+      status: myStatusFilter || undefined,
+    })
+      .then((data) => {
+        if (ignore) return;
+        setMyApplications(data.content);
+        setMyTotalPages(data.totalPages);
+        setMyTotalElements(data.totalElements);
+      })
+      .catch(() => {
+        if (!ignore) setMyError("신청 목록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setMyLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [activeTab, myPage, myStatusFilter]);
+
   useEffect(() => {
     setCurrentPage(0);
     setSelectedActivityId(null);
     setApplyError(null);
+    setMyPage(0);
+    setMyStatusFilter("");
   }, [activeTab]);
 
   useEffect(() => {
@@ -195,7 +255,7 @@ function Volunteer() {
     }
   };
 
-  // ---- 필터 핸들러 ----
+  // ---- 필터 핸들러 (내가 직접 선택 탭) ----
   const resetPageAndSelection = () => {
     setCurrentPage(0);
     setSelectedActivityId(null);
@@ -658,6 +718,53 @@ function Volunteer() {
     </section>
   );
 
+  const renderMyStatusFilterBar = () => (
+    <section
+      aria-label="신청 상태 필터"
+      style={{
+        maxWidth: 860,
+        margin: "0 auto 18px",
+        padding: "14px 16px",
+        border: "1px solid #ece5dd",
+        borderRadius: 14,
+        background: "#fff",
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+      }}
+    >
+      {[
+        { value: "", label: "전체" },
+        { value: "PENDING", label: "대기중" },
+        { value: "APPROVED", label: "승인됨" },
+        { value: "REJECTED", label: "거절됨" },
+        { value: "CANCELED", label: "취소됨" },
+      ].map(({ value, label }) => (
+        <button
+          key={label}
+          type="button"
+          aria-pressed={myStatusFilter === value}
+          onClick={() => {
+            setMyStatusFilter(value);
+            setMyPage(0);
+          }}
+          style={{
+            minHeight: 40,
+            padding: "0 16px",
+            borderRadius: 10,
+            border: `1px solid ${myStatusFilter === value ? "#f4771c" : "#ece5dd"}`,
+            background: myStatusFilter === value ? "#f4771c" : "#fff",
+            color: myStatusFilter === value ? "#fff" : "#685d52",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </section>
+  );
+
   return (
     <>
       <PageHeader
@@ -680,6 +787,13 @@ function Volunteer() {
           onClick={() => setActiveTab("auto")}
         >
           배정 받기
+        </button>
+        <button
+          type="button"
+          className={activeTab === "my" ? "active" : ""}
+          onClick={() => setActiveTab("my")}
+        >
+          내 신청 현황
         </button>
       </section>
 
@@ -788,39 +902,157 @@ function Volunteer() {
         </section>
       )}
 
-      <section className="visit-detail">
-        <h2>안부 확인 전 확인하세요</h2>
+      {activeTab === "my" && (
+        <>
+          {renderMyStatusFilterBar()}
 
-        {selectedActivity ? (
-          <p style={{ margin: "0 0 14px", fontWeight: 700 }}>
-            선택한 활동: {selectedActivity.region} ·{" "}
-            {formatSchedule(selectedActivity.scheduledAt)}
-          </p>
-        ) : (
-          <p style={{ margin: "0 0 14px", color: "#897e75" }}>
-            위 목록에서 참여할 활동을 먼저 선택해주세요.
-          </p>
-        )}
+          <section className="visit-list">
+            {myLoading && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                불러오는 중입니다...
+              </p>
+            )}
 
-        <ol>
-          <li>대상자를 직접 만나셨나요?</li>
-          <li>식사 및 건강 상태에 큰 변화가 없나요?</li>
-          <li>특이사항이 있다면 기록해 주세요.</li>
-        </ol>
+            {!myLoading && myError && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                {myError}
+              </p>
+            )}
 
-        {applyError && (
-          <p style={{ color: "#c0392b", margin: "0 0 12px" }}>{applyError}</p>
-        )}
+            {!myLoading && !myError && myApplications.length === 0 && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                아직 신청한 활동이 없어요.{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("direct")}
+                  style={{
+                    color: "#f4771c",
+                    textDecoration: "underline",
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    font: "inherit",
+                  }}
+                >
+                  활동 둘러보기
+                </button>
+              </p>
+            )}
 
-        <button
-          className="submit"
-          type="button"
-          disabled={!selectedActivityId || isApplying}
-          onClick={() => setShowConfirmModal(true)}
-        >
-          {isApplying ? "신청 중..." : "이 활동 신청하기"}
-        </button>
-      </section>
+            {!myLoading &&
+              !myError &&
+              myApplications.map((app) => (
+                <div
+                  className="visit"
+                  key={app.applicationId}
+                  style={{ cursor: "default", alignItems: "flex-start" }}
+                >
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "4px 10px",
+                      borderRadius: 20,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#fff",
+                      background:
+                        APPLICATION_STATUS_COLOR[app.status] ?? "#897e75",
+                      marginRight: 10,
+                      marginTop: 4,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {APPLICATION_STATUS_LABEL[app.status] ?? app.status}
+                  </span>
+
+                  <div style={{ flex: 1 }}>
+                    <h2 style={{ fontSize: "15px" }}>
+                      안부확인
+                      <small> · {formatSchedule(app.scheduledAt)}</small>
+                    </h2>
+                    <p>
+                      {app.region ?? "지역 정보 없음"} · {app.ageGroup ?? ""} ·{" "}
+                      {app.gender === "FEMALE" ? "여성" : "남성"} 어르신
+                    </p>
+                    {app.status === "REJECTED" && app.rejectedReason && (
+                      <p style={{ color: "#c0392b", fontSize: 13, marginTop: 4 }}>
+                        거절 사유: {app.rejectedReason}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </section>
+
+          {!myLoading && !myError && myApplications.length > 0 && (
+            <p
+              style={{
+                maxWidth: 860,
+                margin: "0 auto 20px",
+                textAlign: "center",
+                color: "#897e75",
+                fontSize: 13,
+              }}
+            >
+              전체 {myTotalElements}건
+            </p>
+          )}
+        </>
+      )}
+
+      {activeTab === "direct" && (
+        <section className="visit-detail">
+          <h2>안부 확인 전 확인하세요</h2>
+
+          {selectedActivity ? (
+            <p style={{ margin: "0 0 14px", fontWeight: 700 }}>
+              선택한 활동: {selectedActivity.region} ·{" "}
+              {formatSchedule(selectedActivity.scheduledAt)}
+            </p>
+          ) : (
+            <p style={{ margin: "0 0 14px", color: "#897e75" }}>
+              위 목록에서 참여할 활동을 먼저 선택해주세요.
+            </p>
+          )}
+
+          <ol>
+            <li>대상자를 직접 만나셨나요?</li>
+            <li>식사 및 건강 상태에 큰 변화가 없나요?</li>
+            <li>특이사항이 있다면 기록해 주세요.</li>
+          </ol>
+
+          {applyError && (
+            <p style={{ color: "#c0392b", margin: "0 0 12px" }}>{applyError}</p>
+          )}
+
+          <button
+            className="submit"
+            type="button"
+            disabled={!selectedActivityId || isApplying}
+            onClick={() => setShowConfirmModal(true)}
+          >
+            {isApplying ? "신청 중..." : "이 활동 신청하기"}
+          </button>
+        </section>
+      )}
 
       {showConfirmModal && selectedActivity && (
         <div
