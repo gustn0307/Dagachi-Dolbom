@@ -19,6 +19,8 @@ import VolunteerManagement from "./pages/institution/VolunteerManagement";
 import VolunteerDetail from "./pages/institution/VolunteerDetail";
 import ActivityManagement from "./pages/institution/ActivityManagement";
 import InstitutionStatistics from "./pages/institution/Statistics";
+import ActivityDetail from "./pages/institution/ActivityDetail";
+
 
 import UserManagement from "./pages/admin/UserManagement";
 import InstitutionManagement from "./pages/admin/InstitutionManagement";
@@ -98,6 +100,9 @@ function App() {
 
           <Route path="activities" element={<ActivityManagement />} />
           <Route path="statistics" element={<InstitutionStatistics />} />
+        
+
+          <Route path="activities/:activityId" element={<ActivityDetail />} />
         </Route>
 
         {/* 관리자 전용 영역 */}

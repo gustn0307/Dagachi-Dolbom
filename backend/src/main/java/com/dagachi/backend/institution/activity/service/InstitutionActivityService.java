@@ -22,6 +22,7 @@ import com.dagachi.backend.institution.activity.dto.InstitutionActivityDetailRes
 import com.dagachi.backend.institution.activity.dto.InstitutionActivityStatusRequest;
 import com.dagachi.backend.institution.activity.dto.InstitutionActivitySummaryResponse;
 import com.dagachi.backend.institution.activity.dto.InstitutionActivityUpdateRequest;
+import com.dagachi.backend.institution.activity.dto.InstitutionActivityApplicationRejectRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -598,6 +599,175 @@ public class InstitutionActivityService {
                 };
 
         if (!allowed) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+    }
+    /**
+     * 기관 담당자가 봉사 신청을 승인한다.
+     */
+    @Transactional
+    public InstitutionActivityApplicationResponse
+    approveActivityApplication(
+            Long userId,
+            Long activityId,
+            Long applicationId
+    ) {
+        User user =
+                findUser(userId);
+
+        Institution institution =
+                getInstitution(user);
+
+        CareActivity activity =
+                findInstitutionActivity(
+                        institution.getId(),
+                        activityId
+                );
+
+        /*
+         * 모집 중인 활동의 신청만 승인할 수 있다.
+         */
+        if (
+                activity.getStatus()
+                        != ActivityStatus.RECRUITING
+        ) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+
+        ActivityApplication application =
+                findActivityApplication(
+                        institution.getId(),
+                        activityId,
+                        applicationId
+                );
+
+        /*
+         * 승인 대기 상태의 신청만 처리할 수 있다.
+         */
+        validatePendingApplication(
+                application
+        );
+
+        long approvedCount =
+                institutionActivityRepository
+                        .countApplications(
+                                activityId,
+                                ApplicationStatus.APPROVED
+                        );
+
+        /*
+         * 필요한 인원이 이미 모두 승인됐다면
+         * 추가 신청을 승인할 수 없다.
+         */
+        if (
+                approvedCount
+                        >= activity.getRequiredPeople()
+        ) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+
+        application.approve(
+                user
+        );
+
+        return InstitutionActivityApplicationResponse.from(
+                application
+        );
+    }
+    /**
+     * 기관 담당자가 봉사 신청을 반려한다.
+     */
+    @Transactional
+    public InstitutionActivityApplicationResponse
+    rejectActivityApplication(
+            Long userId,
+            Long activityId,
+            Long applicationId,
+            InstitutionActivityApplicationRejectRequest request
+    ) {
+        User user =
+                findUser(userId);
+
+        Institution institution =
+                getInstitution(user);
+
+        CareActivity activity =
+                findInstitutionActivity(
+                        institution.getId(),
+                        activityId
+                );
+
+        /*
+         * 모집 중인 활동의 신청만 반려할 수 있다.
+         */
+        if (
+                activity.getStatus()
+                        != ActivityStatus.RECRUITING
+        ) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+
+        ActivityApplication application =
+                findActivityApplication(
+                        institution.getId(),
+                        activityId,
+                        applicationId
+                );
+
+        validatePendingApplication(
+                application
+        );
+
+        application.reject(
+                user,
+                request.reason().trim()
+        );
+
+        return InstitutionActivityApplicationResponse.from(
+                application
+        );
+    }
+    /**
+     * 기관과 활동에 속한 신청서를 조회한다.
+     */
+    private ActivityApplication
+    findActivityApplication(
+            Long institutionId,
+            Long activityId,
+            Long applicationId
+    ) {
+        return institutionActivityRepository
+                .findActivityApplication(
+                        institutionId,
+                        activityId,
+                        applicationId
+                )
+                .orElseThrow(
+                        () ->
+                                new CustomException(
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                )
+                );
+    }
+
+    /**
+     * 승인 대기 상태의 신청인지 검사한다.
+     */
+    private void validatePendingApplication(
+            ActivityApplication application
+    ) {
+        if (
+                application.getStatus()
+                        != ApplicationStatus.PENDING
+        ) {
             throw new CustomException(
                     ErrorCode.INVALID_INPUT_VALUE
             );

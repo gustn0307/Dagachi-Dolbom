@@ -202,4 +202,27 @@ public interface InstitutionActivityRepository
 
             Pageable pageable
     );
+    /**
+     * 기관, 활동, 신청 번호가 모두 일치하는 신청서를 조회한다.
+     */
+    @Query("""
+        SELECT application
+        FROM ActivityApplication application
+        JOIN FETCH application.user
+        LEFT JOIN FETCH application.approvedBy
+        WHERE application.id = :applicationId
+          AND application.activity.id = :activityId
+          AND application.activity.institution.id = :institutionId
+        """)
+    Optional<ActivityApplication>
+    findActivityApplication(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("activityId")
+            Long activityId,
+
+            @Param("applicationId")
+            Long applicationId
+    );
 }

@@ -15,10 +15,10 @@ public record InstitutionActivityUpdateRequest(
         @Future(message = "활동 예정 일시는 현재보다 이후여야 합니다.")
         LocalDateTime scheduledAt,
 
-        @NotNull(message = "필요 인원은 필수입니다.")
+        @NotNull(message = "모집 인원은 필수입니다.")
         @Min(
-                value = 1,
-                message = "필요 인원은 1명 이상이어야 합니다."
+                value = 2,
+                message = "모집 인원은 최소 2명이어야 합니다."
         )
         Integer requiredPeople
 ) {

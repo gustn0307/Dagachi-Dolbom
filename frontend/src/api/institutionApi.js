@@ -289,6 +289,36 @@ export const getActivityApplications = (
     ),
   );
 
+  /**
+ * 기관 담당자의 봉사 신청 승인.
+ */
+export const approveActivityApplication = (
+  activityId,
+  applicationId,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/activities/${activityId}/applications/${applicationId}/approve`,
+    ),
+  );
+
+/**
+ * 기관 담당자의 봉사 신청 반려.
+ */
+export const rejectActivityApplication = (
+  activityId,
+  applicationId,
+  reason,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/activities/${activityId}/applications/${applicationId}/reject`,
+      {
+        reason,
+      },
+    ),
+  );
+
 /**
  * 기관 통계 조회.
  */
@@ -351,12 +381,14 @@ export const institutionApi = {
   getVolunteerActivities,
 
   // 기관 활동 API
-  getActivities,
+ getActivities,
   getActivity,
   createActivity,
   updateActivity,
   updateActivityStatus,
   getActivityApplications,
+  approveActivityApplication,
+  rejectActivityApplication,
 
   // 기관 활동 및 통계 API
   getStatistics,

@@ -283,4 +283,86 @@ public class InstitutionActivityController {
                 )
         );
     }
+    /**
+     * 기관 담당자의 봉사 신청 승인.
+     *
+     * PATCH
+     * /api/institution/activities/{activityId}
+     * /applications/{applicationId}/approve
+     */
+    @PatchMapping(
+            "/{activityId}/applications/{applicationId}/approve"
+    )
+    public ResponseEntity<
+            ApiResponse<InstitutionActivityApplicationResponse>
+            >
+    approveActivityApplication(
+            @AuthenticationPrincipal
+            Long userId,
+
+            @PathVariable
+            Long activityId,
+
+            @PathVariable
+            Long applicationId
+    ) {
+        InstitutionActivityApplicationResponse response =
+                institutionActivityService
+                        .approveActivityApplication(
+                                userId,
+                                activityId,
+                                applicationId
+                        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "봉사 신청을 승인했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 기관 담당자의 봉사 신청 반려.
+     *
+     * PATCH
+     * /api/institution/activities/{activityId}
+     * /applications/{applicationId}/reject
+     */
+    @PatchMapping(
+            "/{activityId}/applications/{applicationId}/reject"
+    )
+    public ResponseEntity<
+            ApiResponse<InstitutionActivityApplicationResponse>
+            >
+    rejectActivityApplication(
+            @AuthenticationPrincipal
+            Long userId,
+
+            @PathVariable
+            Long activityId,
+
+            @PathVariable
+            Long applicationId,
+
+            @Valid
+            @RequestBody
+            InstitutionActivityApplicationRejectRequest request
+    ) {
+        InstitutionActivityApplicationResponse response =
+                institutionActivityService
+                        .rejectActivityApplication(
+                                userId,
+                                activityId,
+                                applicationId,
+                                request
+                        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "봉사 신청을 반려했습니다.",
+                        response
+                )
+        );
+    }
 }
