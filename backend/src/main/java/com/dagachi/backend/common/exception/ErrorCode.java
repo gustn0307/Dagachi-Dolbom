@@ -88,6 +88,12 @@ public enum ErrorCode {
             "이미 다른 기관에 배정된 제보입니다."
     ),
 
+    REPORT_INVALID_STATUS_TRANSITION(
+            HttpStatus.CONFLICT,
+            "REPORT_409_INVALID_STATUS_TRANSITION",
+            "현재 상태에서는 요청한 제보 상태로 변경할 수 없습니다."
+    ),
+
     // AI
     AI_SERVICE_UNAVAILABLE(
             HttpStatus.SERVICE_UNAVAILABLE,

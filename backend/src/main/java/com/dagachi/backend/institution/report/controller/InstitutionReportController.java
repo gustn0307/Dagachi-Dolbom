@@ -1,20 +1,18 @@
 package com.dagachi.backend.institution.report.controller;
 
 import com.dagachi.backend.common.response.ApiResponse;
-import com.dagachi.backend.institution.report.dto.ReportAssignmentResponse;
+import com.dagachi.backend.common.response.PageResponse;
+import com.dagachi.backend.domain.enums.ReportStatus;
+import com.dagachi.backend.institution.report.dto.*;
 import com.dagachi.backend.institution.report.service.InstitutionReportService;
+import com.dagachi.backend.institution.report.service.ReportAiAnalysisService;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import com.dagachi.backend.common.response.PageResponse;
-import com.dagachi.backend.domain.enums.ReportStatus;
-import com.dagachi.backend.institution.report.dto.InstitutionReportListItemResponse;
-import com.dagachi.backend.institution.report.dto.UnassignedReportListItemResponse;
-import org.springframework.data.domain.Pageable;
-import org.springframework.format.annotation.DateTimeFormat;
-import com.dagachi.backend.institution.report.dto.InstitutionReportDetailResponse;
-import com.dagachi.backend.institution.report.dto.ReportAiAnalysisResponse;
-import com.dagachi.backend.institution.report.service.ReportAiAnalysisService;
+
 import java.time.LocalDate;
 
 @RestController
@@ -206,6 +204,34 @@ public class InstitutionReportController {
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "제보 AI 요약 결과를 조회했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 현재 로그인한 기관에 배정된 제보의 처리 상태를 변경합니다.
+     *
+     * 상태 전이 가능 여부는 Report Entity의 도메인 규칙으로 검증하며,
+     * 다른 기관의 제보 또는 미배정 제보는 변경할 수 없습니다.
+     */
+    @PatchMapping("/{reportId}/status")
+    public ResponseEntity<ApiResponse<ReportStatusUpdateResponse>>
+    updateReportStatus(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long reportId,
+            @Valid @RequestBody ReportStatusUpdateRequest request
+    ) {
+        ReportStatusUpdateResponse response =
+                institutionReportService.updateReportStatus(
+                        userId,
+                        reportId,
+                        request.status()
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "제보 상태를 변경했습니다.",
                         response
                 )
         );

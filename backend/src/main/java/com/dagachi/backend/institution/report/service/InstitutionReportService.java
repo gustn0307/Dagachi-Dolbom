@@ -23,7 +23,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -309,6 +308,54 @@ public class InstitutionReportService {
                 images,
                 aiSummary
         );
+    }
+
+    /**
+     * 현재 로그인한 기관에 배정된 제보의 처리 상태를 변경합니다.
+     *
+     * 기관 Role만 확인하는 것으로 끝내지 않고,
+     * 실제 Report가 로그인 사용자의 기관 소유인지 검증한 뒤
+     * Entity의 상태 전이 규칙을 통해 상태를 변경합니다.
+     */
+    @Transactional
+    public ReportStatusUpdateResponse updateReportStatus(
+            Long userId,
+            Long reportId,
+            ReportStatus newStatus
+    ) {
+        Institution institution =
+                getInstitutionByUserId(userId);
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(
+                        () -> new CustomException(
+                                ErrorCode.RESOURCE_NOT_FOUND
+                        )
+                );
+
+        /*
+         * 미배정 제보 및 다른 기관의 제보 상태를
+         * 임의로 변경하지 못하도록 기관 소유권을 확인합니다.
+         */
+        if (report.getInstitution() == null
+                || !report.getInstitution()
+                .getId()
+                .equals(institution.getId())) {
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN
+            );
+        }
+
+        /*
+         * 실제 상태 전이 가능 여부는 Report Entity가 판단합니다.
+         */
+        report.changeStatus(newStatus);
+
+        /*
+         * @Transactional 안의 managed Entity이므로
+         * 별도의 save() 호출 없이 dirty checking으로 UPDATE됩니다.
+         */
+        return ReportStatusUpdateResponse.from(report);
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.dagachi.backend.domain.entity;
 
 import com.dagachi.backend.common.entity.BaseTimeEntity;
+import com.dagachi.backend.common.exception.CustomException;
+import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.domain.enums.ReportStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -109,5 +111,53 @@ public class Report extends BaseTimeEntity {
             Institution institution
     ) {
         this.institution = institution;
+    }
+
+    /**
+     * 기관 담당자의 검토 결과에 따라 제보 처리 상태를 변경합니다.
+     *
+     * 상태 전이 규칙을 Service에 흩어놓지 않고
+     * Report Entity가 자신의 상태 변경 규칙을 관리합니다.
+     *
+     * 허용 전이:
+     * SUBMITTED      -> REVIEWING
+     * REVIEWING      -> NEED_MORE_INFO / ACCEPTED / REJECTED
+     * NEED_MORE_INFO -> REVIEWING / ACCEPTED / REJECTED
+     * ACCEPTED       -> CLOSED
+     * REJECTED       -> CLOSED
+     * CLOSED         -> 변경 불가
+     */
+    public void changeStatus(
+            ReportStatus newStatus
+    ) {
+        boolean allowed =
+                switch (this.status) {
+                    case SUBMITTED ->
+                            newStatus == ReportStatus.REVIEWING;
+
+                    case REVIEWING ->
+                            newStatus == ReportStatus.NEED_MORE_INFO
+                                    || newStatus == ReportStatus.ACCEPTED
+                                    || newStatus == ReportStatus.REJECTED;
+
+                    case NEED_MORE_INFO ->
+                            newStatus == ReportStatus.REVIEWING
+                                    || newStatus == ReportStatus.ACCEPTED
+                                    || newStatus == ReportStatus.REJECTED;
+
+                    case ACCEPTED, REJECTED ->
+                            newStatus == ReportStatus.CLOSED;
+
+                    case CLOSED ->
+                            false;
+                };
+
+        if (!allowed) {
+            throw new CustomException(
+                    ErrorCode.REPORT_INVALID_STATUS_TRANSITION
+            );
+        }
+
+        this.status = newStatus;
     }
 }
