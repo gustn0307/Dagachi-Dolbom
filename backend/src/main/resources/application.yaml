@@ -53,3 +53,14 @@ ai:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+# Kakao Local API
+#
+# 기관 주소를 위도/경도로 변환할 때 사용합니다.
+# REST API Key는 코드에 직접 작성하지 않고 환경변수로 주입합니다.
+kakao:
+  local:
+    base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${KAKAO_REST_API_KEY}
+    connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:3000}
+    read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:5000}

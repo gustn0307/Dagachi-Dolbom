@@ -88,6 +88,25 @@ public enum ErrorCode {
             "이미 다른 기관에 배정된 제보입니다."
     ),
 
+    // AI
+    AI_SERVICE_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AI_503_SERVICE_UNAVAILABLE",
+            "AI 서비스를 사용할 수 없습니다."
+    ),
+
+    AI_SERVICE_TIMEOUT(
+            HttpStatus.GATEWAY_TIMEOUT,
+            "AI_504_TIMEOUT",
+            "AI 서비스 응답 시간이 초과되었습니다."
+    ),
+
+    AI_SERVICE_INVALID_RESPONSE(
+            HttpStatus.BAD_GATEWAY,
+            "AI_502_INVALID_RESPONSE",
+            "AI 서비스가 올바르지 않은 응답을 반환했습니다."
+    ),
+
     // S3
     S3_UPLOAD_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
