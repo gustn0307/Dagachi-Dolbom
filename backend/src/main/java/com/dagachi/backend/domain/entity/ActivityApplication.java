@@ -61,4 +61,48 @@ public class ActivityApplication extends BaseTimeEntity {
   }
   this.status = ApplicationStatus.CANCELED;
  }
+ /**
+  * 기관 담당자가 봉사 신청을 승인한다.
+  */
+ public void approve(
+         User processedBy
+ ) {
+  this.status =
+          ApplicationStatus.APPROVED;
+
+  // 신청을 처리한 기관 담당자
+  this.approvedBy =
+          processedBy;
+
+  // 신청을 처리한 시간
+  this.approvedAt =
+          LocalDateTime.now();
+
+  // 이전 반려 사유가 있다면 제거
+  this.rejectedReason =
+          null;
+ }
+
+ /**
+  * 기관 담당자가 봉사 신청을 반려한다.
+  */
+ public void reject(
+         User processedBy,
+         String reason
+ ) {
+  this.status =
+          ApplicationStatus.REJECTED;
+
+  // 신청을 처리한 기관 담당자
+  this.approvedBy =
+          processedBy;
+
+  // 신청을 처리한 시간
+  this.approvedAt =
+          LocalDateTime.now();
+
+  // 기관 담당자가 입력한 반려 사유
+  this.rejectedReason =
+          reason;
+ }
 }
