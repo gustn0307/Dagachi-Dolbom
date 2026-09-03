@@ -46,6 +46,7 @@ function Volunteer() {
   const [activities, setActivities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -53,7 +54,7 @@ function Volunteer() {
   const [isNarrow, setIsNarrow] = useState(
     typeof window !== "undefined"
       ? window.innerWidth <= NARROW_BREAKPOINT
-      : false
+      : false,
   );
 
   const [selectedActivityId, setSelectedActivityId] = useState(null);
@@ -107,12 +108,19 @@ function Volunteer() {
     return () => {
       ignore = true;
     };
-  }, [activeTab, currentPage, appliedRegion, selectedAgeGroups, selectedGender, coords]);
+  }, [
+    activeTab,
+    currentPage,
+    appliedRegion,
+    selectedAgeGroups,
+    selectedGender,
+    coords,
+  ]);
 
   useEffect(() => {
     setCurrentPage(0);
     setSelectedActivityId(null);
-    setApplyError(null)
+    setApplyError(null);
   }, [activeTab]);
 
   useEffect(() => {
@@ -208,7 +216,9 @@ function Volunteer() {
   const handleToggleAgeGroup = (ageGroup) => {
     resetPageAndSelection();
     setSelectedAgeGroups((prev) =>
-      prev.includes(ageGroup) ? prev.filter((a) => a !== ageGroup) : [...prev, ageGroup]
+      prev.includes(ageGroup)
+        ? prev.filter((a) => a !== ageGroup)
+        : [...prev, ageGroup],
     );
   };
 
@@ -246,10 +256,12 @@ function Volunteer() {
         setGeoLoading(false);
       },
       () => {
-        setToastMessage("위치 정보를 가져올 수 없습니다. 위치 권한을 확인해주세요.");
+        setToastMessage(
+          "위치 정보를 가져올 수 없습니다. 위치 권한을 확인해주세요.",
+        );
         setGeoLoading(false);
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
     );
   };
 
@@ -270,7 +282,10 @@ function Volunteer() {
     sortMode === "distance";
 
   // ---- 페이지네이션 버튼 스타일 헬퍼 ----
-  const pageBtnStyle = (key, { active = false, disabled = false, wide = false } = {}) => ({
+  const pageBtnStyle = (
+    key,
+    { active = false, disabled = false, wide = false } = {},
+  ) => ({
     minWidth: isNarrow ? 36 : 40,
     minHeight: isNarrow ? 36 : 40,
     padding: wide ? (isNarrow ? "0 10px" : "0 16px") : "0 10px",
@@ -284,8 +299,8 @@ function Volunteer() {
     color: active
       ? "#fff"
       : hoveredPageBtn === key && !disabled
-      ? "#f4771c"
-      : "#685d52",
+        ? "#f4771c"
+        : "#685d52",
     fontSize: isNarrow ? 13 : 14,
     fontWeight: 700,
     fontFamily: "inherit",
@@ -313,7 +328,9 @@ function Volunteer() {
           textAlign: "center",
         }}
       >
-        <p style={{ color: "#897e75", fontSize: isNarrow ? 12 : 13, margin: 0 }}>
+        <p
+          style={{ color: "#897e75", fontSize: isNarrow ? 12 : 13, margin: 0 }}
+        >
           전체 {totalElements}건 중 {startIdx}~{endIdx}번째
         </p>
 
@@ -342,38 +359,42 @@ function Volunteer() {
             {!isNarrow && <span> 이전</span>}
           </button>
 
-          {getPageNumbers(currentPage, effectiveTotalPages, siblingCount).map((p, idx) =>
-            p === "..." ? (
-              <span
-                key={`ellipsis-${idx}`}
-                aria-hidden="true"
-                style={{
-                  minWidth: 24,
-                  minHeight: isNarrow ? 36 : 40,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#b3aba4",
-                  fontSize: 14,
-                }}
-              >
-                …
-              </span>
-            ) : (
-              <button
-                type="button"
-                key={p}
-                style={pageBtnStyle(p, { active: p === currentPage, disabled: isLoading })}
-                disabled={isLoading}
-                aria-current={p === currentPage ? "page" : undefined}
-                aria-label={`${p + 1}페이지`}
-                onClick={() => handlePageChange(p)}
-                onMouseEnter={() => setHoveredPageBtn(p)}
-                onMouseLeave={() => setHoveredPageBtn(null)}
-              >
-                {p + 1}
-              </button>
-            )
+          {getPageNumbers(currentPage, effectiveTotalPages, siblingCount).map(
+            (p, idx) =>
+              p === "..." ? (
+                <span
+                  key={`ellipsis-${idx}`}
+                  aria-hidden="true"
+                  style={{
+                    minWidth: 24,
+                    minHeight: isNarrow ? 36 : 40,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#b3aba4",
+                    fontSize: 14,
+                  }}
+                >
+                  …
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  key={p}
+                  style={pageBtnStyle(p, {
+                    active: p === currentPage,
+                    disabled: isLoading,
+                  })}
+                  disabled={isLoading}
+                  aria-current={p === currentPage ? "page" : undefined}
+                  aria-label={`${p + 1}페이지`}
+                  onClick={() => handlePageChange(p)}
+                  onMouseEnter={() => setHoveredPageBtn(p)}
+                  onMouseLeave={() => setHoveredPageBtn(null)}
+                >
+                  {p + 1}
+                </button>
+              ),
           )}
 
           <button
@@ -474,7 +495,14 @@ function Volunteer() {
 
       {/* 연령대 필터 */}
       <div>
-        <p style={{ margin: "0 0 8px", fontSize: 13, color: "#897e75", fontWeight: 700 }}>
+        <p
+          style={{
+            margin: "0 0 8px",
+            fontSize: 13,
+            color: "#897e75",
+            fontWeight: 700,
+          }}
+        >
           연령대
         </p>
         <div
@@ -511,10 +539,21 @@ function Volunteer() {
 
       {/* 성별 필터 */}
       <div>
-        <p style={{ margin: "0 0 8px", fontSize: 13, color: "#897e75", fontWeight: 700 }}>
+        <p
+          style={{
+            margin: "0 0 8px",
+            fontSize: 13,
+            color: "#897e75",
+            fontWeight: 700,
+          }}
+        >
           성별
         </p>
-        <div role="group" aria-label="성별 선택" style={{ display: "flex", gap: 8 }}>
+        <div
+          role="group"
+          aria-label="성별 선택"
+          style={{ display: "flex", gap: 8 }}
+        >
           {GENDER_OPTIONS.map(({ value, label }) => {
             const active = selectedGender === value;
             return (
@@ -544,10 +583,21 @@ function Volunteer() {
 
       {/* 정렬 */}
       <div>
-        <p style={{ margin: "0 0 8px", fontSize: 13, color: "#897e75", fontWeight: 700 }}>
+        <p
+          style={{
+            margin: "0 0 8px",
+            fontSize: 13,
+            color: "#897e75",
+            fontWeight: 700,
+          }}
+        >
           정렬
         </p>
-        <div role="group" aria-label="정렬 방식 선택" style={{ display: "flex", gap: 8 }}>
+        <div
+          role="group"
+          aria-label="정렬 방식 선택"
+          style={{ display: "flex", gap: 8 }}
+        >
           <button
             type="button"
             aria-pressed={sortMode === "latest"}
@@ -639,19 +689,37 @@ function Volunteer() {
 
           <section className="visit-list">
             {isLoading && (
-              <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
                 불러오는 중입니다...
               </p>
             )}
 
             {!isLoading && error && (
-              <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
                 {error}
               </p>
             )}
 
             {!isLoading && !error && activities.length === 0 && (
-              <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
                 조건에 맞는 방문 활동이 없습니다.
               </p>
             )}
@@ -712,7 +780,9 @@ function Volunteer() {
 
       {activeTab === "auto" && (
         <section className="visit-list">
-          <p style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}>
+          <p
+            style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}
+          >
             자동배정 기능은 준비 중입니다.
           </p>
         </section>
@@ -746,11 +816,105 @@ function Volunteer() {
           className="submit"
           type="button"
           disabled={!selectedActivityId || isApplying}
-          onClick={handleApply}
+          onClick={() => setShowConfirmModal(true)}
         >
           {isApplying ? "신청 중..." : "이 활동 신청하기"}
         </button>
       </section>
+
+      {showConfirmModal && selectedActivity && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-modal-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+          onClick={() => !isApplying && setShowConfirmModal(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              padding: 28,
+              maxWidth: 360,
+              width: "100%",
+              textAlign: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="confirm-modal-title"
+              style={{ fontSize: 18, margin: "0 0 12px", color: "#3d332a" }}
+            >
+              이 활동을 신청하시겠어요?
+            </h2>
+            <p
+              style={{
+                margin: "0 0 24px",
+                color: "#897e75",
+                fontSize: 14,
+                lineHeight: 1.5,
+              }}
+            >
+              {selectedActivity.region} ·{" "}
+              {formatSchedule(selectedActivity.scheduledAt)}
+              <br />
+              신청 후 기관 담당자의 승인을 기다리게 됩니다.
+            </p>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                disabled={isApplying}
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  border: "1px solid #ece5dd",
+                  borderRadius: 10,
+                  background: "#fff",
+                  color: "#685d52",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: isApplying ? "not-allowed" : "pointer",
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={isApplying}
+                onClick={async () => {
+                  await handleApply();
+                  setShowConfirmModal(false);
+                }}
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  border: "1px solid #f4771c",
+                  borderRadius: 10,
+                  background: "#f4771c",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: isApplying ? "not-allowed" : "pointer",
+                  opacity: isApplying ? 0.7 : 1,
+                }}
+              >
+                {isApplying ? "신청 중..." : "신청 확정"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toastMessage && <div className="toast">{toastMessage}</div>}
     </>
