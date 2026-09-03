@@ -217,6 +217,77 @@ export const getActivities = (
           { params },
         ),
       );
+      
+/**
+ * 기관 활동 상세 조회.
+ */
+export const getActivity = (
+  activityId,
+) =>
+  unwrapData(
+    api.get(
+      `/api/institution/activities/${activityId}`,
+    ),
+  );
+
+/**
+ * 기관 활동 등록.
+ */
+export const createActivity = (
+  request,
+) =>
+  unwrapData(
+    api.post(
+      "/api/institution/activities",
+      request,
+    ),
+  );
+
+/**
+ * 기관 활동 정보 수정.
+ */
+export const updateActivity = (
+  activityId,
+  request,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/activities/${activityId}`,
+      request,
+    ),
+  );
+
+/**
+ * 기관 활동 상태 변경.
+ */
+export const updateActivityStatus = (
+  activityId,
+  status,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/activities/${activityId}/status`,
+      {
+        status,
+      },
+    ),
+  );
+
+/**
+ * 기관 활동 신청자 목록 조회.
+ */
+export const getActivityApplications = (
+  activityId,
+  params = {},
+) =>
+  unwrapData(
+    api.get(
+      `/api/institution/activities/${activityId}/applications`,
+      {
+        params,
+      },
+    ),
+  );
 
 /**
  * 기관 통계 조회.
@@ -279,8 +350,15 @@ export const institutionApi = {
   getVolunteer,
   getVolunteerActivities,
 
-  // 기관 활동 및 통계 API
+  // 기관 활동 API
   getActivities,
+  getActivity,
+  createActivity,
+  updateActivity,
+  updateActivityStatus,
+  getActivityApplications,
+
+  // 기관 활동 및 통계 API
   getStatistics,
 
   // 제보 상태 변경 API

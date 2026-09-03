@@ -1,5 +1,6 @@
 package com.dagachi.backend.domain.repository;
 
+import com.dagachi.backend.domain.entity.ActivityApplication;
 import com.dagachi.backend.domain.entity.ActivityRecord;
 import com.dagachi.backend.domain.entity.CareActivity;
 import com.dagachi.backend.domain.enums.ActivityStatus;
@@ -12,7 +13,6 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-
 /**
  * 기관 담당자의 활동 관리 조회를 담당하는 Repository.
  *
@@ -153,5 +153,53 @@ public interface InstitutionActivityRepository
     Optional<ActivityRecord> findActivityRecord(
             @Param("activityId")
             Long activityId
+    );
+    /**
+     * 새로운 기관 활동을 저장한다.
+     */
+    CareActivity save(
+            CareActivity activity
+    );
+    /**
+     * 특정 기관 활동의 신청자 목록을 조회한다.
+     */
+    @Query(
+            value = """
+                SELECT application
+                FROM ActivityApplication application
+                JOIN FETCH application.user volunteer
+                LEFT JOIN FETCH application.approvedBy
+                WHERE application.activity.id = :activityId
+                  AND application.activity.institution.id = :institutionId
+                  AND (
+                      :hasStatus = false
+                      OR application.status = :status
+                  )
+                """,
+            countQuery = """
+                SELECT COUNT(application.id)
+                FROM ActivityApplication application
+                WHERE application.activity.id = :activityId
+                  AND application.activity.institution.id = :institutionId
+                  AND (
+                      :hasStatus = false
+                      OR application.status = :status
+                  )
+                """
+    )
+    Page<ActivityApplication> findActivityApplications(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("activityId")
+            Long activityId,
+
+            @Param("hasStatus")
+            boolean hasStatus,
+
+            @Param("status")
+            ApplicationStatus status,
+
+            Pageable pageable
     );
 }
