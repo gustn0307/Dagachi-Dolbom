@@ -26,7 +26,7 @@ services:
 
   ai-service:
     build:
-      context: ./ai-service
+      context: ../ai-service
       dockerfile: Dockerfile
 
     container_name: dagachi-prod-ai-service
@@ -51,7 +51,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ../backend
       dockerfile: Dockerfile
 
     container_name: dagachi-prod-backend
@@ -83,7 +83,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ""
