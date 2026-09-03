@@ -34,4 +34,75 @@ public class ActivityApplication extends BaseTimeEntity {
 
  @Column(name="rejected_reason",columnDefinition="text")
  private String rejectedReason;
+
+ // Entity 확인 및 수정
+ public static ActivityApplication createDirect(CareActivity activity, User user) {
+  ActivityApplication application = new ActivityApplication();
+  application.activity = activity;
+  application.user = user;
+  application.applicationType = ApplicationType.DIRECT;
+  application.status = ApplicationStatus.PENDING;
+  return application;
+ }
+
+ public void reactivate() {
+  if (this.status != ApplicationStatus.CANCELED) {
+   throw new IllegalStateException("CANCELED 상태에서만 재신청할 수 있습니다.");
+  }
+  this.status = ApplicationStatus.PENDING;
+  this.approvedBy = null;
+  this.approvedAt = null;
+  this.rejectedReason = null;
+ }
+
+ public void cancel() {
+  if (this.status != ApplicationStatus.PENDING && this.status != ApplicationStatus.APPROVED) {
+   throw new IllegalStateException("PENDING 또는 APPROVED 상태에서만 취소할 수 있습니다.");
+  }
+  this.status = ApplicationStatus.CANCELED;
+ }
+ /**
+  * 기관 담당자가 봉사 신청을 승인한다.
+  */
+ public void approve(
+         User processedBy
+ ) {
+  this.status =
+          ApplicationStatus.APPROVED;
+
+  // 신청을 처리한 기관 담당자
+  this.approvedBy =
+          processedBy;
+
+  // 신청을 처리한 시간
+  this.approvedAt =
+          LocalDateTime.now();
+
+  // 이전 반려 사유가 있다면 제거
+  this.rejectedReason =
+          null;
+ }
+
+ /**
+  * 기관 담당자가 봉사 신청을 반려한다.
+  */
+ public void reject(
+         User processedBy,
+         String reason
+ ) {
+  this.status =
+          ApplicationStatus.REJECTED;
+
+  // 신청을 처리한 기관 담당자
+  this.approvedBy =
+          processedBy;
+
+  // 신청을 처리한 시간
+  this.approvedAt =
+          LocalDateTime.now();
+
+  // 기관 담당자가 입력한 반려 사유
+  this.rejectedReason =
+          reason;
+ }
 }
