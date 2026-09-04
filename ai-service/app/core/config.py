@@ -21,11 +21,17 @@ class Settings(BaseSettings):
     app_name: str = "Dagachi Dolbom AI Service"
     app_version: str = "0.1.0"
 
-    # OpenAI API Key
+    # OpenAI 설정
     #
-    # 아직 OpenAI 기능을 연결하지 않았으므로 기본값을 빈 문자열로 둡니다.
-    # 이후 실제 AI 기능 구현 시 .env에서 값을 주입합니다.
+    # 실제 API Key는 코드에 직접 작성하지 않고
+    # OPENAI_API_KEY 환경변수에서 주입합니다.
     openai_api_key: str = ""
+
+    # AI 기능에서 사용할 기본 OpenAI 모델입니다.
+    #
+    # 환경변수 OPENAI_MODEL로 변경할 수 있으며,
+    # 현재 프로젝트에서는 gpt-4o-mini를 기본 모델로 사용합니다.
+    openai_model: str = "gpt-4o-mini"
 
     # .env 파일을 읽도록 설정합니다.
     #

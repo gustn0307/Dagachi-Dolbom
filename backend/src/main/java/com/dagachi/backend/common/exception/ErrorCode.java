@@ -82,6 +82,49 @@ public enum ErrorCode {
             "제보 사진은 최대 3장까지 첨부할 수 있습니다."
     ),
 
+    REPORT_ALREADY_ASSIGNED(
+            HttpStatus.CONFLICT,
+            "REPORT_409_ALREADY_ASSIGNED",
+            "이미 다른 기관에 배정된 제보입니다."
+    ),
+
+    REPORT_INVALID_STATUS_TRANSITION(
+            HttpStatus.CONFLICT,
+            "REPORT_409_INVALID_STATUS_TRANSITION",
+            "현재 상태에서는 요청한 제보 상태로 변경할 수 없습니다."
+    ),
+
+    REPORT_CARE_RECIPIENT_ALREADY_LINKED(
+            HttpStatus.CONFLICT,
+            "REPORT_409_CARE_RECIPIENT_ALREADY_LINKED",
+            "이미 돌봄 대상자가 연결된 제보입니다."
+    ),
+
+    REPORT_INVALID_INITIAL_CONSENT_STATUS(
+            HttpStatus.BAD_REQUEST,
+            "REPORT_400_INVALID_INITIAL_CONSENT_STATUS",
+            "신규 대상자 등록 시 동의 상태는 PENDING 또는 AGREED만 가능합니다."
+    ),
+
+    // AI
+    AI_SERVICE_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AI_503_SERVICE_UNAVAILABLE",
+            "AI 서비스를 사용할 수 없습니다."
+    ),
+
+    AI_SERVICE_TIMEOUT(
+            HttpStatus.GATEWAY_TIMEOUT,
+            "AI_504_TIMEOUT",
+            "AI 서비스 응답 시간이 초과되었습니다."
+    ),
+
+    AI_SERVICE_INVALID_RESPONSE(
+            HttpStatus.BAD_GATEWAY,
+            "AI_502_INVALID_RESPONSE",
+            "AI 서비스가 올바르지 않은 응답을 반환했습니다."
+    ),
+
     // S3
     S3_UPLOAD_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
