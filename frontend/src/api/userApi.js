@@ -87,3 +87,20 @@ export const fetchMyApplications = async ({
   const response = await api.get("/api/users/me/activity-applications", { params });
   return response.data.data;
 };
+
+// 내 활동 목록 조회 (APP-04)
+export const fetchMyActivities = async ({
+  page = 0,
+  size = 10,
+  activityStatus,
+} = {}) => {
+  const params = { page, size };
+  if (activityStatus) params.activityStatus = activityStatus;
+
+  const response = await api.get("/api/users/me/activities", { params });
+  return response.data.data;
+};
+
+// 신청 취소 (APP-05)
+export const cancelApplication = (applicationId) =>
+  unwrapData(api.post(`/api/activity-applications/${applicationId}/cancel`));

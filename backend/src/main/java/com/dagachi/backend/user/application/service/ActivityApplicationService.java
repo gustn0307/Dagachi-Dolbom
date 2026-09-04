@@ -18,8 +18,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
- * 일반 USER의 활동 신청(APP-01) / 내 신청 목록 조회(APP-03) 비즈니스 로직을 담당한다.
+ * 일반 USER의 활동 신청(APP-01) / 내 신청 목록(APP-03) / 내 활동 목록(APP-04)
+ * / 신청 취소(APP-05) 비즈니스 로직을 담당한다.
  */
 @Service
 public class ActivityApplicationService {
@@ -40,9 +43,6 @@ public class ActivityApplicationService {
 
     /**
      * APP-01 직접 신청.
-     * 동일 activity/user 조합이 없으면 새로 생성(PENDING),
-     * CANCELED 상태로 남아있으면 기존 행을 재사용(reactivate)한다.
-     * 그 외 상태(PENDING/APPROVED/REJECTED)로 이미 존재하면 409.
      */
     @Transactional
     public ApplicationResponse applyDirect(Long activityId, Long userId) {
@@ -96,10 +96,75 @@ public class ActivityApplicationService {
     }
 
     /**
-     * recipient까지 JOIN FETCH된 상태로 활동을 조회한다.
-     * ApplicationResponse.from()이 activity.getRecipient()를 바로 쓰기 때문에
-     * LazyInitializationException을 피하려면 findById가 아니라 이 메서드를 써야 한다.
+     * APP-04 내 활동 목록 조회 (APPROVED 신청 기준).
      */
+    @Transactional(readOnly = true)
+    public PageResponse<ApplicationResponse> getMyActivities(
+            Long userId,
+            ActivityStatus activityStatus,
+            Pageable pageable
+    ) {
+        Page<ActivityApplication> page = activityApplicationRepository.findMyActivities(
+                userId, activityStatus != null, activityStatus, pageable
+        );
+
+        return PageResponse.from(page.map(ApplicationResponse::from));
+    }
+
+    /**
+     * APP-05 신청 취소.
+     * PENDING: 단순 취소.
+     * APPROVED: 활동이 시작 전(RECRUITING/READY)인 경우만 허용.
+     *           취소 후 승인 인원이 정원 미달이 되면 READY -> RECRUITING으로 되돌린다.
+     * 그 외(REJECTED/CANCELED, 또는 활동이 이미 시작/종료됨): 취소 불가.
+     */
+    @Transactional
+    public ApplicationResponse cancelApplication(Long applicationId, Long userId) {
+
+        ActivityApplication application = activityApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!application.getUser().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        if (application.getStatus() == ApplicationStatus.PENDING) {
+            application.cancel();
+            return ApplicationResponse.from(application);
+        }
+
+        if (application.getStatus() == ApplicationStatus.APPROVED) {
+            return cancelApprovedApplication(application);
+        }
+
+        throw new CustomException(ErrorCode.APPLICATION_NOT_CANCELABLE);
+    }
+
+    private ApplicationResponse cancelApprovedApplication(ActivityApplication application) {
+        Long activityId = application.getActivity().getId();
+
+        CareActivity activity = careActivityRepository.findByIdForUpdate(activityId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (activity.getStatus() != ActivityStatus.RECRUITING
+                && activity.getStatus() != ActivityStatus.READY) {
+            throw new CustomException(ErrorCode.APPLICATION_NOT_CANCELABLE);
+        }
+
+        application.cancel();
+
+        long remainingApproved = activityApplicationRepository
+                .countApprovedMap(List.of(activityId))
+                .getOrDefault(activityId, 0L);
+
+        if (activity.getStatus() == ActivityStatus.READY
+                && remainingApproved < activity.getRequiredPeople()) {
+            activity.changeStatus(ActivityStatus.RECRUITING);
+        }
+
+        return ApplicationResponse.from(application);
+    }
+
     private CareActivity findActivity(Long activityId) {
         return careActivityRepository.findDetailById(activityId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));

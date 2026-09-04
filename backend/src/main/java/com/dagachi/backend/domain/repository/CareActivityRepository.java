@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -111,4 +113,12 @@ public interface CareActivityRepository extends JpaRepository<CareActivity, Long
             WHERE ca.id = :activityId
             """)
     Optional<CareActivity> findDetailById(@Param("activityId") Long activityId);
+
+    /**
+     * APP-05 승인 취소 시 정원/상태 경쟁 조건 방지용 락 조회.
+     * DB_ENTITY_GUIDE 06번 문서 동시성 규칙에 따라 신청 승인/승인취소/활동시작 시 사용한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ca FROM CareActivity ca WHERE ca.id = :activityId")
+    Optional<CareActivity> findByIdForUpdate(@Param("activityId") Long activityId);
 }

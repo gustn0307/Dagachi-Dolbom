@@ -2,6 +2,7 @@ package com.dagachi.backend.user.application.controller;
 
 import com.dagachi.backend.common.response.ApiResponse;
 import com.dagachi.backend.common.response.PageResponse;
+import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
 import com.dagachi.backend.user.application.dto.ApplicationResponse;
@@ -13,9 +14,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.PageRequest;
 
 /**
- * 일반 USER의 활동 신청/조회(APP-01, APP-03) API를 제공한다.
+ * 일반 USER의 활동 신청/조회/취소(APP-01, APP-03, APP-04, APP-05) API를 제공한다.
  */
 @RestController
 public class ActivityApplicationController {
@@ -61,6 +63,47 @@ public class ActivityApplicationController {
 
         return ResponseEntity.ok(
                 ApiResponse.success("내 신청 목록을 조회했습니다.", response)
+        );
+    }
+
+    /**
+     * APP-04 내 활동 목록 조회 (APPROVED 신청 기준).
+     *
+     * GET /api/users/me/activities
+     */
+    @GetMapping("/api/users/me/activities")
+    public ResponseEntity<ApiResponse<PageResponse<ApplicationResponse>>> getMyActivities(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) ActivityStatus activityStatus,
+            @PageableDefault(page = 0, size = 20)   // sort 파라미터 제거
+            Pageable pageable
+    ) {
+        // 정렬은 @Query의 ORDER BY ca.scheduledAt DESC로 고정되므로,
+        // Pageable의 정렬 정보는 제거하고 페이지/사이즈만 사용한다.
+        Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+
+        PageResponse<ApplicationResponse> response =
+                activityApplicationService.getMyActivities(userId, activityStatus, pageOnly);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("내 활동 목록을 조회했습니다.", response)
+        );
+    }
+
+    /**
+     * APP-05 신청 취소.
+     *
+     * POST /api/activity-applications/{applicationId}/cancel
+     */
+    @PostMapping("/api/activity-applications/{applicationId}/cancel")
+    public ResponseEntity<ApiResponse<ApplicationResponse>> cancel(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long applicationId
+    ) {
+        ApplicationResponse response = activityApplicationService.cancelApplication(applicationId, userId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("신청이 취소되었습니다.", response)
         );
     }
 }

@@ -10,8 +10,7 @@ import com.dagachi.backend.domain.enums.ApplicationType;
 import java.time.LocalDateTime;
 
 /**
- * APP-01 신청 응답과 APP-03 내 신청 목록 조회 응답을 함께 담당하는 DTO.
- * activity/recipient 정보까지 포함해 신청 자체의 정보 + 활동 요약을 한 번에 제공한다.
+ * APP-01/03/04/05 응답을 함께 담당하는 DTO.
  */
 public record ApplicationResponse(
         Long applicationId,
@@ -24,7 +23,9 @@ public record ApplicationResponse(
         String ageGroup,
         String gender,
         LocalDateTime scheduledAt,
-        ActivityStatus activityStatus
+        ActivityStatus activityStatus,
+        boolean cancelable,
+        boolean reapplicable
 ) {
     public static ApplicationResponse from(ActivityApplication application) {
         CareActivity activity = application.getActivity();
@@ -41,7 +42,30 @@ public record ApplicationResponse(
                 AddressUtils.calculateAgeGroup(recipient.getBirthYear()),
                 recipient.getGender().name(),
                 activity.getScheduledAt(),
-                activity.getStatus()
+                activity.getStatus(),
+                isCancelable(application, activity),
+                isReapplicable(application, activity)
         );
+    }
+
+    // APP-05 스펙: PENDING 또는 (활동이 시작 전인) APPROVED만 취소 가능
+    private static boolean isCancelable(ActivityApplication application, CareActivity activity) {
+        if (application.getStatus() == ApplicationStatus.PENDING) {
+            return true;
+        }
+        if (application.getStatus() == ApplicationStatus.APPROVED) {
+            return activity.getStatus() == ActivityStatus.RECRUITING
+                    || activity.getStatus() == ActivityStatus.READY;
+        }
+        return false;
+    }
+
+    // 취소된 신청이고, 활동이 여전히 모집 중(RECRUITING/READY)일 때만 재신청 가능
+    private static boolean isReapplicable(ActivityApplication application, CareActivity activity) {
+        if (application.getStatus() != ApplicationStatus.CANCELED) {
+            return false;
+        }
+        return activity.getStatus() == ActivityStatus.RECRUITING
+                || activity.getStatus() == ActivityStatus.READY;
     }
 }
