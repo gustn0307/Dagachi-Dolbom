@@ -160,4 +160,22 @@ public class Report extends BaseTimeEntity {
 
         this.status = newStatus;
     }
+
+    /**
+     * 제보를 기존 돌봄 대상자와 연결합니다.
+     *
+     * 한 제보에는 최대 한 명의 돌봄 대상자만 연결할 수 있습니다.
+     * 기관 일치 여부는 Service에서 검증한 뒤 호출합니다.
+     */
+    public void linkCareRecipient(
+            CareRecipient careRecipient
+    ) {
+        if (this.careRecipient != null) {
+            throw new CustomException(
+                    ErrorCode.REPORT_CARE_RECIPIENT_ALREADY_LINKED
+            );
+        }
+
+        this.careRecipient = careRecipient;
+    }
 }

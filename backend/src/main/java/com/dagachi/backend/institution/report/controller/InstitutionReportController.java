@@ -12,6 +12,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.dagachi.backend.institution.recipient.dto.CareRecipientCreateRequest;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 
@@ -235,5 +237,61 @@ public class InstitutionReportController {
                         response
                 )
         );
+    }
+
+    /**
+     * 현재 로그인한 기관의 제보에
+     * 같은 기관의 기존 돌봄 대상자를 연결합니다.
+     */
+    @PutMapping("/{reportId}/care-recipient")
+    public ResponseEntity<ApiResponse<ReportCareRecipientLinkResponse>>
+    linkCareRecipient(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long reportId,
+            @Valid @RequestBody ReportCareRecipientLinkRequest request
+    ) {
+        ReportCareRecipientLinkResponse response =
+                institutionReportService.linkCareRecipient(
+                        userId,
+                        reportId,
+                        request.careRecipientId()
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "제보에 돌봄 대상자를 연결했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 현재 로그인한 기관의 제보를 기준으로
+     * 신규 돌봄 대상자를 생성하고 즉시 해당 제보에 연결합니다.
+     *
+     * CARE-03과 동일한 대상자 입력 필드를 사용합니다.
+     */
+    @PostMapping("/{reportId}/care-recipient")
+    public ResponseEntity<ApiResponse<ReportCareRecipientCreateResponse>>
+    createAndLinkCareRecipient(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long reportId,
+            @Valid @RequestBody CareRecipientCreateRequest request
+    ) {
+        ReportCareRecipientCreateResponse response =
+                institutionReportService.createAndLinkCareRecipient(
+                        userId,
+                        reportId,
+                        request
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(
+                        ApiResponse.success(
+                                "돌봄 대상자를 등록하고 제보에 연결했습니다.",
+                                response
+                        )
+                );
     }
 }

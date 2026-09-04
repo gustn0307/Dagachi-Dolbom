@@ -7,22 +7,24 @@ import com.dagachi.backend.common.kakao.dto.Coordinate;
 import com.dagachi.backend.common.response.PageResponse;
 import com.dagachi.backend.common.storage.S3StorageService;
 import com.dagachi.backend.common.util.GeoUtils;
+import com.dagachi.backend.domain.entity.CareRecipient;
 import com.dagachi.backend.domain.entity.Institution;
 import com.dagachi.backend.domain.entity.Report;
 import com.dagachi.backend.domain.entity.User;
 import com.dagachi.backend.domain.enums.AIAnalysisType;
 import com.dagachi.backend.domain.enums.AITargetType;
+import com.dagachi.backend.domain.enums.ConsentStatus;
 import com.dagachi.backend.domain.enums.ReportStatus;
-import com.dagachi.backend.domain.repository.AIAnalysisRepository;
-import com.dagachi.backend.domain.repository.ReportImageRepository;
-import com.dagachi.backend.domain.repository.ReportRepository;
-import com.dagachi.backend.domain.repository.UserRepository;
+import com.dagachi.backend.domain.repository.*;
+import com.dagachi.backend.institution.recipient.dto.CareRecipientCreateRequest;
+import com.dagachi.backend.institution.recipient.dto.CareRecipientDetailResponse;
 import com.dagachi.backend.institution.report.dto.*;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,6 +40,7 @@ public class InstitutionReportService {
     private final ReportImageRepository reportImageRepository;
     private final AIAnalysisRepository aiAnalysisRepository;
     private final S3StorageService s3StorageService;
+    private final CareRecipientRepository careRecipientRepository;
 
     public InstitutionReportService(
             ReportRepository reportRepository,
@@ -45,7 +48,8 @@ public class InstitutionReportService {
             KakaoLocalClient kakaoLocalClient,
             ReportImageRepository reportImageRepository,
             AIAnalysisRepository aiAnalysisRepository,
-            S3StorageService s3StorageService
+            S3StorageService s3StorageService,
+            CareRecipientRepository careRecipientRepository
     ) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
@@ -53,6 +57,7 @@ public class InstitutionReportService {
         this.reportImageRepository = reportImageRepository;
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.s3StorageService = s3StorageService;
+        this.careRecipientRepository = careRecipientRepository;
     }
 
     /**
@@ -274,12 +279,26 @@ public class InstitutionReportService {
         /*
          * /api/institution/** 권한 검사는
          * "기관 사용자"라는 것만 보장합니다.
-         *
          * 다른 기관에 배정된 제보의 원문, 위치, 이미지가
          * 노출되지 않도록 실제 기관 소유권을 별도로 확인합니다.
          */
         if (report.getInstitution() == null
                 || !report.getInstitution().getId()
+                .equals(institution.getId())) {
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN
+            );
+        }
+
+        /*
+         * 데이터 오류나 향후 연결 로직의 회귀로
+         * 다른 기관 대상자가 연결되어 있더라도
+         * 대상자 개인정보가 상세 응답에 노출되지 않도록 재검증합니다.
+         */
+        if (report.getCareRecipient() != null
+                && !report.getCareRecipient()
+                .getInstitution()
+                .getId()
                 .equals(institution.getId())) {
             throw new CustomException(
                     ErrorCode.FORBIDDEN
@@ -326,7 +345,13 @@ public class InstitutionReportService {
         Institution institution =
                 getInstitutionByUserId(userId);
 
-        Report report = reportRepository.findById(reportId)
+        /*
+         * 동일 Report에 대한 상태 변경 요청을 직렬화합니다.
+         *
+         * 두 요청이 동시에 같은 이전 상태를 읽고 각각 상태 전이를
+         * 성공시키는 lost update를 방지합니다.
+         */
+        Report report = reportRepository.findWithLockById(reportId)
                 .orElseThrow(
                         () -> new CustomException(
                                 ErrorCode.RESOURCE_NOT_FOUND
@@ -352,10 +377,224 @@ public class InstitutionReportService {
         report.changeStatus(newStatus);
 
         /*
+         * BaseTimeEntity의 @LastModifiedDate는 flush 시점에 갱신되므로,
+         * 응답 DTO를 만들기 전에 UPDATE를 DB에 반영하여
+         * updatedAt이 실제 저장값과 동일하도록 합니다.
+         */
+        reportRepository.flush();
+
+        /*
          * @Transactional 안의 managed Entity이므로
          * 별도의 save() 호출 없이 dirty checking으로 UPDATE됩니다.
          */
         return ReportStatusUpdateResponse.from(report);
+    }
+
+    /**
+     * 현재 로그인한 기관에 배정된 제보를
+     * 같은 기관의 기존 돌봄 대상자와 연결합니다.
+     *
+     * Report와 CareRecipient 모두 로그인 기관 소속인지 확인하며,
+     * 이미 대상자가 연결된 제보에는 다시 연결할 수 없습니다.
+     */
+    @Transactional
+    public ReportCareRecipientLinkResponse linkCareRecipient(
+            Long userId,
+            Long reportId,
+            Long careRecipientId
+    ) {
+        Institution institution =
+                getInstitutionByUserId(userId);
+
+        /*
+         * 같은 제보에 대한 기존 대상자 연결 요청을 직렬화하여
+         * 서로 다른 대상자가 동시에 연결되는 경쟁 상태를 방지합니다.
+         */
+        Report report = reportRepository.findWithLockById(reportId)
+                .orElseThrow(
+                        () -> new CustomException(
+                                ErrorCode.RESOURCE_NOT_FOUND
+                        )
+                );
+
+        /*
+         * 미배정 제보 또는 다른 기관의 제보에는
+         * 대상자를 연결할 수 없습니다.
+         */
+        if (report.getInstitution() == null
+                || !report.getInstitution()
+                .getId()
+                .equals(institution.getId())) {
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN
+            );
+        }
+
+        /*
+         * 이미 연결된 대상자가 있으면
+         * 다른 대상자로 덮어쓰지 않습니다.
+         */
+        if (report.getCareRecipient() != null) {
+            throw new CustomException(
+                    ErrorCode.REPORT_CARE_RECIPIENT_ALREADY_LINKED
+            );
+        }
+
+        CareRecipient careRecipient =
+                careRecipientRepository.findById(careRecipientId)
+                        .orElseThrow(
+                                () -> new CustomException(
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                )
+                        );
+
+        /*
+         * 논리 삭제된 대상자는 연결 대상으로 사용할 수 없습니다.
+         */
+        if (Boolean.TRUE.equals(careRecipient.getDeleted())) {
+            throw new CustomException(
+                    ErrorCode.RESOURCE_NOT_FOUND
+            );
+        }
+
+        /*
+         * 다른 기관의 돌봄 대상자가 연결되면
+         * 기관 간 개인정보가 섞이므로 반드시 차단합니다.
+         */
+        if (!careRecipient.getInstitution()
+                .getId()
+                .equals(institution.getId())) {
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN
+            );
+        }
+
+        report.linkCareRecipient(
+                careRecipient
+        );
+
+        return ReportCareRecipientLinkResponse.from(
+                report
+        );
+    }
+
+    /**
+     * 현재 로그인한 기관에 배정된 제보를 기준으로
+     * 신규 돌봄 대상자를 생성하고 즉시 해당 제보와 연결합니다.
+     *
+     * CareRecipient 생성과 Report 연결은 하나의 Transaction에서 처리하여
+     * 둘 중 하나라도 실패하면 전체 작업을 rollback합니다.
+     */
+    @Transactional
+    public ReportCareRecipientCreateResponse createAndLinkCareRecipient(
+            Long userId,
+            Long reportId,
+            CareRecipientCreateRequest request
+    ) {
+        Institution institution =
+                getInstitutionByUserId(userId);
+
+        /*
+         * 신규 대상자 생성 전에 Report row를 잠급니다.
+         *
+         * 동일 Report에 REPORT-06/07 또는 REPORT-07 두 요청이
+         * 동시에 들어와 고아 CareRecipient가 생성되는 것을 방지합니다.
+         */
+        Report report = reportRepository.findWithLockById(reportId)
+                .orElseThrow(
+                        () -> new CustomException(
+                                ErrorCode.RESOURCE_NOT_FOUND
+                        )
+                );
+
+        /*
+         * 미배정 제보나 다른 기관의 제보를 기준으로
+         * 신규 대상자를 만들 수 없습니다.
+         */
+        if (report.getInstitution() == null
+                || !report.getInstitution()
+                .getId()
+                .equals(institution.getId())) {
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN
+            );
+        }
+
+        /*
+         * 이미 대상자가 연결된 제보라면
+         * 또 다른 신규 대상자를 생성하지 않습니다.
+         *
+         * 이 검증을 CareRecipient 생성보다 먼저 수행해야
+         * 불필요한 대상자 데이터가 생성되지 않습니다.
+         */
+        if (report.getCareRecipient() != null) {
+            throw new CustomException(
+                    ErrorCode.REPORT_CARE_RECIPIENT_ALREADY_LINKED
+            );
+        }
+
+        /*
+         * 제보 기반 신규 대상자 등록 시점에는
+         * 아직 동의 여부를 확인하지 않은 PENDING 또는
+         * 이미 동의를 확보한 AGREED만 허용합니다.
+         *
+         * WITHDRAWN은 기존 동의를 철회했다는 의미이므로
+         * 신규 등록 초기 상태로는 허용하지 않습니다.
+         */
+        if (request.consentStatus() == ConsentStatus.WITHDRAWN) {
+            throw new CustomException(
+                    ErrorCode.REPORT_INVALID_INITIAL_CONSENT_STATUS
+            );
+        }
+
+        /*
+         * CARE-03과 동일한 입력값을 사용해
+         * 로그인 사용자의 기관 소속 대상자를 생성합니다.
+         */
+        CareRecipient careRecipient =
+                CareRecipient.create(
+                        institution,
+                        request.name().trim(),
+                        request.gender(),
+                        request.birthYear(),
+                        normalizeNullableText(request.phone()),
+                        request.address().trim(),
+                        normalizeNullableText(request.detailAddress()),
+                        request.latitude(),
+                        request.longitude(),
+                        request.consentStatus()
+                );
+
+        CareRecipient savedCareRecipient =
+                careRecipientRepository.save(
+                        careRecipient
+                );
+
+        /*
+         * 방금 생성한 대상자를 현재 제보와 연결합니다.
+         *
+         * 이 메서드 전체가 @Transactional이므로
+         * 이후 예외가 발생하면 CareRecipient INSERT도 함께 rollback됩니다.
+         */
+        report.linkCareRecipient(
+                savedCareRecipient
+        );
+
+        /*
+         * 신규 대상자는 현재 이 Report 한 건과 연결되고,
+         * 아직 활동은 없으므로 각각 1, 0으로 반환합니다.
+         */
+        CareRecipientDetailResponse recipientResponse =
+                CareRecipientDetailResponse.of(
+                        savedCareRecipient,
+                        1L,
+                        0L
+                );
+
+        return new ReportCareRecipientCreateResponse(
+                report.getId(),
+                recipientResponse
+        );
     }
 
     /**
@@ -643,5 +882,24 @@ public class InstitutionReportService {
 
             return predicate;
         };
+    }
+
+    /**
+     * 선택 입력값의 앞뒤 공백을 제거하고,
+     * null 또는 공백 문자열은 null로 변환합니다.
+     */
+    private String normalizeNullableText(
+            String value
+    ) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmedValue =
+                value.trim();
+
+        return trimmedValue.isEmpty()
+                ? null
+                : trimmedValue;
     }
 }
