@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import PageHeader from "../../components/common/PageHeader";
-import { fetchActivities, applyForActivity } from "../../api/userApi";
+import {
+  fetchActivities,
+  applyForActivity,
+  fetchMyApplications,
+  fetchMyActivities,
+  cancelApplication,
+} from "../../api/userApi";
 
 const PAGE_SIZE = 10;
 const NARROW_BREAKPOINT = 380;
@@ -14,6 +20,20 @@ const GENDER_OPTIONS = [
 const STATUS_LABEL = {
   RECRUITING: "모집중",
   READY: "모집완료",
+};
+
+const APPLICATION_STATUS_LABEL = {
+  PENDING: "대기중",
+  APPROVED: "승인됨",
+  REJECTED: "거절됨",
+  CANCELED: "취소됨",
+};
+
+const APPLICATION_STATUS_COLOR = {
+  PENDING: "#f4771c",
+  APPROVED: "#3a9d5d",
+  REJECTED: "#897e75",
+  CANCELED: "#b3aba4",
 };
 
 function formatSchedule(isoString) {
@@ -63,7 +83,7 @@ function Volunteer() {
   const [toastMessage, setToastMessage] = useState(null);
   const [hoveredPageBtn, setHoveredPageBtn] = useState(null);
 
-  // ---- 필터/정렬 state ----
+  // ---- 필터/정렬 state (내가 직접 선택 탭) ----
   const [regionInput, setRegionInput] = useState("");
   const [appliedRegion, setAppliedRegion] = useState("");
   const [selectedAgeGroups, setSelectedAgeGroups] = useState([]);
@@ -71,6 +91,28 @@ function Volunteer() {
   const [sortMode, setSortMode] = useState("latest"); // "latest" | "distance"
   const [coords, setCoords] = useState(null); // { latitude, longitude }
   const [geoLoading, setGeoLoading] = useState(false);
+
+  // ---- 내 신청 현황 탭 state ----
+  const [myApplications, setMyApplications] = useState([]);
+  const [myLoading, setMyLoading] = useState(false);
+  const [myError, setMyError] = useState(null);
+  const [myStatusFilter, setMyStatusFilter] = useState(""); // "" | PENDING | APPROVED | REJECTED | CANCELED
+  const [myPage, setMyPage] = useState(0);
+  const [myTotalPages, setMyTotalPages] = useState(0);
+  const [myTotalElements, setMyTotalElements] = useState(0);
+
+  // ---- 내 활동 탭 state (APP-04) ----
+  const [myActivities, setMyActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activitiesError, setActivitiesError] = useState(null);
+  const [myActivitiesPage, setMyActivitiesPage] = useState(0);
+
+  // ---- 신청 취소 및 재신청 state (APP-05) ----
+  const [cancelTarget, setCancelTarget] = useState(null); // applicationId
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState(null);
+  const [reapplyingId, setReapplyingId] = useState(null);
+  const [reapplyError, setReapplyError] = useState(null);
 
   useEffect(() => {
     if (activeTab !== "direct") return;
@@ -117,10 +159,71 @@ function Volunteer() {
     coords,
   ]);
 
+  // 내 신청 현황 조회 (APP-03)
+  useEffect(() => {
+    if (activeTab !== "my") return;
+
+    let ignore = false;
+    setMyLoading(true);
+    setMyError(null);
+
+    fetchMyApplications({
+      page: myPage,
+      size: PAGE_SIZE,
+      status: myStatusFilter || undefined,
+    })
+      .then((data) => {
+        if (ignore) return;
+        setMyApplications(data.content);
+        setMyTotalPages(data.totalPages);
+        setMyTotalElements(data.totalElements);
+      })
+      .catch(() => {
+        if (!ignore) setMyError("신청 목록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setMyLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [activeTab, myPage, myStatusFilter]);
+
+  // 내 활동 목록 조회 (APP-04)
+  useEffect(() => {
+    if (activeTab !== "myActivities") return;
+
+    let ignore = false;
+    setActivitiesLoading(true);
+    setActivitiesError(null);
+
+    fetchMyActivities({ page: myActivitiesPage, size: PAGE_SIZE })
+      .then((data) => {
+        if (ignore) return;
+        setMyActivities(data.content);
+      })
+      .catch(() => {
+        if (!ignore) setActivitiesError("활동 목록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setActivitiesLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [activeTab, myActivitiesPage]);
+
   useEffect(() => {
     setCurrentPage(0);
     setSelectedActivityId(null);
     setApplyError(null);
+    setMyPage(0);
+    setMyStatusFilter("");
+    setMyActivitiesPage(0);
+    setCancelTarget(null);
+    setCancelError(null);
   }, [activeTab]);
 
   useEffect(() => {
@@ -195,7 +298,61 @@ function Volunteer() {
     }
   };
 
-  // ---- 필터 핸들러 ----
+  // 신청 취소 실행 (APP-05)
+  const handleCancelApplication = async () => {
+    if (!cancelTarget) return;
+
+    setIsCanceling(true);
+    setCancelError(null);
+
+    try {
+      await cancelApplication(cancelTarget);
+      setToastMessage("신청이 취소되었습니다.");
+      setCancelTarget(null);
+
+      const data = await fetchMyApplications({
+        page: myPage,
+        size: PAGE_SIZE,
+        status: myStatusFilter || undefined,
+      });
+      setMyApplications(data.content);
+      setMyTotalPages(data.totalPages);
+      setMyTotalElements(data.totalElements);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ?? "취소 중 오류가 발생했습니다.";
+      setCancelError(message);
+    } finally {
+      setIsCanceling(false);
+    }
+  };
+
+  const handleReapply = async (activityId) => {
+    setReapplyingId(activityId);
+    setReapplyError(null);
+
+    try {
+      await applyForActivity(activityId);
+      setToastMessage("다시 신청되었습니다. 기관 승인을 기다려주세요.");
+
+      const data = await fetchMyApplications({
+        page: myPage,
+        size: PAGE_SIZE,
+        status: myStatusFilter || undefined,
+      });
+      setMyApplications(data.content);
+      setMyTotalPages(data.totalPages);
+      setMyTotalElements(data.totalElements);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ?? "재신청 중 오류가 발생했습니다.";
+      setReapplyError(message);
+    } finally {
+      setReapplyingId(null);
+    }
+  };
+
+  // ---- 필터 핸들러 (내가 직접 선택 탭) ----
   const resetPageAndSelection = () => {
     setCurrentPage(0);
     setSelectedActivityId(null);
@@ -658,6 +815,53 @@ function Volunteer() {
     </section>
   );
 
+  const renderMyStatusFilterBar = () => (
+    <section
+      aria-label="신청 상태 필터"
+      style={{
+        maxWidth: 860,
+        margin: "0 auto 18px",
+        padding: "14px 16px",
+        border: "1px solid #ece5dd",
+        borderRadius: 14,
+        background: "#fff",
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+      }}
+    >
+      {[
+        { value: "", label: "전체" },
+        { value: "PENDING", label: "대기중" },
+        { value: "APPROVED", label: "승인됨" },
+        { value: "REJECTED", label: "거절됨" },
+        { value: "CANCELED", label: "취소됨" },
+      ].map(({ value, label }) => (
+        <button
+          key={label}
+          type="button"
+          aria-pressed={myStatusFilter === value}
+          onClick={() => {
+            setMyStatusFilter(value);
+            setMyPage(0);
+          }}
+          style={{
+            minHeight: 40,
+            padding: "0 16px",
+            borderRadius: 10,
+            border: `1px solid ${myStatusFilter === value ? "#f4771c" : "#ece5dd"}`,
+            background: myStatusFilter === value ? "#f4771c" : "#fff",
+            color: myStatusFilter === value ? "#fff" : "#685d52",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </section>
+  );
+
   return (
     <>
       <PageHeader
@@ -680,6 +884,20 @@ function Volunteer() {
           onClick={() => setActiveTab("auto")}
         >
           배정 받기
+        </button>
+        <button
+          type="button"
+          className={activeTab === "my" ? "active" : ""}
+          onClick={() => setActiveTab("my")}
+        >
+          내 신청 현황
+        </button>
+        <button
+          type="button"
+          className={activeTab === "myActivities" ? "active" : ""}
+          onClick={() => setActiveTab("myActivities")}
+        >
+          내 활동
         </button>
       </section>
 
@@ -788,39 +1006,277 @@ function Volunteer() {
         </section>
       )}
 
-      <section className="visit-detail">
-        <h2>안부 확인 전 확인하세요</h2>
+      {activeTab === "my" && (
+        <>
+          {renderMyStatusFilterBar()}
 
-        {selectedActivity ? (
-          <p style={{ margin: "0 0 14px", fontWeight: 700 }}>
-            선택한 활동: {selectedActivity.region} ·{" "}
-            {formatSchedule(selectedActivity.scheduledAt)}
-          </p>
-        ) : (
-          <p style={{ margin: "0 0 14px", color: "#897e75" }}>
-            위 목록에서 참여할 활동을 먼저 선택해주세요.
-          </p>
-        )}
+          <section className="visit-list">
+            {myLoading && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                불러오는 중입니다...
+              </p>
+            )}
 
-        <ol>
-          <li>대상자를 직접 만나셨나요?</li>
-          <li>식사 및 건강 상태에 큰 변화가 없나요?</li>
-          <li>특이사항이 있다면 기록해 주세요.</li>
-        </ol>
+            {!myLoading && myError && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                {myError}
+              </p>
+            )}
 
-        {applyError && (
-          <p style={{ color: "#c0392b", margin: "0 0 12px" }}>{applyError}</p>
-        )}
+            {!myLoading && !myError && myApplications.length === 0 && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                아직 신청한 활동이 없어요.{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("direct")}
+                  style={{
+                    color: "#f4771c",
+                    textDecoration: "underline",
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    font: "inherit",
+                  }}
+                >
+                  활동 둘러보기
+                </button>
+              </p>
+            )}
 
-        <button
-          className="submit"
-          type="button"
-          disabled={!selectedActivityId || isApplying}
-          onClick={() => setShowConfirmModal(true)}
-        >
-          {isApplying ? "신청 중..." : "이 활동 신청하기"}
-        </button>
-      </section>
+            {!myLoading &&
+              !myError &&
+              myApplications.map((app) => (
+                <div
+                  className="visit"
+                  key={app.applicationId}
+                  style={{
+                    cursor: "default",
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "4px 10px",
+                      borderRadius: 20,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#fff",
+                      background:
+                        APPLICATION_STATUS_COLOR[app.status] ?? "#897e75",
+                      marginRight: 10,
+                      marginTop: 4,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {APPLICATION_STATUS_LABEL[app.status] ?? app.status}
+                  </span>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 style={{ fontSize: "15px" }}>
+                      안부확인
+                      <small> · {formatSchedule(app.scheduledAt)}</small>
+                    </h2>
+                    <p>
+                      {app.region ?? "지역 정보 없음"} · {app.ageGroup ?? ""} ·{" "}
+                      {app.gender === "FEMALE" ? "여성" : "남성"} 어르신
+                    </p>
+                    {app.status === "REJECTED" && app.rejectedReason && (
+                      <p
+                        style={{ color:    "#c0392b", fontSize: 13, marginTop: 4 }}
+                      >
+                        거절 사유: {app.rejectedReason}
+                      </p>
+                    )}
+                  </div>
+
+                  {app.cancelable && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCancelError(null);
+                        setCancelTarget(app.applicationId);
+                      }}
+                      style={{
+                        marginTop: 8,
+                        minHeight: 36,
+                        padding: "0 14px",
+                        border: "1px solid #d9534f",
+                        borderRadius: 8,
+                        background: "#fff",
+                        color: "#d9534f",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      신청 취소
+                    </button>
+                  )}
+
+                  {app.reapplicable && (
+                    <button
+                      type="button"
+                      disabled={reapplyingId === app.activityId}
+                      onClick={() => handleReapply(app.activityId)}
+                      style={{
+                        marginTop: 8,
+                        minHeight: 36,
+                        padding: "0 14px",
+                        border: "1px solid #f4771c",
+                        borderRadius: 8,
+                        background: "#fff3ea",
+                        color: "#f4771c",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor:
+                          reapplyingId === app.activityId
+                            ? "not-allowed"
+                            : "pointer",
+                      }}
+                    >
+                      {reapplyingId === app.activityId
+                        ? "신청 중..."
+                        : "다시 신청"}
+                    </button>
+                  )}
+                </div>
+              ))}
+          </section>
+
+          {!myLoading && !myError && myApplications.length > 0 && (
+            <p
+              style={{
+                maxWidth: 860,
+                margin: "0 auto 20px",
+                textAlign: "center",
+                color: "#897e75",
+                fontSize: 13,
+              }}
+            >
+              전체 {myTotalElements}건
+            </p>
+          )}
+        </>
+      )}
+
+      {activeTab === "myActivities" && (
+        <section className="visit-list">
+          {activitiesLoading && (
+            <p
+              style={{
+                textAlign: "center",
+                color: "#897e75",
+                padding: "24px 0",
+              }}
+            >
+              불러오는 중입니다...
+            </p>
+          )}
+
+          {!activitiesLoading && activitiesError && (
+            <p
+              style={{
+                textAlign: "center",
+                color: "#897e75",
+                padding: "24px 0",
+              }}
+            >
+              {activitiesError}
+            </p>
+          )}
+
+          {!activitiesLoading &&
+            !activitiesError &&
+            myActivities.length === 0 && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                아직 확정된 활동이 없어요. 신청이 승인되면 여기에 표시됩니다.
+              </p>
+            )}
+
+          {!activitiesLoading &&
+            !activitiesError &&
+            myActivities.map((app) => (
+              <div
+                className="visit"
+                key={app.applicationId}
+                style={{ cursor: "default" }}
+              >
+                <div>
+                  <h2 style={{ fontSize: "15px" }}>
+                    안부확인
+                    <small> · {formatSchedule(app.scheduledAt)}</small>
+                  </h2>
+                  <p>
+                    {app.region ?? "지역 정보 없음"} · {app.ageGroup ?? ""} ·{" "}
+                    {app.gender === "FEMALE" ? "여성" : "남성"} 어르신
+                  </p>
+                </div>
+              </div>
+            ))}
+        </section>
+      )}
+
+      {activeTab === "direct" && (
+        <section className="visit-detail">
+          <h2>안부 확인 전 확인하세요</h2>
+
+          {selectedActivity ? (
+            <p style={{ margin: "0 0 14px", fontWeight: 700 }}>
+              선택한 활동: {selectedActivity.region} ·{" "}
+              {formatSchedule(selectedActivity.scheduledAt)}
+            </p>
+          ) : (
+            <p style={{ margin: "0 0 14px", color: "#897e75" }}>
+              위 목록에서 참여할 활동을 먼저 선택해주세요.
+            </p>
+          )}
+
+          <ol>
+            <li>대상자를 직접 만나셨나요?</li>
+            <li>식사 및 건강 상태에 큰 변화가 없나요?</li>
+            <li>특이사항이 있다면 기록해 주세요.</li>
+          </ol>
+
+          {applyError && (
+            <p style={{ color: "#c0392b", margin: "0 0 12px" }}>{applyError}</p>
+          )}
+
+          <button
+            className="submit"
+            type="button"
+            disabled={!selectedActivityId || isApplying}
+            onClick={() => setShowConfirmModal(true)}
+          >
+            {isApplying ? "신청 중..." : "이 활동 신청하기"}
+          </button>
+        </section>
+      )}
 
       {showConfirmModal && selectedActivity && (
         <div
@@ -910,6 +1366,100 @@ function Volunteer() {
                 }}
               >
                 {isApplying ? "신청 중..." : "신청 확정"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-modal-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+          onClick={() => !isCanceling && setCancelTarget(null)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              padding: 28,
+              maxWidth: 360,
+              width: "100%",
+              textAlign: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="cancel-modal-title"
+              style={{ fontSize: 18, margin: "0 0 12px", color: "#3d332a" }}
+            >
+              신청을 취소하시겠어요?
+            </h2>
+            <p
+              style={{
+                margin: "0 0 20px",
+                color: "#897e75",
+                fontSize: 14,
+                lineHeight: 1.5,
+              }}
+            >
+              취소하면 다시 신청해야 참여할 수 있어요.
+            </p>
+
+            {cancelError && (
+              <p style={{ color: "#c0392b", fontSize: 13, margin: "0 0 12px" }}>
+                {cancelError}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                disabled={isCanceling}
+                onClick={() => setCancelTarget(null)}
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  border: "1px solid #ece5dd",
+                  borderRadius: 10,
+                  background: "#fff",
+                  color: "#685d52",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: isCanceling ? "not-allowed" : "pointer",
+                }}
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                disabled={isCanceling}
+                onClick={handleCancelApplication}
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  border: "1px solid #d9534f",
+                  borderRadius: 10,
+                  background: "#d9534f",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: isCanceling ? "not-allowed" : "pointer",
+                  opacity: isCanceling ? 0.7 : 1,
+                }}
+              >
+                {isCanceling ? "취소 중..." : "취소하기"}
               </button>
             </div>
           </div>
