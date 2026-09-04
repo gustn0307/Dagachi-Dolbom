@@ -179,6 +179,12 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
         "APPLICATION_409_DUPLICATE",
                 "이미 신청한 활동입니다."
+    ),
+
+    APPLICATION_NOT_CANCELABLE(
+            HttpStatus.CONFLICT,
+            "APPLICATION_409_NOT_CANCELABLE",
+            "취소할 수 없는 신청입니다."
     );
 
     private final HttpStatus status;
