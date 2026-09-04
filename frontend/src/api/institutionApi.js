@@ -122,21 +122,95 @@ export const getDashboard = () =>
       );
 
 /**
- * 기관 제보 목록 조회.
+ * 기관에 아직 배정되지 않은 제보 목록 조회.
+ *
+ * 미배정 제보는 개인정보 최소화 정책에 따라
+ * 정확한 주소, 연락처, 이미지 등을 제공하지 않는다.
+ */
+export const getUnassignedReports = (
+  params = {},
+) =>
+  unwrapData(
+    api.get(
+      "/api/institution/reports/unassigned",
+      {
+        params,
+      },
+    ),
+  );
+
+/**
+ * 미배정 제보를 현재 로그인한 기관의
+ * 관할 제보로 지정한다.
+ *
+ * institutionId는 JWT를 기준으로
+ * 백엔드에서 직접 확인한다.
+ */
+export const assignReport = (
+  reportId,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/reports/${reportId}/assignment`,
+    ),
+  );
+
+/**
+ * 현재 로그인한 기관에 배정된
+ * 제보 목록을 조회한다.
  */
 export const getReports = (
   params = {},
 ) =>
-  USE_MOCK
-    ? clone(
-        institutionMockData.reports,
-      )
-    : unwrapData(
-        api.get(
-          "/api/institution/reports",
-          { params },
-        ),
-      );
+  unwrapData(
+    api.get(
+      "/api/institution/reports",
+      {
+        params,
+      },
+    ),
+  );
+
+/**
+ * 현재 기관에 배정된 제보의
+ * 상세 정보를 조회한다.
+ */
+export const getReport = (
+  reportId,
+) =>
+  unwrapData(
+    api.get(
+      `/api/institution/reports/${reportId}`,
+    ),
+  );
+
+/**
+ * 제보 원문을 기준으로
+ * AI 요약을 새로 생성한다.
+ *
+ * 프론트에서는 FastAPI를 직접 호출하지 않는다.
+ */
+export const createReportAiSummary = (
+  reportId,
+) =>
+  unwrapData(
+    api.post(
+      `/api/institution/reports/${reportId}/ai-analyses`,
+    ),
+  );
+
+/**
+ * 해당 제보의 가장 최근
+ * AI 요약 결과를 조회한다.
+ */
+export const getLatestReportAiSummary = (
+  reportId,
+) =>
+  unwrapData(
+    api.get(
+      `/api/institution/reports/${reportId}/ai-analyses`,
+    ),
+  );
 
 /**
  * 기존 화면 호환용 돌봄 대상자 목록 조회.
@@ -369,10 +443,15 @@ export const institutionApi = {
   closeCareRecipient,
   reopenCareRecipient,
 
-  // 대시보드 및 제보 API
+  // 대시보드
   getDashboard,
+  // 기관 제보 API
+  getUnassignedReports,
+  assignReport,
   getReports,
-  getCareTargets,
+  getReport,
+  createReportAiSummary,
+  getLatestReportAiSummary,
 
   // VOL-01~07 기관 봉사자 관리 API
   getVolunteers,

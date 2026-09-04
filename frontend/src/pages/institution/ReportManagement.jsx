@@ -1,106 +1,475 @@
 import { useState } from "react";
+
 import { institutionApi } from "../../api/institutionApi";
-import { DataState, useInstitutionData } from "../../hooks/useInstitutionData";
+import {
+  DataState,
+  useInstitutionData,
+} from "../../hooks/useInstitutionData";
+
+const STATUS_OPTIONS = [
+  {
+    value: "",
+    label: "전체 상태",
+  },
+  {
+    value: "SUBMITTED",
+    label: "접수",
+  },
+  {
+    value: "REVIEWING",
+    label: "검토 중",
+  },
+  {
+    value: "NEED_MORE_INFO",
+    label: "추가 정보 필요",
+  },
+  {
+    value: "ACCEPTED",
+    label: "접수 승인",
+  },
+  {
+    value: "REJECTED",
+    label: "반려",
+  },
+  {
+    value: "CLOSED",
+    label: "종결",
+  },
+];
+
+const STATUS_LABELS = {
+  SUBMITTED: "접수",
+  REVIEWING: "검토 중",
+  NEED_MORE_INFO: "추가 정보 필요",
+  ACCEPTED: "접수 승인",
+  REJECTED: "반려",
+  CLOSED: "종결",
+};
+
+function formatDate(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Date(value).toLocaleDateString(
+    "ko-KR",
+    {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    },
+  );
+}
+
+function formatDistance(value) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "거리 정보 없음";
+  }
+
+  return `약 ${Number(value).toFixed(1)}km`;
+}
 
 function ReportManagement() {
-  // BACKEND: 현재 검색/필터는 내려받은 더미 배열에서 처리합니다.
-  // 운영에서는 getReports({ query, status, page })로 전달해 서버 페이지네이션을 사용하세요.
-  const [filter, setFilter] = useState("전체");
-  const [query, setQuery] = useState("");
+  /*
+   * unassigned: 미배정 제보
+   * assigned: 내 기관 제보
+   */
+  const [activeTab, setActiveTab] =
+    useState("unassigned");
+
+  const [page, setPage] =
+    useState(0);
+
+  const [status, setStatus] =
+    useState("");
+
+  const [from, setFrom] =
+    useState("");
+
+  const [to, setTo] =
+    useState("");
+
   const {
-    data = [],
+    data,
     loading,
     error,
     reload,
-  } = useInstitutionData(institutionApi.getReports, []);
-  if (loading || error)
+  } = useInstitutionData(
+    () => {
+      const params = {
+        page,
+        size: 20,
+        status: status || undefined,
+        from: from || undefined,
+        to: to || undefined,
+      };
+
+      if (activeTab === "unassigned") {
+        return institutionApi
+          .getUnassignedReports(params);
+      }
+
+      return institutionApi
+        .getReports(params);
+    },
+    [
+      activeTab,
+      page,
+      status,
+      from,
+      to,
+    ],
+  );
+
+  const reports =
+    Array.isArray(data?.content)
+      ? data.content
+      : [];
+
+  const totalElements =
+    data?.totalElements ?? 0;
+
+  const totalPages =
+    data?.totalPages ?? 0;
+
+  const isFirst =
+    data?.first ?? true;
+
+  const isLast =
+    data?.last ?? true;
+
+  const changeTab = (tab) => {
+    setActiveTab(tab);
+    setPage(0);
+    setStatus("");
+    setFrom("");
+    setTo("");
+  };
+
+  const handleStatusChange = (event) => {
+    setStatus(event.target.value);
+    setPage(0);
+  };
+
+  const handleFromChange = (event) => {
+    setFrom(event.target.value);
+    setPage(0);
+  };
+
+  const handleToChange = (event) => {
+    setTo(event.target.value);
+    setPage(0);
+  };
+
+  const resetFilters = () => {
+    setStatus("");
+    setFrom("");
+    setTo("");
+    setPage(0);
+  };
+
+  if (loading || error) {
     return (
       <div className="institution-page">
-        <DataState loading={loading} error={error} onRetry={reload} />
+        <DataState
+          loading={loading}
+          error={error}
+          onRetry={reload}
+        />
       </div>
     );
-  const visible = data.filter(
-    (item) =>
-      (filter === "전체" || item.status === filter) &&
-      `${item.id}${item.title}${item.place}`.includes(query),
-  );
+  }
+
   return (
     <div className="institution-page">
       <div className="page-title-row compact">
         <div>
           <p>제보 관리</p>
-          <h1>접수된 제보를 확인하세요</h1>
-          <span>내용을 검토하고 처리 상태를 관리할 수 있습니다.</span>
+
+          <h1>
+            접수된 제보를 확인하세요
+          </h1>
+
+          <span>
+            미배정 제보를 확인하고 기관에
+            배정된 제보를 관리합니다.
+          </span>
         </div>
-        <button className="orange-action">＋ 제보 직접 등록</button>
       </div>
+
       <section className="panel table-panel">
-        <div className="filter-bar">
-          <div className="filter-tabs">
-            {["전체", "신규", "확인 중", "기관 연계", "연계 완료"].map(
-              (item) => (
-                <button
-                  key={item}
-                  className={filter === item ? "active" : ""}
-                  onClick={() => setFilter(item)}
-                >
-                  {item}
-                  {item === "신규" && <em>12</em>}
-                </button>
-              ),
-            )}
-          </div>
-          <div className="table-search">
-            <span>⌕</span>
+        <div className="report-main-tabs">
+          <button
+            type="button"
+            className={
+              activeTab === "unassigned"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              changeTab("unassigned")
+            }
+          >
+            미배정 제보
+          </button>
+
+          <button
+            type="button"
+            className={
+              activeTab === "assigned"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              changeTab("assigned")
+            }
+          >
+            내 기관 제보
+          </button>
+        </div>
+
+        <div className="report-filter-bar">
+          <select
+            value={status}
+            aria-label="제보 상태"
+            onChange={handleStatusChange}
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option
+                key={option.value}
+                value={option.value}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <label>
+            <span>시작일</span>
+
             <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="제보 검색"
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={handleFromChange}
             />
-          </div>
-          <button className="filter-button">☷ 필터</button>
+          </label>
+
+          <label>
+            <span>종료일</span>
+
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={handleToChange}
+            />
+          </label>
+
+          <button
+            type="button"
+            className="report-filter-reset"
+            onClick={resetFilters}
+          >
+            초기화
+          </button>
         </div>
-        <div className="data-table">
-          <div className="table-head">
-            <span>제보 번호</span>
-            <span>제보 내용</span>
-            <span>접수일</span>
-            <span>우선순위</span>
-            <span>처리 상태</span>
-            <span></span>
-          </div>
-          {visible.map((item) => (
-            <article key={item.id}>
-              <span className="id-cell">{item.id}</span>
-              <span className="main-cell">
-                <strong>{item.title}</strong>
-                <small>⌖ {item.place}</small>
-              </span>
-              <span>{item.receivedAt}</span>
-              <span>
-                <i className={`priority ${item.priority}`}>{item.priority}</i>
-              </span>
-              <span>
-                <i className={`table-status ${item.status.replace(" ", "-")}`}>
-                  {item.status}
-                </i>
-              </span>
-              <button aria-label="상세보기">›</button>
-            </article>
-          ))}
+
+        <div
+          className={
+            activeTab === "unassigned"
+              ? "report-management-table unassigned"
+              : "report-management-table assigned"
+          }
+        >
+          {activeTab === "unassigned" ? (
+            <div className="report-table-head">
+              <span>제보 번호</span>
+              <span>제보 내용</span>
+              <span>지역</span>
+              <span>거리</span>
+              <span>접수일</span>
+              <span>상태</span>
+            </div>
+          ) : (
+            <div className="report-table-head">
+              <span>제보 번호</span>
+              <span>제보 내용</span>
+              <span>주소</span>
+              <span>접수일</span>
+              <span>상태</span>
+              <span></span>
+            </div>
+          )}
+
+          {reports.length === 0 ? (
+            <div className="report-empty-state">
+              {activeTab === "unassigned"
+                ? "현재 미배정 제보가 없습니다."
+                : "내 기관에 배정된 제보가 없습니다."}
+            </div>
+          ) : activeTab === "unassigned" ? (
+            reports.map((report) => {
+              const statusLabel =
+                STATUS_LABELS[report.status] ??
+                report.status;
+
+              return (
+                <article
+                  key={report.reportId}
+                >
+                  <span className="id-cell">
+                    #{report.reportId}
+                  </span>
+
+                  <span className="main-cell">
+                    <strong>
+                      {report.contentPreview}
+                    </strong>
+                  </span>
+
+                  <span>
+                    {report.region || "-"}
+                  </span>
+
+                  <span>
+                    {formatDistance(
+                      report.distanceKm,
+                    )}
+                  </span>
+
+                  <span>
+                    {formatDate(
+                      report.createdAt,
+                    )}
+                  </span>
+
+                  <span>
+                    <i className="table-status">
+                      {statusLabel}
+                    </i>
+                  </span>
+                </article>
+              );
+            })
+          ) : (
+            reports.map((report) => {
+              const statusLabel =
+                STATUS_LABELS[report.status] ??
+                report.status;
+
+              return (
+                <article
+                  key={report.reportId}
+                >
+                  <span className="id-cell">
+                    #{report.reportId}
+                  </span>
+
+                  <span className="main-cell">
+                    <strong>
+                      {report.content}
+                    </strong>
+                  </span>
+
+                  <span>
+                    {report.address || "-"}
+                  </span>
+
+                  <span>
+                    {formatDate(
+                      report.createdAt,
+                    )}
+                  </span>
+
+                  <span>
+                    <i className="table-status">
+                      {statusLabel}
+                    </i>
+                  </span>
+
+                  <span className="report-detail-ready">
+                    상세 준비 중
+                  </span>
+                </article>
+              );
+            })
+          )}
         </div>
-        <div className="table-footer">
-          <span>총 {visible.length}건의 제보</span>
-          <div>
-            <button>‹</button>
-            <button className="active">1</button>
-            <button>2</button>
-            <button>3</button>
-            <button>›</button>
+
+        {totalPages > 0 && (
+          <div className="table-footer care-pagination">
+            <span>
+              전체 {totalElements}건 ·{" "}
+              {page + 1}/{totalPages} 페이지
+            </span>
+
+            <div>
+              <button
+                type="button"
+                disabled={isFirst}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.max(
+                      current - 1,
+                      0,
+                    ),
+                  )
+                }
+              >
+                이전
+              </button>
+
+              {Array.from(
+                {
+                  length: totalPages,
+                },
+                (_, index) => index,
+              ).map((pageNumber) => (
+                <button
+                  type="button"
+                  key={pageNumber}
+                  className={
+                    pageNumber === page
+                      ? "active"
+                      : ""
+                  }
+                  aria-current={
+                    pageNumber === page
+                      ? "page"
+                      : undefined
+                  }
+                  onClick={() =>
+                    setPage(pageNumber)
+                  }
+                >
+                  {pageNumber + 1}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                disabled={isLast}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(
+                      current + 1,
+                      totalPages - 1,
+                    ),
+                  )
+                }
+              >
+                다음
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </section>
     </div>
   );
 }
+
 export default ReportManagement;
