@@ -10,15 +10,20 @@ import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
+import com.dagachi.backend.domain.repository.ActivityRecordRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
 import com.dagachi.backend.user.application.dto.ApplicationResponse;
+import com.dagachi.backend.domain.entity.ActivityRecord;
+import com.dagachi.backend.domain.repository.ActivityRecordRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 일반 USER의 활동 신청(APP-01) / 내 신청 목록(APP-03) / 내 활동 목록(APP-04)
@@ -30,15 +35,18 @@ public class ActivityApplicationService {
     private final ActivityApplicationRepository activityApplicationRepository;
     private final CareActivityRepository careActivityRepository;
     private final UserRepository userRepository;
+    private final ActivityRecordRepository activityRecordRepository;
 
     public ActivityApplicationService(
             ActivityApplicationRepository activityApplicationRepository,
             CareActivityRepository careActivityRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ActivityRecordRepository activityRecordRepository
     ) {
         this.activityApplicationRepository = activityApplicationRepository;
         this.careActivityRepository = careActivityRepository;
         this.userRepository = userRepository;
+        this.activityRecordRepository = activityRecordRepository;
     }
 
     /**
@@ -108,7 +116,27 @@ public class ActivityApplicationService {
                 userId, activityStatus != null, activityStatus, pageable
         );
 
-        return PageResponse.from(page.map(ApplicationResponse::from));
+        // 이번 페이지에 나온 활동들의 activityId를 모아 한 번에 activityRecordId를 조회한다.
+        // (N+1 방지: 활동 개수만큼 반복 쿼리하지 않고 IN 절 한 번으로 처리)
+        List<Long> activityIds = page.getContent().stream()
+                .map(application -> application.getActivity().getId())
+                .collect(Collectors.toList());
+
+        Map<Long, Long> recordIdByActivityId = activityRecordRepository
+                .findByActivity_IdIn(activityIds).stream()
+                .collect(Collectors.toMap(
+                        record -> record.getActivity().getId(),
+                        ActivityRecord::getId
+                ));
+
+        Page<ApplicationResponse> responsePage = page.map(application ->
+                ApplicationResponse.from(
+                        application,
+                        recordIdByActivityId.get(application.getActivity().getId())
+                )
+        );
+
+        return PageResponse.from(responsePage);
     }
 
     /**
