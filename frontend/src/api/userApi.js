@@ -150,13 +150,10 @@ export const fetchActivityDetail = async (
   return response.data.data;
 };
 
-export const fetchExecutionDetail = async (
-  activityId,
-) => {
+export const fetchExecutionDetail = async (activityId) => {
   const response = await api.get(
     `/api/activities/${activityId}/execution-details`,
   );
-
   return response.data.data;
 };
 
@@ -175,7 +172,9 @@ export const fetchMyApplications = async ({
   if (status) params.status = status;
   if (applicationType) params.applicationType = applicationType;
 
-  const response = await api.get("/api/users/me/activity-applications", { params });
+  const response = await api.get("/api/users/me/activity-applications", {
+    params,
+  });
   return response.data.data;
 };
 
@@ -199,3 +198,20 @@ export const cancelApplication = (applicationId) =>
 // 활동 시작 (RECORD-01)
 export const startActivity = (activityId) =>
   unwrapData(api.post(`/api/activities/${activityId}/start`));
+
+// USER-01 내 프로필 조회
+export const getMyProfile = () => unwrapData(api.get("/api/users/me"));
+
+// USER-02 내 프로필 수정
+export const updateMyProfile = (payload) =>
+  unwrapData(api.patch("/api/users/me", payload));
+
+// 비밀번호 변경
+export const changePassword = (currentPassword, newPassword) =>
+  unwrapData(
+    api.patch("/api/users/me/password", { currentPassword, newPassword }),
+  );
+
+// USER-03 회원 탈퇴 (본인확인용 비밀번호 필요)
+export const withdrawUser = (password) =>
+  unwrapData(api.delete("/api/users/me", { data: { password } }));
