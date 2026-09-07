@@ -104,3 +104,7 @@ export const fetchMyActivities = async ({
 // 신청 취소 (APP-05)
 export const cancelApplication = (applicationId) =>
   unwrapData(api.post(`/api/activity-applications/${applicationId}/cancel`));
+
+// 활동 시작 (RECORD-01)
+export const startActivity = (activityId) =>
+  unwrapData(api.post(`/api/activities/${activityId}/start`));

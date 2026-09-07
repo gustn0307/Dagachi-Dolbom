@@ -142,6 +142,25 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "APPLICATION_409_NOT_CANCELABLE",
             "취소할 수 없는 신청입니다."
+    ),
+
+    // CareActivity / ActivityRecord
+    ACTIVITY_NOT_READY(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_NOT_READY",
+            "아직 시작할 수 없는 활동입니다."
+    ),
+
+    ACTIVITY_ALREADY_STARTED(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_ALREADY_STARTED",
+            "이미 시작된 활동입니다."
+    ),
+
+    ACTIVITY_GENDER_CONDITION_NOT_MET(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_GENDER_CONDITION",
+            "성별 조건을 충족하지 않습니다."
     );
 
     private final HttpStatus status;
