@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 public record ReportCreateRequest(
 
         @NotBlank(message = "제보 내용은 필수입니다.")
+        @Size(max = 500)
         String content,
 
         @Size(max = 255, message = "주소는 255자 이하여야 합니다.")

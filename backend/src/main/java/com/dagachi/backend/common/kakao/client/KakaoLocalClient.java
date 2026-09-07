@@ -62,7 +62,7 @@ public class KakaoLocalClient {
                 || response.documents() == null
                 || response.documents().isEmpty()) {
             throw new IllegalStateException(
-                    "기관 주소의 좌표를 찾을 수 없습니다."
+                    "주소의 좌표를 찾을 수 없습니다."
             );
         }
 
