@@ -4,6 +4,7 @@ import com.dagachi.backend.domain.entity.ActivityApplication;
 import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
+import com.dagachi.backend.domain.enums.UserGender;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -93,4 +94,16 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
             @Param("activityStatus") ActivityStatus activityStatus,
             Pageable pageable
     );
+
+    /**
+     * RECORD-01 활동 시작 시 SAME_GENDER_ONE 조건 검증용.
+     */
+    @Query("""
+        SELECT u.gender
+        FROM ActivityApplication aa
+        JOIN aa.user u
+        WHERE aa.activity.id = :activityId
+          AND aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+        """)
+    List<UserGender> findApprovedUserGenders(@Param("activityId") Long activityId);
 }

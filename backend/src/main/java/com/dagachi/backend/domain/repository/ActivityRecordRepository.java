@@ -15,4 +15,5 @@ public interface ActivityRecordRepository extends JpaRepository<ActivityRecord, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select ar from ActivityRecord ar where ar.id = :id")
     Optional<ActivityRecord> findByIdForUpdate(@Param("id") Long id);
+    Optional<ActivityRecord> findByActivity_Id(Long activityId);
 }
