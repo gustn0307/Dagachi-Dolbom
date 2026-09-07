@@ -204,6 +204,24 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "ACTIVITY_409_GENDER_CONDITION",
             "성별 조건을 충족하지 않습니다."
+    ),
+
+    PASSWORD_MISMATCH(
+            HttpStatus.BAD_REQUEST,
+            "USER_400_PASSWORD_MISMATCH",
+            "비밀번호가 일치하지 않습니다."
+    ),
+
+    PASSWORD_SAME_AS_CURRENT(
+            HttpStatus.BAD_REQUEST,
+            "USER_400_PASSWORD_SAME_AS_CURRENT",
+            "새 비밀번호는 현재 비밀번호와 달라야 합니다."
+    ),
+
+    WITHDRAWAL_BLOCKED(
+            HttpStatus.CONFLICT,
+            "USER_409_WITHDRAWAL_BLOCKED",
+            "진행 중인 신청 또는 활동이 있어 탈퇴할 수 없습니다. 먼저 신청을 취소해 주세요."
     );
 
     private final HttpStatus status;

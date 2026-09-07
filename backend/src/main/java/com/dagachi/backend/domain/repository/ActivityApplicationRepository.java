@@ -99,4 +99,10 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
           AND aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
         """)
     List<UserGender> findApprovedUserGenders(@Param("activityId") Long activityId);
+
+    /**
+     * USER-03 탈퇴 시 진행 중인 신청/활동 여부 확인.
+     * [팀 미확정 정책 임시 적용] PENDING 또는 APPROVED가 하나라도 있으면 탈퇴를 막는다.
+     */
+    boolean existsByUser_IdAndStatusIn(Long userId, List<ApplicationStatus> statuses);
 }
