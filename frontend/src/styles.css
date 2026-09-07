@@ -1004,6 +1004,481 @@ footer {
   font-size: 14px;
 }
 
+/* ---- ActivityRecord (활동기록 작성) ----------------------------- */
+.activity-record-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 34px 22px 60px;
+}
+
+.activity-record-back {
+  margin-bottom: 18px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: #786e64;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.activity-record-back:hover {
+  color: #f4771c;
+}
+
+.activity-record-header {
+  margin-bottom: 22px;
+}
+
+.activity-record-header p {
+  margin: 0 0 7px;
+  color: #f4771c;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.activity-record-header h1 {
+  margin: 0;
+  color: #3d332a;
+  font-size: 32px;
+  letter-spacing: -1.5px;
+}
+
+.activity-record-header > span {
+  display: block;
+  margin-top: 10px;
+  color: #897e75;
+  font-size: 13px;
+}
+
+/* 기록 상태 / 시작 시각 / 서명 요약 */
+.activity-record-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.activity-record-summary article {
+  padding: 18px;
+  border: 1px solid #ece5dd;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.activity-record-summary span {
+  display: block;
+  margin-bottom: 6px;
+  color: #897e75;
+  font-size: 12px;
+}
+
+.activity-record-summary strong {
+  color: #4b4038;
+  font-size: 15px;
+}
+
+/* 기관 보완 요청 */
+.activity-record-review-note {
+  margin-bottom: 20px;
+  padding: 17px 19px;
+  border: 1px solid #f0c6ad;
+  border-radius: 12px;
+  background: #fff7f1;
+}
+
+.activity-record-review-note strong {
+  color: #e56c24;
+  font-size: 14px;
+}
+
+.activity-record-review-note p {
+  margin: 7px 0 0;
+  color: #685d52;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 성공 / 오류 메시지 */
+.activity-record-message {
+  margin-bottom: 18px;
+  padding: 13px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.activity-record-message.error {
+  border: 1px solid #f2c4c4;
+  background: #fff2f2;
+  color: #c0392b;
+}
+
+.activity-record-message.success {
+  border: 1px solid #cde5c8;
+  background: #f2f9ef;
+  color: #4d9142;
+}
+
+/* 공통 기록 섹션 */
+.activity-record-section {
+  margin-bottom: 18px;
+  padding: 25px;
+  border: 1px solid #ece5dd;
+  border-radius: 15px;
+  background: #fff;
+}
+
+.activity-record-section-title {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.activity-record-section-title > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #fff0e5;
+  color: #f4771c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.activity-record-section-title h2 {
+  margin: 0;
+  color: #3d332a;
+  font-size: 19px;
+}
+
+.activity-record-section-title p {
+  margin: 5px 0 0;
+  color: #897e75;
+  font-size: 13px;
+}
+
+/* 방문 결과 */
+.activity-record-visit-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.activity-record-visit-options label {
+  padding: 18px;
+  border: 1px solid #e7dfd7;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.activity-record-visit-options label:has(input:checked) {
+  border-color: #f4771c;
+  background: #fff7f0;
+}
+
+.activity-record-visit-options input {
+  margin-right: 7px;
+  accent-color: #f4771c;
+}
+
+.activity-record-visit-options strong {
+  color: #45382f;
+  font-size: 15px;
+}
+
+.activity-record-visit-options span {
+  display: block;
+  margin-top: 7px;
+  color: #897e75;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.activity-record-help {
+  margin: 12px 0 0;
+  color: #d66a2b;
+  font-size: 12px;
+}
+
+/* 체크리스트 */
+.activity-record-checklist {
+  display: grid;
+  gap: 13px;
+}
+
+.activity-record-checklist article {
+  padding: 18px;
+  border: 1px solid #eee7df;
+  border-radius: 12px;
+  background: #fffdf9;
+}
+
+.activity-record-question {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.activity-record-question > span {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #f4eee8;
+  color: #685d52;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.activity-record-question strong {
+  flex: 1;
+  color: #45382f;
+  font-size: 14px;
+}
+
+.activity-record-question em {
+  color: #f4771c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.activity-record-answer-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activity-record-answer-options label {
+  min-height: 40px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e6ddd5;
+  border-radius: 10px;
+  background: #fff;
+  color: #685d52;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.activity-record-answer-options label:has(input:checked) {
+  border-color: #f4771c;
+  background: #fff3ea;
+  color: #f4771c;
+  font-weight: 700;
+}
+
+.activity-record-answer-options input {
+  accent-color: #f4771c;
+}
+
+/* 완료 시각 / 특이사항 */
+.activity-record-fields {
+  display: grid;
+  gap: 18px;
+}
+
+.activity-record-fields label > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #4b4038;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.activity-record-fields em {
+  color: #f4771c;
+  font-style: normal;
+}
+
+.activity-record-fields input,
+.activity-record-fields textarea {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid #ded7cf;
+  border-radius: 9px;
+  background: #fff;
+  color: #42352b;
+}
+
+.activity-record-fields textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.activity-record-fields input:focus,
+.activity-record-fields textarea:focus {
+  outline: 0;
+  border-color: #f4771c;
+  box-shadow: 0 0 0 4px #f4771c12;
+}
+
+/* 서명 */
+.activity-record-signature-status {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #f7f4f0;
+  color: #5f554d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.activity-record-signature-status span {
+  display: block;
+  margin-top: 5px;
+  color: #897e75;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.activity-record-signature-upload {
+  display: grid;
+  gap: 10px;
+}
+
+.activity-record-signature-upload input {
+  padding: 12px;
+  border: 1px dashed #d8c9bc;
+  border-radius: 10px;
+  background: #fffaf5;
+}
+
+.activity-record-signature-upload button {
+  min-height: 43px;
+  border: 1px solid #f4771c;
+  border-radius: 9px;
+  background: #fff;
+  color: #f4771c;
+  font-weight: 700;
+}
+
+.activity-record-signature-upload button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.activity-record-signature-upload small {
+  color: #897e75;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 임시저장 / 최종제출 */
+.activity-record-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.activity-record-actions button {
+  min-height: 52px;
+  border: 1px solid #ded7cf;
+  border-radius: 11px;
+  background: #fff;
+  color: #685d52;
+  font-weight: 800;
+}
+
+.activity-record-actions .activity-record-submit {
+  border-color: #f4771c;
+  background: #f4771c;
+  color: #fff;
+}
+
+.activity-record-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 임시저장/제출 메시지는 버튼 위에서 한 줄 전체를 사용합니다. */
+.activity-record-actions .activity-record-message {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+/* 제출 후 조회 전용 상태 */
+.activity-record-readonly {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid #e1ddd8;
+  border-radius: 13px;
+  background: #f7f5f2;
+  text-align: center;
+}
+
+.activity-record-readonly strong {
+  color: #554b43;
+  font-size: 15px;
+}
+
+.activity-record-readonly p {
+  margin: 7px 0 0;
+  color: #897e75;
+  font-size: 12px;
+}
+
+/* 로딩 / 조회 실패 */
+.activity-record-state {
+  margin: 70px auto 20px;
+  padding: 30px;
+  border: 1px solid #ece5dd;
+  border-radius: 14px;
+  background: #fff;
+  color: #786e64;
+  text-align: center;
+}
+
+.activity-record-state.error {
+  color: #c0392b;
+}
+
+/* ActivityRecord 모바일 */
+@media (max-width: 540px) {
+  .activity-record-page {
+    padding: 24px 14px 42px;
+  }
+
+  .activity-record-header h1 {
+    font-size: 27px;
+  }
+
+  .activity-record-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-record-section {
+    padding: 20px 16px;
+  }
+
+  .activity-record-visit-options {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-record-answer-options {
+    flex-direction: column;
+  }
+
+  .activity-record-answer-options label {
+    width: 100%;
+  }
+
+  .activity-record-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---- MyPage (마이페이지) --------------------------------------- */
 .profile-grid {
   display: grid;
@@ -1082,6 +1557,186 @@ footer {
   float: right;
   color: #55a147;
 } /* "완료" 뱃지 */
+
+/* ---- Notice > 공지사항 목록 ------------------------------------ */
+.notice-list {
+  width: 100%;
+}
+
+.notice-list-head,
+.notice-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  align-items: center;
+  gap: 18px;
+}
+
+.notice-list-head {
+  padding: 12px 8px;
+  border-bottom: 2px solid #eee8e0;
+  color: #786e64;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.notice-list-head span:last-child {
+  text-align: center;
+}
+
+.notice-list-row {
+  min-height: 58px;
+  padding: 13px 8px;
+  border-bottom: 1px solid #eee8e0;
+}
+
+.notice-list-title {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #42352b;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-list-title:hover {
+  color: #f4771c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.notice-list-row time {
+  color: #786f66;
+  font-size: 13px;
+  text-align: center;
+}
+
+.notice-list-empty {
+  padding: 35px 10px;
+  color: #897f74;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 공지사항 페이지네이션 */
+.notice-pagination {
+  margin-top: 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.notice-pagination button {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid #e6ddd5;
+  border-radius: 8px;
+  background: #fff;
+  color: #6f655d;
+  font-size: 13px;
+}
+
+.notice-pagination button:hover:not(:disabled) {
+  border-color: #f4771c;
+  color: #f4771c;
+}
+
+.notice-pagination button.active {
+  border-color: #f4771c;
+  background: #f4771c;
+  color: #fff;
+  font-weight: 700;
+}
+
+.notice-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- Notice > 공지 상세 ---------------------------------------- */
+.notice-detail {
+  max-width: 816px;
+  margin: 28px auto;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #eee7df;
+  border-radius: 16px;
+}
+
+.notice-detail-head {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #eee8e0;
+}
+
+.notice-detail-head h2 {
+  margin: 0 0 10px;
+  color: #42352b;
+  font-size: 23px;
+  line-height: 1.4;
+}
+
+.notice-detail-head time {
+  color: #897f74;
+  font-size: 13px;
+}
+
+.notice-detail-content {
+  min-height: 180px;
+  padding: 28px 4px;
+  color: #5f554d;
+  font-size: 15px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 공개할 수 없는 공지 상세 안내 */
+.notice-detail-error {
+  padding: 42px 10px;
+  text-align: center;
+}
+
+.notice-detail-error strong {
+  display: block;
+  color: #42352b;
+  font-size: 17px;
+}
+
+.notice-detail-error p {
+  margin: 9px 0 0;
+  color: #897f74;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.notice-detail-actions {
+  padding-top: 18px;
+  border-top: 1px solid #eee8e0;
+  text-align: right;
+}
+
+.notice-detail-actions button,
+.notice-detail > button {
+  padding: 10px 18px;
+  border: 1px solid #ddd4cc;
+  border-radius: 9px;
+  background: #fff;
+  color: #5f554d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.notice-detail-actions button:hover,
+.notice-detail > button:hover {
+  border-color: #f4771c;
+  color: #f4771c;
+}
 
 /* ---- Notice (공지사항 · FAQ 아코디언) ---------------------------- */
 .faq {
@@ -1336,5 +1991,44 @@ footer {
   }
   .large-text {
     font-size: 17px;
+  }
+
+   /* Notice 모바일 */
+  .notice-list-head,
+  .notice-list-row {
+    grid-template-columns: minmax(0, 1fr) 92px;
+    gap: 10px;
+  }
+
+  .notice-list-head {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .notice-list-row {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .notice-list-title {
+    font-size: 14px;
+  }
+
+  .notice-list-row time {
+    font-size: 12px;
+  }
+
+  .notice-detail {
+    margin: 20px auto;
+    padding: 20px;
+  }
+
+  .notice-detail-head h2 {
+    font-size: 20px;
+  }
+
+  .notice-detail-content {
+    padding: 22px 2px;
+    font-size: 14px;
   }
 }

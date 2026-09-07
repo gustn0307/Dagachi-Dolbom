@@ -82,6 +82,20 @@ public enum ErrorCode {
             "제보 사진은 최대 3장까지 첨부할 수 있습니다."
     ),
 
+    // ActivityRecord
+    ACTIVITY_RECORD_STATE_CONFLICT(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_RECORD_409",
+            "현재 상태에서는 활동기록을 변경할 수 없습니다."
+    ),
+
+    // Checklist
+    CHECKLIST_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "CHECKLIST_404",
+            "해당 버전의 체크리스트를 찾을 수 없습니다."
+    ),
+
     REPORT_ALREADY_ASSIGNED(
             HttpStatus.CONFLICT,
             "REPORT_409_ALREADY_ASSIGNED",
@@ -185,6 +199,43 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "APPLICATION_409_NOT_CANCELABLE",
             "취소할 수 없는 신청입니다."
+    ),
+
+    // CareActivity / ActivityRecord
+    ACTIVITY_NOT_READY(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_NOT_READY",
+            "아직 시작할 수 없는 활동입니다."
+    ),
+
+    ACTIVITY_ALREADY_STARTED(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_ALREADY_STARTED",
+            "이미 시작된 활동입니다."
+    ),
+
+    ACTIVITY_GENDER_CONDITION_NOT_MET(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_GENDER_CONDITION",
+            "성별 조건을 충족하지 않습니다."
+    ),
+
+    PASSWORD_MISMATCH(
+            HttpStatus.BAD_REQUEST,
+            "USER_400_PASSWORD_MISMATCH",
+            "비밀번호가 일치하지 않습니다."
+    ),
+
+    PASSWORD_SAME_AS_CURRENT(
+            HttpStatus.BAD_REQUEST,
+            "USER_400_PASSWORD_SAME_AS_CURRENT",
+            "새 비밀번호는 현재 비밀번호와 달라야 합니다."
+    ),
+
+    WITHDRAWAL_BLOCKED(
+            HttpStatus.CONFLICT,
+            "USER_409_WITHDRAWAL_BLOCKED",
+            "진행 중인 신청 또는 활동이 있어 탈퇴할 수 없습니다. 먼저 신청을 취소해 주세요."
     );
 
     private final HttpStatus status;

@@ -1,5 +1,10 @@
 package com.dagachi.backend.domain.entity;
-import com.dagachi.backend.common.entity.BaseTimeEntity; import com.dagachi.backend.domain.enums.*; import jakarta.persistence.*; import lombok.*; import java.time.LocalDateTime;
+import com.dagachi.backend.common.entity.BaseTimeEntity;
+import com.dagachi.backend.domain.enums.*;
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name="activity_records")
 @Getter
@@ -52,4 +57,50 @@ public class ActivityRecord extends BaseTimeEntity {
 
  @Column(name="review_note",columnDefinition="text")
  private String reviewNote;
+
+ // 공동 Draft의 활동 결과 내용을 수정합니다.
+ public void updateDraft(
+         VisitResult visitResult,
+         LocalDateTime completedAt,
+         String specialNote
+ ) {
+  this.visitResult = visitResult;
+  this.completedAt = completedAt;
+  this.specialNote = specialNote;
+ }
+
+ // 대상자 서명 파일과 서명 시각을 함께 변경합니다.
+ public void updateSignature(
+         String signatureS3Key,
+         LocalDateTime signedAt
+ ) {
+  this.signatureS3Key = signatureS3Key;
+  this.signedAt = signedAt;
+ }
+
+ // 활동 결과를 최종 제출 상태로 변경합니다.
+ public void submit(User submittedBy) {
+  this.submittedBy = submittedBy;
+  this.reviewStatus = ActivityReviewStatus.SUBMITTED;
+ }
+
+ /**
+  * RECORD-01 활동 시작 시 DRAFT 상태의 공동 활동 결과를 생성한다.
+  * submittedBy/visitResult 등은 DRAFT에서 아직 확정되지 않으므로 null로 둔다.
+  * 이후 값 채우기(제출·검토)는 맹동영님 담당(RECORD-02~09) 메서드에서 처리한다.
+  */
+ public static ActivityRecord createDraft(
+         CareActivity activity,
+         Integer checklistVersion,
+         LocalDateTime startedAt
+ ) {
+  ActivityRecord record = new ActivityRecord();
+
+  record.activity = activity;
+  record.checklistVersion = checklistVersion;
+  record.startedAt = startedAt;
+  record.reviewStatus = ActivityReviewStatus.DRAFT;
+
+  return record;
+ }
 }

@@ -4,6 +4,7 @@ import com.dagachi.backend.domain.entity.ActivityApplication;
 import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
+import com.dagachi.backend.domain.enums.UserGender;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,6 +30,13 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
     List<ActivityApplicationCountProjection> countApprovedByActivityIds(
             @Param("activityIds") List<Long> activityIds,
             @Param("status") ApplicationStatus status
+    );
+
+    // 특정 활동에 대해 사용자가 특정 신청 상태인지 확인한다.
+    boolean existsByActivityIdAndUserIdAndStatus(
+            Long activityId,
+            Long userId,
+            ApplicationStatus status
     );
 
     interface ActivityApplicationCountProjection {
@@ -86,4 +94,22 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
             @Param("activityStatus") ActivityStatus activityStatus,
             Pageable pageable
     );
+
+    /**
+     * RECORD-01 활동 시작 시 SAME_GENDER_ONE 조건 검증용.
+     */
+    @Query("""
+        SELECT u.gender
+        FROM ActivityApplication aa
+        JOIN aa.user u
+        WHERE aa.activity.id = :activityId
+          AND aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+        """)
+    List<UserGender> findApprovedUserGenders(@Param("activityId") Long activityId);
+
+    /**
+     * USER-03 탈퇴 시 진행 중인 신청/활동 여부 확인.
+     * [팀 미확정 정책 임시 적용] PENDING 또는 APPROVED가 하나라도 있으면 탈퇴를 막는다.
+     */
+    boolean existsByUser_IdAndStatusIn(Long userId, List<ApplicationStatus> statuses);
 }
