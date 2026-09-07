@@ -1465,22 +1465,44 @@ function Volunteer() {
                   </button>
                 )}
 
-                {app.activityStatus === "IN_PROGRESS" && (
-                  <span
-                    style={{
-                      marginTop: 8,
-                      display: "inline-block",
-                      padding: "6px 14px",
-                      borderRadius: 8,
-                      background: "#fff3ea",
-                      color: "#f4771c",
-                      fontWeight: 700,
-                      fontSize: 13,
-                    }}
-                  >
-                    체크리스트 진행 중 (준비 중인 화면입니다)
-                  </span>
-                )}
+                {app.activityStatus === "IN_PROGRESS" &&
+                  (app.activityRecordId ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/activity-records/${app.activityRecordId}`)
+                      }
+                      style={{
+                        marginTop: 8,
+                        minHeight: 36,
+                        padding: "0 14px",
+                        border: "1px solid #f4771c",
+                        borderRadius: 8,
+                        background: "#f4771c",
+                        color: "#fff",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      체크리스트 이어하기
+                    </button>
+                  ) : (
+                    <span
+                      style={{
+                        marginTop: 8,
+                        display: "inline-block",
+                        padding: "6px 14px",
+                        borderRadius: 8,
+                        background: "#fff3ea",
+                        color: "#f4771c",
+                        fontWeight: 700,
+                        fontSize: 13,
+                      }}
+                    >
+                      체크리스트 진행 중
+                    </span>
+                  ))}
 
                 {app.activityStatus === "COMPLETED" && (
                   <span
