@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # 현재 프로젝트에서는 gpt-4o-mini를 기본 모델로 사용합니다.
     openai_model: str = "gpt-4o-mini"
 
+    # 제보 유사도 검색용 embedding 모델입니다.
+    # 요약 모델과 역할이 다르므로 별도 환경변수로 분리합니다.
+    openai_embedding_model: str = "text-embedding-3-small"
+
     # .env 파일을 읽도록 설정합니다.
     #
     # extra="ignore":

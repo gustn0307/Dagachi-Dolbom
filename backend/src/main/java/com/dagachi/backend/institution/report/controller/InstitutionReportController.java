@@ -6,6 +6,7 @@ import com.dagachi.backend.domain.enums.ReportStatus;
 import com.dagachi.backend.institution.report.dto.*;
 import com.dagachi.backend.institution.report.service.InstitutionReportService;
 import com.dagachi.backend.institution.report.service.ReportAiAnalysisService;
+import com.dagachi.backend.institution.report.service.ReportDuplicateAnalysisService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -23,13 +24,16 @@ public class InstitutionReportController {
 
     private final InstitutionReportService institutionReportService;
     private final ReportAiAnalysisService reportAiAnalysisService;
+    private final ReportDuplicateAnalysisService reportDuplicateAnalysisService;
 
     public InstitutionReportController(
             InstitutionReportService institutionReportService,
-            ReportAiAnalysisService reportAiAnalysisService
+            ReportAiAnalysisService reportAiAnalysisService,
+            ReportDuplicateAnalysisService reportDuplicateAnalysisService
     ) {
         this.institutionReportService = institutionReportService;
         this.reportAiAnalysisService = reportAiAnalysisService;
+        this.reportDuplicateAnalysisService = reportDuplicateAnalysisService;
     }
 
     /**
@@ -212,6 +216,60 @@ public class InstitutionReportController {
     }
 
     /**
+     * 현재 로그인한 기관에 배정된 제보를 기준으로
+     * 중복/유사 제보 후보 분석을 새로 실행합니다.
+     *
+     * AI가 중복 여부를 확정하지 않고,
+     * 내용 유사도와 위치/접수 시점 등의 참고 후보만 반환합니다.
+     */
+    @PostMapping("/{reportId}/duplicate-analysis")
+    public ResponseEntity<ApiResponse<ReportDuplicateAnalysisResponse>>
+    createDuplicateAnalysis(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long reportId
+    ) {
+        ReportDuplicateAnalysisResponse response =
+                reportDuplicateAnalysisService.createDuplicateAnalysis(
+                        userId,
+                        reportId
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "유사 제보 분석을 완료했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 현재 로그인한 기관에 배정된 제보의
+     * 최신 중복/유사 제보 분석 결과를 조회합니다.
+     *
+     * AI 분석을 다시 실행하지 않고
+     * 저장된 최신 DUPLICATE_REPORT 결과만 반환합니다.
+     */
+    @GetMapping("/{reportId}/duplicate-analysis")
+    public ResponseEntity<ApiResponse<ReportDuplicateAnalysisResponse>>
+    getLatestDuplicateAnalysis(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long reportId
+    ) {
+        ReportDuplicateAnalysisResponse response =
+                reportDuplicateAnalysisService.getLatestDuplicateAnalysis(
+                        userId,
+                        reportId
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "최신 유사 제보 분석 결과를 조회했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
      * 현재 로그인한 기관에 배정된 제보의 처리 상태를 변경합니다.
      *
      * 상태 전이 가능 여부는 Report Entity의 도메인 규칙으로 검증하며,
@@ -294,4 +352,6 @@ public class InstitutionReportController {
                         )
                 );
     }
+
+
 }
