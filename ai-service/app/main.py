@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 # 각 기능별 API Router를 main 애플리케이션에 등록하기 위해 import합니다.
 from app.api.routes.health import router as health_router
+from app.api.routes.report_summary import router as report_summary_router
 
 # 애플리케이션 공통 설정을 가져옵니다.
 from app.core.config import get_settings
@@ -21,8 +22,8 @@ app = FastAPI(
 )
 
 
-# 서버 상태 확인용 health API를 FastAPI 애플리케이션에 등록합니다.
-#
-# 앞으로 AI 분석, 챗봇 등의 Router가 추가되면
-# 같은 방식으로 Router를 추가합니다.
+# 서버 상태 확인용 health API를 등록합니다.
 app.include_router(health_router)
+
+# Spring Boot가 내부적으로 호출할 제보 AI 요약 API를 등록합니다.
+app.include_router(report_summary_router)
