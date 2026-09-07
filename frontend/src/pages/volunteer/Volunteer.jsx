@@ -5,6 +5,7 @@ import PageHeader from "../../components/common/PageHeader";
 import {
   fetchActivities,
   applyForActivity,
+  fetchExecutionDetail,
   fetchMyApplications,
   fetchMyActivities,
   cancelApplication,
@@ -416,6 +417,27 @@ function Volunteer() {
       setStartError(message);
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  // 이미 시작된 공동 활동에 다시 진입합니다.
+  // ACT-03에서 기존 ActivityRecord id를 받아 같은 체크리스트 화면으로 이동합니다.
+  const handleContinueActivity = async (activityId) => {
+    try {
+      const detail = await fetchExecutionDetail(activityId);
+
+      if (!detail.activityRecordId) {
+        setToastMessage("활동기록 정보를 찾을 수 없습니다.");
+        return;
+      }
+
+      navigate(`/activity-records/${detail.activityRecordId}`);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ??
+        "활동기록을 불러오는 중 오류가 발생했습니다.";
+
+      setToastMessage(message);
     }
   };
 
@@ -1465,44 +1487,26 @@ function Volunteer() {
                   </button>
                 )}
 
-                {app.activityStatus === "IN_PROGRESS" &&
-                  (app.activityRecordId ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(`/activity-records/${app.activityRecordId}`)
-                      }
-                      style={{
-                        marginTop: 8,
-                        minHeight: 36,
-                        padding: "0 14px",
-                        border: "1px solid #f4771c",
-                        borderRadius: 8,
-                        background: "#f4771c",
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: 13,
-                        cursor: "pointer",
-                      }}
-                    >
-                      체크리스트 이어하기
-                    </button>
-                  ) : (
-                    <span
-                      style={{
-                        marginTop: 8,
-                        display: "inline-block",
-                        padding: "6px 14px",
-                        borderRadius: 8,
-                        background: "#fff3ea",
-                        color: "#f4771c",
-                        fontWeight: 700,
-                        fontSize: 13,
-                      }}
-                    >
-                      체크리스트 진행 중
-                    </span>
-                  ))}
+                {app.activityStatus === "IN_PROGRESS" && (
+                  <button
+                    type="button"
+                    onClick={() => handleContinueActivity(app.activityId)}
+                    style={{
+                      marginTop: 8,
+                      minHeight: 36,
+                      padding: "0 14px",
+                      border: "1px solid #f4771c",
+                      borderRadius: 8,
+                      background: "#fff3ea",
+                      color: "#f4771c",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    체크리스트 계속하기
+                  </button>
+                )}
 
                 {app.activityStatus === "COMPLETED" && (
                   <span
