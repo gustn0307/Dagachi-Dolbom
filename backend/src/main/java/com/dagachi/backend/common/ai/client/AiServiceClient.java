@@ -2,6 +2,8 @@ package com.dagachi.backend.common.ai.client;
 
 import com.dagachi.backend.common.ai.dto.AiReportSummaryRequest;
 import com.dagachi.backend.common.ai.dto.AiReportSummaryResponse;
+import com.dagachi.backend.common.ai.dto.AiReportEmbeddingRequest;
+import com.dagachi.backend.common.ai.dto.AiReportEmbeddingResponse;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -130,6 +132,80 @@ public class AiServiceClient {
          */
         if (!StringUtils.hasText(response.summary())
                 || !StringUtils.hasText(response.model())) {
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_INVALID_RESPONSE
+            );
+        }
+
+        return response;
+    }
+
+    /**
+     * FastAPI의 제보 embedding API를 호출합니다.
+     *
+     * 제보 원문(content)만 전달하고,
+     * 생성된 embedding 벡터와 사용 모델명을 반환받습니다.
+     */
+    public AiReportEmbeddingResponse createReportEmbedding(
+            String content
+    ) {
+
+        AiReportEmbeddingRequest request =
+                new AiReportEmbeddingRequest(content);
+
+        AiReportEmbeddingResponse response;
+
+        try {
+            response =
+                    aiServiceRestClient
+                            .post()
+                            .uri("/internal/ai/report-embedding")
+                            .body(request)
+                            .retrieve()
+                            .body(AiReportEmbeddingResponse.class);
+
+        } catch (ResourceAccessException exception) {
+
+            String message = exception.getMessage();
+
+            if (message != null
+                    && message.toLowerCase().contains("timed out")) {
+                throw new CustomException(
+                        ErrorCode.AI_SERVICE_TIMEOUT
+                );
+            }
+
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_UNAVAILABLE
+            );
+
+        } catch (RestClientResponseException exception) {
+
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_UNAVAILABLE
+            );
+
+        } catch (RestClientException exception) {
+
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_INVALID_RESPONSE
+            );
+        }
+
+        if (response == null) {
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_INVALID_RESPONSE
+            );
+        }
+
+        /*
+         * HTTP 요청 자체가 성공했더라도
+         * embedding이나 model이 비어 있으면 정상 결과로 사용하지 않습니다.
+         */
+        if (response.embedding() == null
+                || response.embedding().length == 0
+                || !StringUtils.hasText(response.model())) {
+
             throw new CustomException(
                     ErrorCode.AI_SERVICE_INVALID_RESPONSE
             );

@@ -154,6 +154,22 @@ function Report() {
     }
   };
 
+  const handleAddressSearch = () => {
+    if (!window.daum?.Postcode) {
+      setError("주소 검색 서비스를 불러오지 못했습니다.");
+      return;
+    }
+
+    new window.daum.Postcode({
+      oncomplete: (data) => {
+        const selectedAddress = data.roadAddress || data.jibunAddress;
+
+        setLocation(selectedAddress);
+        setError("");
+      },
+    }).open();
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -164,7 +180,7 @@ function Report() {
     setError("");
 
     if (!location.trim()) {
-      setError("발견 위치를 입력해 주세요.");
+      setError("발견 위치 주소를 검색해 선택해 주세요.");
       return;
     }
 
@@ -298,7 +314,7 @@ function Report() {
               <b>01</b>
               <span>
                 <strong>위치를 알려주세요</strong>
-                정확하지 않아도 괜찮아요.
+                주소를 검색해 발견 위치를 선택해 주세요.
               </span>
             </li>
 
@@ -344,7 +360,7 @@ function Report() {
               발견 위치 <em>*</em>
             </label>
 
-            <p>건물명이나 주변의 눈에 띄는 장소를 함께 적어주세요.</p>
+            <p>주소 검색을 통해 발견 위치의 주소를 선택해 주세요.</p>
 
             <div className="input-with-icon">
               <LocationIcon />
@@ -356,9 +372,17 @@ function Report() {
                 required
                 maxLength="255"
                 value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder="예: 행복구 한마음로 123, 온누리 약국 앞"
+                readOnly
+                placeholder="주소를 검색해 선택해주세요."
               />
+
+              <button
+                type="button"
+                onClick={handleAddressSearch}
+                className="report-address-button"
+              >
+                주소 검색
+              </button>
             </div>
           </div>
 

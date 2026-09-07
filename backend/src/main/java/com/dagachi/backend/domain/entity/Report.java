@@ -178,4 +178,16 @@ public class Report extends BaseTimeEntity {
 
         this.careRecipient = careRecipient;
     }
+
+    /**
+     * 제보 내용으로 생성한 embedding 벡터를 저장합니다.
+     *
+     * embedding 생성은 외부 AI 서비스에서 수행하고,
+     * Report Entity는 생성된 벡터를 자신의 상태로 보관합니다.
+     */
+    public void updateEmbedding(
+            float[] embedding
+    ) {
+        this.embedding = embedding;
+    }
 }

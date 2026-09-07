@@ -51,6 +51,9 @@ ai:
     # AI 요청은 일반 API보다 오래 걸릴 수 있어 기본값을 30초로 둡니다.
     read-timeout: ${AI_SERVICE_READ_TIMEOUT:30000}
 
+  embedding:
+    model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 

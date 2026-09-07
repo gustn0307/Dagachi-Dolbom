@@ -522,6 +522,41 @@ footer {
   margin-top: 13px;
 }
 
+/* 제보 주소 검색 입력 + 버튼 */
+.report-form .input-with-icon {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.report-form .input-with-icon svg {
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.report-address-button {
+  height: 48px;
+  padding: 0 18px;
+  border: 1px solid var(--report-orange);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--report-orange);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    transform 0.18s;
+}
+
+.report-address-button:hover {
+  background: #fff4eb;
+  transform: translateY(-1px);
+}
+
 /* Report page refresh */
 .public-landing { min-height: 100dvh; color: #382f28; background: #fff; }
 .public-header { height: 78px; padding: 0 clamp(22px,5vw,72px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #eee8e1; background: rgba(255,255,255,.96); }
@@ -841,11 +876,21 @@ footer {
   .form-card.report-form { padding: 25px 20px; }
   .form-intro h2 { font-size: 20px; }
   .form-intro small { display: none; }
+
+  .report-form .input-with-icon {
+    grid-template-columns: 1fr;
+  }
+
+  .report-address-button {
+    width: 100%;
+  }
+
   .report-form .upload { align-items: flex-start; flex-wrap: wrap; }
   .upload-copy { width: calc(100% - 66px); flex: none; }
   .upload-button { margin-left: 63px; }
   .report-complete .success-panel { padding: 38px 22px; }
   .receipt-card { flex-direction: column; }
+
   .report-image-preview-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
