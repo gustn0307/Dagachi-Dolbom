@@ -52,4 +52,24 @@ public class ActivityRecord extends BaseTimeEntity {
 
  @Column(name="review_note",columnDefinition="text")
  private String reviewNote;
+
+ /**
+  * RECORD-01 활동 시작 시 DRAFT 상태의 공동 활동 결과를 생성한다.
+  * submittedBy/visitResult 등은 DRAFT에서 아직 확정되지 않으므로 null로 둔다.
+  * 이후 값 채우기(제출·검토)는 맹동영님 담당(RECORD-02~09) 메서드에서 처리한다.
+  */
+ public static ActivityRecord createDraft(
+         CareActivity activity,
+         Integer checklistVersion,
+         LocalDateTime startedAt
+ ) {
+  ActivityRecord record = new ActivityRecord();
+
+  record.activity = activity;
+  record.checklistVersion = checklistVersion;
+  record.startedAt = startedAt;
+  record.reviewStatus = ActivityReviewStatus.DRAFT;
+
+  return record;
+ }
 }
