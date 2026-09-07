@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import PageHeader from "../../components/common/PageHeader";
 import {
   fetchActivities,
@@ -52,7 +54,9 @@ function formatSchedule(isoString) {
 function isCancelable(app) {
   if (app.status === "PENDING") return true;
   if (app.status === "APPROVED") {
-    return app.activityStatus === "RECRUITING" || app.activityStatus === "READY";
+    return (
+      app.activityStatus === "RECRUITING" || app.activityStatus === "READY"
+    );
   }
   return false;
 }
@@ -78,6 +82,8 @@ function getPageNumbers(currentPage, totalPages, siblingCount) {
 }
 
 function Volunteer() {
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState("direct");
   const [activities, setActivities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -393,12 +399,16 @@ function Volunteer() {
     setStartError(null);
 
     try {
-      await startActivity(startTarget.activityId);
-      setToastMessage("활동이 시작되었습니다. 체크리스트를 진행해주세요.");
-      setStartTarget(null);
+      const result = await startActivity(startTarget.activityId);
+
+      // RECORD-01에서 생성된 공동 ActivityRecord 화면으로 이동합니다.
+      navigate(`/activity-records/${result.activityRecordId}`);
 
       // 내 활동 목록 새로고침 (activityStatus가 IN_PROGRESS로 바뀐 걸 반영)
-      const data = await fetchMyActivities({ page: myActivitiesPage, size: PAGE_SIZE });
+      const data = await fetchMyActivities({
+        page: myActivitiesPage,
+        size: PAGE_SIZE,
+      });
       setMyActivities(data.content);
     } catch (err) {
       const message =
@@ -692,41 +702,42 @@ function Volunteer() {
             {!isNarrow && <span> 이전</span>}
           </button>
 
-          {getPageNumbers(page, effectiveTotalPages, siblingCount).map((p, idx) =>
-            p === "..." ? (
-              <span
-                key={`gen-ellipsis-${idx}`}
-                aria-hidden="true"
-                style={{
-                  minWidth: 24,
-                  minHeight: isNarrow ? 36 : 40,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#b3aba4",
-                  fontSize: 14,
-                }}
-              >
-                …
-              </span>
-            ) : (
-              <button
-                type="button"
-                key={`gen-${p}`}
-                style={pageBtnStyle(`gen-${p}`, {
-                  active: p === page,
-                  disabled: loading,
-                })}
-                disabled={loading}
-                aria-current={p === page ? "page" : undefined}
-                aria-label={`${p + 1}페이지`}
-                onClick={() => onChange(p)}
-                onMouseEnter={() => setHoveredPageBtn(`gen-${p}`)}
-                onMouseLeave={() => setHoveredPageBtn(null)}
-              >
-                {p + 1}
-              </button>
-            ),
+          {getPageNumbers(page, effectiveTotalPages, siblingCount).map(
+            (p, idx) =>
+              p === "..." ? (
+                <span
+                  key={`gen-ellipsis-${idx}`}
+                  aria-hidden="true"
+                  style={{
+                    minWidth: 24,
+                    minHeight: isNarrow ? 36 : 40,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#b3aba4",
+                    fontSize: 14,
+                  }}
+                >
+                  …
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  key={`gen-${p}`}
+                  style={pageBtnStyle(`gen-${p}`, {
+                    active: p === page,
+                    disabled: loading,
+                  })}
+                  disabled={loading}
+                  aria-current={p === page ? "page" : undefined}
+                  aria-label={`${p + 1}페이지`}
+                  onClick={() => onChange(p)}
+                  onMouseEnter={() => setHoveredPageBtn(`gen-${p}`)}
+                  onMouseLeave={() => setHoveredPageBtn(null)}
+                >
+                  {p + 1}
+                </button>
+              ),
           )}
 
           <button
@@ -1276,7 +1287,9 @@ function Volunteer() {
                       {app.gender === "FEMALE" ? "여성" : "남성"} 어르신
                     </p>
                     {app.status === "REJECTED" && app.rejectedReason && (
-                      <p style={{ color: "#c0392b", fontSize: 13, marginTop: 4 }}>
+                      <p
+                        style={{ color: "#c0392b", fontSize: 13, marginTop: 4 }}
+                      >
                         거절 사유: {app.rejectedReason}
                       </p>
                     )}
@@ -1327,7 +1340,9 @@ function Volunteer() {
                             : "pointer",
                       }}
                     >
-                      {reapplyingId === app.activityId ? "신청 중..." : "다시 신청"}
+                      {reapplyingId === app.activityId
+                        ? "신청 중..."
+                        : "다시 신청"}
                     </button>
                   )}
                 </div>
@@ -1351,7 +1366,11 @@ function Volunteer() {
         <section className="visit-list">
           {activitiesLoading && (
             <p
-              style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}
+              style={{
+                textAlign: "center",
+                color: "#897e75",
+                padding: "24px 0",
+              }}
             >
               불러오는 중입니다...
             </p>
@@ -1359,19 +1378,29 @@ function Volunteer() {
 
           {!activitiesLoading && activitiesError && (
             <p
-              style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}
+              style={{
+                textAlign: "center",
+                color: "#897e75",
+                padding: "24px 0",
+              }}
             >
               {activitiesError}
             </p>
           )}
 
-          {!activitiesLoading && !activitiesError && myActivities.length === 0 && (
-            <p
-              style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}
-            >
-              아직 확정된 활동이 없어요. 신청이 승인되면 여기에 표시됩니다.
-            </p>
-          )}
+          {!activitiesLoading &&
+            !activitiesError &&
+            myActivities.length === 0 && (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "#897e75",
+                  padding: "24px 0",
+                }}
+              >
+                아직 확정된 활동이 없어요. 신청이 승인되면 여기에 표시됩니다.
+              </p>
+            )}
 
           {!activitiesLoading &&
             !activitiesError &&
@@ -1379,7 +1408,11 @@ function Volunteer() {
               <div
                 className="visit"
                 key={app.applicationId}
-                style={{ cursor: "default", alignItems: "flex-start", flexWrap: "wrap" }}
+                style={{
+                  cursor: "default",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <h2 style={{ fontSize: "15px" }}>

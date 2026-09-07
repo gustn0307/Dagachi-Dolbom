@@ -82,6 +82,20 @@ public enum ErrorCode {
             "제보 사진은 최대 3장까지 첨부할 수 있습니다."
     ),
 
+    // ActivityRecord
+    ACTIVITY_RECORD_STATE_CONFLICT(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_RECORD_409",
+            "현재 상태에서는 활동기록을 변경할 수 없습니다."
+    ),
+
+    // Checklist
+    CHECKLIST_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "CHECKLIST_404",
+            "해당 버전의 체크리스트를 찾을 수 없습니다."
+    ),
+
     REPORT_ALREADY_ASSIGNED(
             HttpStatus.CONFLICT,
             "REPORT_409_ALREADY_ASSIGNED",
