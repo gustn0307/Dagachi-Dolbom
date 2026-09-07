@@ -1,4 +1,4 @@
-package com.dagachi.backend.user.activity.dto;
+package com.dagachi.backend.user.record.dto;
 
 import com.dagachi.backend.domain.enums.ChecklistItemType;
 import java.util.List;

@@ -6,6 +6,55 @@ export const getActivities = (params = {}) =>
 export const getActivity = (activityId) =>
   unwrapData(api.get(`/api/activities/${activityId}`));
 
+// CHECK-01 해당 활동기록 버전의 체크리스트 문항을 조회합니다.
+export const getActivityChecklist = (recordId) =>
+  unwrapData(
+    api.get(`/api/activity-records/${recordId}/checklist`),
+  );
+
+// RECORD-02 현재 공동 ActivityRecord Draft를 조회합니다.
+export const getActivityRecord = (recordId) =>
+  unwrapData(
+    api.get(`/api/activity-records/${recordId}`),
+  );
+
+// RECORD-03 현재 공동 Draft 전체를 저장합니다.
+export const saveActivityRecordDraft = (
+  recordId,
+  request,
+) =>
+  unwrapData(
+    api.put(
+      `/api/activity-records/${recordId}/draft`,
+      request,
+    ),
+  );
+
+// RECORD-04 대상자 서명 이미지를 업로드합니다.
+export const uploadActivityRecordSignature = (
+  recordId,
+  signature,
+) => {
+  const formData = new FormData();
+
+  // 백엔드 multipart part명이 "signature"로 확정되어 있습니다.
+  formData.append("signature", signature);
+
+  return unwrapData(
+    api.post(
+      `/api/activity-records/${recordId}/signature`,
+      formData,
+    ),
+  );
+};
+
+// RECORD-05 활동기록을 최종 제출합니다.
+// Submit API는 별도의 Request Body를 받지 않습니다.
+export const submitActivityRecord = (recordId) =>
+  unwrapData(
+    api.post(`/api/activity-records/${recordId}/submit`),
+  );
+
 // 회원/비회원 공통 제보 등록
 // FormData의 request에는 JSON Blob,
 // images에는 최대 3장의 이미지 파일을 담아 전송합니다.
@@ -20,25 +69,41 @@ export const createReport = (formData) =>
 
 // 로그인 사용자의 제보 목록 조회
 export const getMyReports = (params = {}) =>
-  unwrapData(api.get("/api/users/me/reports", { params }));
+  unwrapData(
+    api.get("/api/users/me/reports", { params }),
+  );
+
 // 공개 공지 목록 조회 API
 export const getNotices = (params = {}) =>
-  unwrapData(api.get("/api/notices", { params }));
+  unwrapData(
+    api.get("/api/notices", { params }),
+  );
 
 // 공개 공지 상세 조회 API
 export const getNotice = (noticeId) =>
-  unwrapData(api.get(`/api/notices/${noticeId}`));
+  unwrapData(
+    api.get(`/api/notices/${noticeId}`),
+  );
 
 export const userApi = {
   getActivities,
   getActivity,
+
+  // 활동기록 API
+  getActivityChecklist,
+  getActivityRecord,
+  saveActivityRecordDraft,
+  uploadActivityRecordSignature,
+  submitActivityRecord,
+
   createReport,
   getMyReports,
   getNotices,
   getNotice,
 };
 
-// 돌봄 대상자 리스트 목록 조회 (지역/연령대/성별/거리순 필터링 포함)
+// 돌봄 대상자 리스트 목록 조회
+// 지역/연령대/성별/거리순 필터링 포함
 export const fetchActivities = async ({
   page = 0,
   size = 20,
@@ -53,32 +118,49 @@ export const fetchActivities = async ({
   if (region) {
     params.region = region;
   }
+
   if (ageGroups && ageGroups.length > 0) {
     params.ageGroups = ageGroups;
   }
+
   if (gender) {
     params.gender = gender;
   }
+
   if (latitude != null && longitude != null) {
     params.latitude = latitude;
     params.longitude = longitude;
   }
 
-  const response = await api.get("/api/activities", { params });
+  const response = await api.get(
+    "/api/activities",
+    { params },
+  );
+
   return response.data.data;
 };
 
-export const fetchActivityDetail = async (activityId) => {
-  const response = await api.get(`/api/activities/${activityId}`);
+export const fetchActivityDetail = async (
+  activityId,
+) => {
+  const response = await api.get(
+    `/api/activities/${activityId}`,
+  );
+
   return response.data.data;
 };
 
-export const fetchExecutionDetail = async (activityId) => {
-  const response = await api.get(`/api/activities/${activityId}/execution-details`);
+export const fetchExecutionDetail = async (
+  activityId,
+) => {
+  const response = await api.get(
+    `/api/activities/${activityId}/execution-details`,
+  );
+
   return response.data.data;
 };
 
-// 신청 버튼 활성화
+// 활동 신청 API
 export const applyForActivity = (activityId) =>
   unwrapData(api.post(`/api/activities/${activityId}/applications`));
 

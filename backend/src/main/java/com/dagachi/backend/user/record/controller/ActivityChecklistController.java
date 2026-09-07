@@ -1,8 +1,8 @@
-package com.dagachi.backend.user.activity.controller;
+package com.dagachi.backend.user.record.controller;
 
 import com.dagachi.backend.common.response.ApiResponse;
-import com.dagachi.backend.user.activity.dto.ActivityChecklistResponse;
-import com.dagachi.backend.user.activity.service.ActivityChecklistService;
+import com.dagachi.backend.user.record.dto.ActivityChecklistResponse;
+import com.dagachi.backend.user.record.service.ActivityChecklistService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;

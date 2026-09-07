@@ -21,6 +21,7 @@ import ActivityManagement from "./pages/institution/ActivityManagement";
 import InstitutionStatistics from "./pages/institution/Statistics";
 import ActivityDetail from "./pages/institution/ActivityDetail";
 
+import ActivityRecord from "./pages/activity/ActivityRecord";
 
 import UserManagement from "./pages/admin/UserManagement";
 import InstitutionManagement from "./pages/admin/InstitutionManagement";
@@ -65,6 +66,15 @@ function App() {
           />
 
           <Route
+            path="/activity-records/:recordId"
+            element={
+              <RequireRole allowedRoles={["USER"]}>
+                <ActivityRecord />
+              </RequireRole>
+            }
+          />
+
+          <Route
             path="/mypage"
             element={
               <RequireRole allowedRoles={["USER"]}>
@@ -102,7 +112,6 @@ function App() {
 
           <Route path="activities" element={<ActivityManagement />} />
           <Route path="statistics" element={<InstitutionStatistics />} />
-        
 
           <Route path="activities/:activityId" element={<ActivityDetail />} />
         </Route>

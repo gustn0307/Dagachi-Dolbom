@@ -1,4 +1,4 @@
-package com.dagachi.backend.user.activity.service;
+package com.dagachi.backend.user.record.service;
 
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
@@ -10,8 +10,8 @@ import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.ActivityRecordRepository;
 import com.dagachi.backend.domain.repository.ChecklistItemRepository;
 import com.dagachi.backend.domain.repository.ChecklistResponseRepository;
-import com.dagachi.backend.user.activity.dto.ActivityChecklistResponse;
-import com.dagachi.backend.user.activity.dto.ChecklistItemResponse;
+import com.dagachi.backend.user.record.dto.ActivityChecklistResponse;
+import com.dagachi.backend.user.record.dto.ChecklistItemResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
