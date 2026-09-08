@@ -100,6 +100,33 @@ public class InstitutionActivityController {
                 )
         );
     }
+    /**
+     * 기관의 승인 대기 봉사 신청 현황 조회.
+     *
+     * 사이드바에는 전체 승인 대기 신청 수를 표시하고,
+     * 활동 관리 화면에는 대상자별 승인 대기 현황을 표시한다.
+     *
+     * GET /api/institution/activities/pending-applications/summary
+     */
+    @GetMapping("/pending-applications/summary")
+    public ResponseEntity<
+            ApiResponse<InstitutionPendingApplicationSummaryResponse>
+            >
+    getPendingApplicationSummary(
+            @AuthenticationPrincipal
+            Long userId
+    ) {
+        InstitutionPendingApplicationSummaryResponse response =
+                institutionActivityService
+                        .getPendingApplicationSummary(userId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "승인 대기 봉사 신청 현황을 조회했습니다.",
+                        response
+                )
+        );
+    }
 
     /**
      * 기관 활동 등록.
@@ -361,6 +388,107 @@ public class InstitutionActivityController {
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "봉사 신청을 반려했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 기관 담당자가 봉사자가 제출한 활동기록을 조회한다.
+     *
+     * GET
+     * /api/institution/activities/{activityId}/record
+     */
+    @GetMapping("/{activityId}/record")
+    public ResponseEntity<
+            ApiResponse<InstitutionActivityRecordResponse>
+            >
+    getInstitutionActivityRecord(
+            @AuthenticationPrincipal
+            Long userId,
+
+            @PathVariable
+            Long activityId
+    ) {
+        InstitutionActivityRecordResponse response =
+                institutionActivityService
+                        .getInstitutionActivityRecord(
+                                userId,
+                                activityId
+                        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "활동기록을 조회했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 기관 담당자가 봉사자가 제출한 활동기록을 승인한다.
+     *
+     * PATCH
+     * /api/institution/activities/{activityId}/record/approve
+     */
+    @PatchMapping("/{activityId}/record/approve")
+    public ResponseEntity<
+            ApiResponse<InstitutionActivityRecordResponse>
+            >
+    approveInstitutionActivityRecord(
+            @AuthenticationPrincipal
+            Long userId,
+
+            @PathVariable
+            Long activityId
+    ) {
+        InstitutionActivityRecordResponse response =
+                institutionActivityService
+                        .approveInstitutionActivityRecord(
+                                userId,
+                                activityId
+                        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "활동기록을 승인하고 활동을 완료했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 기관 담당자가 봉사자가 제출한 활동기록에 보완을 요청한다.
+     *
+     * PATCH
+     * /api/institution/activities/{activityId}/record/revision
+     */
+    @PatchMapping("/{activityId}/record/revision")
+    public ResponseEntity<
+            ApiResponse<InstitutionActivityRecordResponse>
+            >
+    requestInstitutionActivityRecordRevision(
+            @AuthenticationPrincipal
+            Long userId,
+
+            @PathVariable
+            Long activityId,
+
+            @Valid
+            @RequestBody
+            InstitutionActivityRecordRevisionRequest request
+    ) {
+        InstitutionActivityRecordResponse response =
+                institutionActivityService
+                        .requestInstitutionActivityRecordRevision(
+                                userId,
+                                activityId,
+                                request
+                        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "활동기록에 보완을 요청했습니다.",
                         response
                 )
         );

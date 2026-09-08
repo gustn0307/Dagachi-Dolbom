@@ -1295,3 +1295,115 @@
     grid-column: 1 / -1;
   }
 }
+
+.pending-application-panel {
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.pending-application-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 24px;
+  border-bottom: 1px solid #eee7e1;
+}
+
+.pending-application-header h2 {
+  margin: 0 0 6px;
+  color: #292521;
+  font-size: 18px;
+}
+
+.pending-application-header p {
+  margin: 0;
+  color: #817a73;
+  font-size: 13px;
+}
+
+.pending-application-header > strong {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #fff0e8;
+  color: #f36f2b;
+  font-size: 13px;
+}
+
+.pending-application-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pending-application-item {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #f0ebe7;
+}
+
+.pending-application-item:last-child {
+  border-bottom: 0;
+}
+
+.pending-application-icon {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #fff0e8;
+  color: #f36f2b;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.pending-application-content h3 {
+  margin: 0 0 5px;
+  color: #292521;
+  font-size: 15px;
+}
+
+.pending-application-content p {
+  margin: 0;
+  color: #817a73;
+  font-size: 12px;
+}
+
+.pending-application-count {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff0e8;
+  color: #f36f2b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pending-application-item button {
+  padding: 9px 13px;
+  border: 1px solid #f36f2b;
+  border-radius: 8px;
+  background: #fff;
+  color: #f36f2b;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pending-application-item button:hover {
+  background: #f36f2b;
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .pending-application-item {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .pending-application-count,
+  .pending-application-item button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

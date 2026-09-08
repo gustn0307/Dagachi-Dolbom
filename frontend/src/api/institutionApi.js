@@ -239,6 +239,14 @@ export const getActivities = (params = {}) =>
     }),
   );
 
+  // 승인 대기 봉사 신청 현황 조회
+export const getPendingApplicationSummary = () =>
+  unwrapData(
+    api.get(
+      "/api/institution/activities/pending-applications/summary",
+    ),
+  );
+
 // 기관 활동 상세 조회
 export const getActivity = (activityId) =>
   unwrapData(
@@ -322,6 +330,40 @@ export const rejectActivityApplication = (
     ),
   );
 
+// 기관 담당자의 활동기록 상세 조회
+export const getInstitutionActivityRecord = (
+  activityId,
+) =>
+  unwrapData(
+    api.get(
+      `/api/institution/activities/${activityId}/record`,
+    ),
+  );
+
+// 기관 담당자의 활동기록 승인
+export const approveInstitutionActivityRecord = (
+  activityId,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/activities/${activityId}/record/approve`,
+    ),
+  );
+
+// 기관 담당자의 활동기록 보완 요청
+export const requestInstitutionActivityRecordRevision = (
+  activityId,
+  reviewNote,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/activities/${activityId}/record/revision`,
+      {
+        reviewNote,
+      },
+    ),
+  );
+
 /* =====================================================
  * 기관 통계 API
  * ===================================================== */
@@ -374,6 +416,7 @@ export const institutionApi = {
 
   // 활동
   getActivities,
+  getPendingApplicationSummary,
   getActivity,
   createActivity,
   updateActivity,
@@ -381,6 +424,9 @@ export const institutionApi = {
   getActivityApplications,
   approveActivityApplication,
   rejectActivityApplication,
+  getInstitutionActivityRecord,
+  approveInstitutionActivityRecord,
+  requestInstitutionActivityRecordRevision,
 
   // 통계
   getStatistics,
