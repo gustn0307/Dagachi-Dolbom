@@ -1,23 +1,135 @@
+import { useCallback, useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 
-const Icon = ({ children }) => <span className="side-icon" aria-hidden="true">{children}</span>;
+import { institutionApi } from "../../api/institutionApi";
+
+const REPORT_COUNT_CHANGED_EVENT =
+  "institution-report-count-changed";
+
+const Icon = ({ children }) => (
+  <span
+    className="side-icon"
+    aria-hidden="true"
+  >
+    {children}
+  </span>
+);
 
 function InstitutionSidebar() {
+  const [
+    unassignedReportCount,
+    setUnassignedReportCount,
+  ] = useState(0);
+
+  const loadUnassignedReportCount =
+    useCallback(async () => {
+      try {
+        const data =
+          await institutionApi.getUnassignedReports({
+            page: 0,
+            size: 1,
+          });
+
+        setUnassignedReportCount(
+          Number(data?.totalElements ?? 0),
+        );
+      } catch (error) {
+        console.error(
+          "미배정 제보 개수를 불러오지 못했습니다.",
+          error,
+        );
+
+        setUnassignedReportCount(0);
+      }
+    }, []);
+
+  useEffect(() => {
+    loadUnassignedReportCount();
+
+    const handleReportCountChanged = () => {
+      loadUnassignedReportCount();
+    };
+
+    window.addEventListener(
+      REPORT_COUNT_CHANGED_EVENT,
+      handleReportCountChanged,
+    );
+
+    return () => {
+      window.removeEventListener(
+        REPORT_COUNT_CHANGED_EVENT,
+        handleReportCountChanged,
+      );
+    };
+  }, [loadUnassignedReportCount]);
+
   return (
     <aside className="institution-sidebar">
       <div className="institution-logo">
-        <span className="institution-logo-mark">♥</span>
-        <div><h2>다같이 돌봄</h2><p>기관 파트너</p></div>
+        <span className="institution-logo-mark">
+          ♥
+        </span>
+
+        <div>
+          <h2>다같이 돌봄</h2>
+          <p>기관 파트너</p>
+        </div>
       </div>
+
       <nav>
-        <NavLink to="/institution" end><Icon>▦</Icon><span>대시보드</span></NavLink>
-        <NavLink to="/institution/reports"><Icon>⌕</Icon><span>제보 관리</span><em>12</em></NavLink>
-        <NavLink to="/institution/care-targets"><Icon>♡</Icon><span>돌봄 대상자</span></NavLink>
-        <NavLink to="/institution/volunteers"><Icon>♧</Icon><span>봉사자 관리</span></NavLink>
-        <NavLink to="/institution/activities"><Icon>✓</Icon><span>활동 관리</span></NavLink>
-        <NavLink to="/institution/statistics"><Icon>⌁</Icon><span>통계</span></NavLink>
+        <NavLink to="/institution" end>
+          <Icon>▦</Icon>
+          <span>대시보드</span>
+        </NavLink>
+
+        <NavLink to="/institution/reports">
+          <Icon>⌕</Icon>
+          <span>제보 관리</span>
+
+          {unassignedReportCount > 0 && (
+            <em
+              aria-label={`미배정 제보 ${unassignedReportCount}건`}
+            >
+              {unassignedReportCount > 99
+                ? "99+"
+                : unassignedReportCount}
+            </em>
+          )}
+        </NavLink>
+
+        <NavLink to="/institution/care-targets">
+          <Icon>♡</Icon>
+          <span>돌봄 대상자</span>
+        </NavLink>
+
+        <NavLink to="/institution/volunteers">
+          <Icon>♧</Icon>
+          <span>봉사자 관리</span>
+        </NavLink>
+
+        <NavLink to="/institution/activities">
+          <Icon>✓</Icon>
+          <span>활동 관리</span>
+        </NavLink>
+
+        <NavLink to="/institution/statistics">
+          <Icon>⌁</Icon>
+          <span>통계</span>
+        </NavLink>
       </nav>
-      <div className="institution-help"><span>?</span><p><strong>도움이 필요하신가요?</strong>기관 전용 고객센터<br />02-1234-5678</p></div>
+
+      <div className="institution-help">
+        <span>?</span>
+
+        <p>
+          <strong>
+            도움이 필요하신가요?
+          </strong>
+          기관 전용 고객센터
+          <br />
+          02-1234-5678
+        </p>
+      </div>
     </aside>
   );
 }

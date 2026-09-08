@@ -1,51 +1,27 @@
-import { institutionMockData } from "../data/institutionMockData";
 import api, { unwrapData } from "./api";
 
-const USE_MOCK =
-  import.meta.env.VITE_USE_MOCK_API === "true";
+/* =====================================================
+ * 돌봄 대상자 API
+ * ===================================================== */
 
-const clone = (value) =>
-  new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve(
-          structuredClone(value),
-        ),
-      180,
-    ),
-  );
-
-/**
- * CARE-01 돌봄 대상자 목록 조회.
- */
-export const getCareRecipients = (
-  params = {},
-) =>
+// CARE-01 돌봄 대상자 목록 조회
+export const getCareRecipients = (params = {}) =>
   unwrapData(
-    api.get(
-      "/api/institution/care-recipients",
-      { params },
-    ),
+    api.get("/api/institution/care-recipients", {
+      params,
+    }),
   );
 
-/**
- * CARE-02 돌봄 대상자 상세 조회.
- */
-export const getCareRecipient = (
-  recipientId,
-) =>
+// CARE-02 돌봄 대상자 상세 조회
+export const getCareRecipient = (recipientId) =>
   unwrapData(
     api.get(
       `/api/institution/care-recipients/${recipientId}`,
     ),
   );
 
-/**
- * CARE-03 돌봄 대상자 등록.
- */
-export const createCareRecipient = (
-  request,
-) =>
+// CARE-03 돌봄 대상자 등록
+export const createCareRecipient = (request) =>
   unwrapData(
     api.post(
       "/api/institution/care-recipients",
@@ -53,9 +29,7 @@ export const createCareRecipient = (
     ),
   );
 
-/**
- * CARE-04 돌봄 대상자 기본정보 수정.
- */
+// CARE-04 돌봄 대상자 기본정보 수정
 export const updateCareRecipient = (
   recipientId,
   request,
@@ -67,9 +41,7 @@ export const updateCareRecipient = (
     ),
   );
 
-/**
- * CARE-05 돌봄 대상자 동의 상태 변경.
- */
+// CARE-05 돌봄 대상자 동의 상태 변경
 export const updateCareRecipientConsent = (
   recipientId,
   consentStatus,
@@ -83,50 +55,40 @@ export const updateCareRecipientConsent = (
     ),
   );
 
-/**
- * CARE-06 돌봄 대상자 관리 종료.
- */
-export const closeCareRecipient = (
-  recipientId,
-) =>
+// CARE-06 돌봄 대상자 관리 종료
+export const closeCareRecipient = (recipientId) =>
   unwrapData(
     api.post(
       `/api/institution/care-recipients/${recipientId}/close`,
     ),
   );
 
-/**
- * CARE-07 돌봄 대상자 관리 재개.
- */
-export const reopenCareRecipient = (
-  recipientId,
-) =>
+// CARE-07 돌봄 대상자 관리 재개
+export const reopenCareRecipient = (recipientId) =>
   unwrapData(
     api.post(
       `/api/institution/care-recipients/${recipientId}/reopen`,
     ),
   );
 
-/**
- * 기관 대시보드 조회.
- */
-export const getDashboard = () =>
-  USE_MOCK
-    ? clone(
-        institutionMockData.dashboard,
-      )
-    : unwrapData(
-        api.get(
-          "/api/institution/dashboard",
-        ),
-      );
+// 기존 화면에서 사용하는 돌봄 대상자 목록 함수
+export const getCareTargets = (params = {}) =>
+  getCareRecipients(params);
 
-/**
- * 기관에 아직 배정되지 않은 제보 목록 조회.
- *
- * 미배정 제보는 개인정보 최소화 정책에 따라
- * 정확한 주소, 연락처, 이미지 등을 제공하지 않는다.
- */
+/* =====================================================
+ * 기관 대시보드 API
+ * ===================================================== */
+
+export const getDashboard = () =>
+  unwrapData(
+    api.get("/api/institution/dashboard"),
+  );
+
+/* =====================================================
+ * 기관 제보 API
+ * ===================================================== */
+
+// REPORT-01 미배정 제보 목록 조회
 export const getUnassignedReports = (
   params = {},
 ) =>
@@ -139,57 +101,71 @@ export const getUnassignedReports = (
     ),
   );
 
-/**
- * 미배정 제보를 현재 로그인한 기관의
- * 관할 제보로 지정한다.
- *
- * institutionId는 JWT를 기준으로
- * 백엔드에서 직접 확인한다.
- */
-export const assignReport = (
-  reportId,
-) =>
+// REPORT-02 미배정 제보 관할 지정
+export const assignReport = (reportId) =>
   unwrapData(
     api.patch(
       `/api/institution/reports/${reportId}/assignment`,
     ),
   );
 
-/**
- * 현재 로그인한 기관에 배정된
- * 제보 목록을 조회한다.
- */
-export const getReports = (
-  params = {},
-) =>
+// REPORT-03 내 기관 제보 목록 조회
+export const getReports = (params = {}) =>
   unwrapData(
-    api.get(
-      "/api/institution/reports",
-      {
-        params,
-      },
-    ),
+    api.get("/api/institution/reports", {
+      params,
+    }),
   );
 
-/**
- * 현재 기관에 배정된 제보의
- * 상세 정보를 조회한다.
- */
-export const getReport = (
-  reportId,
-) =>
+// REPORT-04 내 기관 제보 상세 조회
+export const getReport = (reportId) =>
   unwrapData(
     api.get(
       `/api/institution/reports/${reportId}`,
     ),
   );
 
-/**
- * 제보 원문을 기준으로
- * AI 요약을 새로 생성한다.
- *
- * 프론트에서는 FastAPI를 직접 호출하지 않는다.
- */
+// REPORT-05 제보 상태 변경
+export const updateReportStatus = (
+  reportId,
+  status,
+) =>
+  unwrapData(
+    api.patch(
+      `/api/institution/reports/${reportId}/status`,
+      {
+        status,
+      },
+    ),
+  );
+
+// REPORT-06 기존 돌봄 대상자 연결
+export const linkReportCareRecipient = (
+  reportId,
+  careRecipientId,
+) =>
+  unwrapData(
+    api.put(
+      `/api/institution/reports/${reportId}/care-recipient`,
+      {
+        careRecipientId,
+      },
+    ),
+  );
+
+// REPORT-07 신규 돌봄 대상자 등록 및 제보 연결
+export const createAndLinkReportCareRecipient = (
+  reportId,
+  request,
+) =>
+  unwrapData(
+    api.post(
+      `/api/institution/reports/${reportId}/care-recipient`,
+      request,
+    ),
+  );
+
+// 제보 AI 요약 생성
 export const createReportAiSummary = (
   reportId,
 ) =>
@@ -199,10 +175,7 @@ export const createReportAiSummary = (
     ),
   );
 
-/**
- * 해당 제보의 가장 최근
- * AI 요약 결과를 조회한다.
- */
+// 제보 최신 AI 요약 조회
 export const getLatestReportAiSummary = (
   reportId,
 ) =>
@@ -212,36 +185,19 @@ export const getLatestReportAiSummary = (
     ),
   );
 
-/**
- * 기존 화면 호환용 돌봄 대상자 목록 조회.
- */
-export const getCareTargets = (
-  params = {},
-) =>
-  USE_MOCK
-    ? clone(
-        institutionMockData.careTargets,
-      )
-    : getCareRecipients(
-        params,
-      );
+/* =====================================================
+ * 기관 봉사자 API
+ * ===================================================== */
 
-/**
- * VOL-01~03 기관 봉사자 목록, 검색 및 정렬.
- */
-export const getVolunteers = (
-  params = {},
-) =>
+// VOL-01~03 봉사자 목록·검색·정렬
+export const getVolunteers = (params = {}) =>
   unwrapData(
-    api.get(
-      "/api/institution/volunteers",
-      { params },
-    ),
+    api.get("/api/institution/volunteers", {
+      params,
+    }),
   );
 
-/**
- * VOL-05 기관 봉사자 현황 요약.
- */
+// VOL-05 기관 봉사자 현황 요약
 export const getVolunteerOverview = () =>
   unwrapData(
     api.get(
@@ -249,21 +205,15 @@ export const getVolunteerOverview = () =>
     ),
   );
 
-/**
- * VOL-06 기관 봉사자 기본 상세 조회.
- */
-export const getVolunteer = (
-  volunteerId,
-) =>
+// VOL-06 기관 봉사자 기본 상세 조회
+export const getVolunteer = (volunteerId) =>
   unwrapData(
     api.get(
       `/api/institution/volunteers/${volunteerId}`,
     ),
   );
 
-/**
- * VOL-06 기관별 봉사자 활동 이력 조회.
- */
+// VOL-07 기관별 봉사자 활동 이력 조회
 export const getVolunteerActivities = (
   volunteerId,
   params = {},
@@ -271,45 +221,34 @@ export const getVolunteerActivities = (
   unwrapData(
     api.get(
       `/api/institution/volunteers/${volunteerId}/activities`,
-      { params },
+      {
+        params,
+      },
     ),
   );
 
-/**
- * 기관 활동 목록 조회.
- */
-export const getActivities = (
-  params = {},
-) =>
-  USE_MOCK
-    ? clone(
-        institutionMockData.activities,
-      )
-    : unwrapData(
-        api.get(
-          "/api/institution/activities",
-          { params },
-        ),
-      );
-      
-/**
- * 기관 활동 상세 조회.
- */
-export const getActivity = (
-  activityId,
-) =>
+/* =====================================================
+ * 기관 활동 API
+ * ===================================================== */
+
+// 기관 활동 목록 조회
+export const getActivities = (params = {}) =>
+  unwrapData(
+    api.get("/api/institution/activities", {
+      params,
+    }),
+  );
+
+// 기관 활동 상세 조회
+export const getActivity = (activityId) =>
   unwrapData(
     api.get(
       `/api/institution/activities/${activityId}`,
     ),
   );
 
-/**
- * 기관 활동 등록.
- */
-export const createActivity = (
-  request,
-) =>
+// 기관 활동 등록
+export const createActivity = (request) =>
   unwrapData(
     api.post(
       "/api/institution/activities",
@@ -317,9 +256,7 @@ export const createActivity = (
     ),
   );
 
-/**
- * 기관 활동 정보 수정.
- */
+// 기관 활동 정보 수정
 export const updateActivity = (
   activityId,
   request,
@@ -331,9 +268,7 @@ export const updateActivity = (
     ),
   );
 
-/**
- * 기관 활동 상태 변경.
- */
+// 기관 활동 상태 변경
 export const updateActivityStatus = (
   activityId,
   status,
@@ -347,9 +282,7 @@ export const updateActivityStatus = (
     ),
   );
 
-/**
- * 기관 활동 신청자 목록 조회.
- */
+// 기관 활동 신청자 목록 조회
 export const getActivityApplications = (
   activityId,
   params = {},
@@ -363,9 +296,7 @@ export const getActivityApplications = (
     ),
   );
 
-  /**
- * 기관 담당자의 봉사 신청 승인.
- */
+// 기관 담당자의 봉사 신청 승인
 export const approveActivityApplication = (
   activityId,
   applicationId,
@@ -376,9 +307,7 @@ export const approveActivityApplication = (
     ),
   );
 
-/**
- * 기관 담당자의 봉사 신청 반려.
- */
+// 기관 담당자의 봉사 신청 반려
 export const rejectActivityApplication = (
   activityId,
   applicationId,
@@ -393,48 +322,27 @@ export const rejectActivityApplication = (
     ),
   );
 
-/**
- * 기관 통계 조회.
- */
+/* =====================================================
+ * 기관 통계 API
+ * ===================================================== */
+
 export const getStatistics = (
   period = "6months",
 ) =>
-  USE_MOCK
-    ? clone(
-        institutionMockData.statistics,
-      )
-    : unwrapData(
-        api.get(
-          "/api/institution/statistics",
-          {
-            params: {
-              period,
-            },
-          },
-        ),
-      );
+  unwrapData(
+    api.get("/api/institution/statistics", {
+      params: {
+        period,
+      },
+    }),
+  );
 
-/**
- * 제보 상태 변경.
- */
-export const updateReportStatus = (
-  id,
-  status,
-) =>
-  USE_MOCK
-    ? clone({
-        id,
-        status,
-      })
-    : unwrapData(
-      api.patch(`/api/institution/reports/${id}/status`, { status }),
-    );
+/* =====================================================
+ * 기관 화면 API 모음
+ * ===================================================== */
 
-/**
- * 기관 화면에서 사용하는 API 모음.
- */
 export const institutionApi = {
-  // 돌봄 대상자 API
+  // 돌봄 대상자
   getCareRecipients,
   getCareRecipient,
   createCareRecipient,
@@ -442,25 +350,30 @@ export const institutionApi = {
   updateCareRecipientConsent,
   closeCareRecipient,
   reopenCareRecipient,
+  getCareTargets,
 
   // 대시보드
   getDashboard,
-  // 기관 제보 API
+
+  // 제보
   getUnassignedReports,
   assignReport,
   getReports,
   getReport,
+  updateReportStatus,
+  linkReportCareRecipient,
+  createAndLinkReportCareRecipient,
   createReportAiSummary,
   getLatestReportAiSummary,
 
-  // VOL-01~07 기관 봉사자 관리 API
+  // 봉사자
   getVolunteers,
   getVolunteerOverview,
   getVolunteer,
   getVolunteerActivities,
 
-  // 기관 활동 API
- getActivities,
+  // 활동
+  getActivities,
   getActivity,
   createActivity,
   updateActivity,
@@ -469,9 +382,6 @@ export const institutionApi = {
   approveActivityApplication,
   rejectActivityApplication,
 
-  // 기관 활동 및 통계 API
+  // 통계
   getStatistics,
-
-  // 제보 상태 변경 API
-  updateReportStatus,
 };

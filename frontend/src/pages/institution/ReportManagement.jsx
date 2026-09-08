@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { institutionApi } from "../../api/institutionApi";
 import {
@@ -72,11 +73,17 @@ function formatDistance(value) {
   return `약 ${Number(value).toFixed(1)}km`;
 }
 
+function getErrorMessage(error) {
+  return (
+    error?.response?.data?.message ||
+    error?.message ||
+    "요청을 처리하지 못했습니다."
+  );
+}
+
 function ReportManagement() {
-  /*
-   * unassigned: 미배정 제보
-   * assigned: 내 기관 제보
-   */
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] =
     useState("unassigned");
 
@@ -91,6 +98,11 @@ function ReportManagement() {
 
   const [to, setTo] =
     useState("");
+
+  const [
+    assigningReportId,
+    setAssigningReportId,
+  ] = useState(null);
 
   const {
     data,
@@ -112,8 +124,9 @@ function ReportManagement() {
           .getUnassignedReports(params);
       }
 
-      return institutionApi
-        .getReports(params);
+      return institutionApi.getReports(
+        params,
+      );
     },
     [
       activeTab,
@@ -169,6 +182,85 @@ function ReportManagement() {
     setFrom("");
     setTo("");
     setPage(0);
+  };
+
+  const handleAssignReport = async (
+  reportId,
+) => {
+  const confirmed = window.confirm(
+    `제보 #${reportId}을(를) 우리 기관의 관할로 지정하시겠습니까?`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setAssigningReportId(reportId);
+
+    await institutionApi.assignReport(
+      reportId,
+    );
+
+    window.dispatchEvent(
+      new Event(
+        "institution-report-count-changed",
+      ),
+    );
+
+    window.alert(
+      "제보를 우리 기관의 관할로 지정했습니다.",
+    );
+
+    if (
+      reports.length === 1 &&
+      page > 0
+    ) {
+      setPage((current) =>
+        Math.max(current - 1, 0),
+      );
+    } else {
+      await reload();
+    }
+  } catch (assignError) {
+    const statusCode =
+      assignError?.response?.status;
+
+    const errorCode =
+      assignError?.response?.data?.code;
+
+    if (
+      statusCode === 409 ||
+      errorCode ===
+        "REPORT_409_ALREADY_ASSIGNED"
+    ) {
+      window.alert(
+        "다른 기관이 먼저 관할로 지정한 제보입니다. 목록을 다시 불러옵니다.",
+      );
+
+      await reload();
+
+      window.dispatchEvent(
+        new Event(
+          "institution-report-count-changed",
+        ),
+      );
+
+      return;
+    }
+
+    window.alert(
+      getErrorMessage(assignError),
+    );
+  } finally {
+    setAssigningReportId(null);
+  }
+};
+
+  const handleOpenDetail = (reportId) => {
+    navigate(
+      `/institution/reports/${reportId}`,
+    );
   };
 
   if (loading || error) {
@@ -293,6 +385,7 @@ function ReportManagement() {
               <span>거리</span>
               <span>접수일</span>
               <span>상태</span>
+              <span></span>
             </div>
           ) : (
             <div className="report-table-head">
@@ -316,6 +409,10 @@ function ReportManagement() {
               const statusLabel =
                 STATUS_LABELS[report.status] ??
                 report.status;
+
+              const isAssigning =
+                assigningReportId ===
+                report.reportId;
 
               return (
                 <article
@@ -352,6 +449,23 @@ function ReportManagement() {
                       {statusLabel}
                     </i>
                   </span>
+
+                  <button
+                    type="button"
+                    className="report-assign-button"
+                    disabled={
+                      assigningReportId !== null
+                    }
+                    onClick={() =>
+                      handleAssignReport(
+                        report.reportId,
+                      )
+                    }
+                  >
+                    {isAssigning
+                      ? "처리 중"
+                      : "관할 지정"}
+                  </button>
                 </article>
               );
             })
@@ -391,9 +505,17 @@ function ReportManagement() {
                     </i>
                   </span>
 
-                  <span className="report-detail-ready">
-                    상세 준비 중
-                  </span>
+                  <button
+                    type="button"
+                    className="report-detail-button"
+                    onClick={() =>
+                      handleOpenDetail(
+                        report.reportId,
+                      )
+                    }
+                  >
+                    상세 보기
+                  </button>
                 </article>
               );
             })
