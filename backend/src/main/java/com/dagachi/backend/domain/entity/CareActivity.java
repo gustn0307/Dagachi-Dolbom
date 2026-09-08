@@ -34,4 +34,67 @@ public class CareActivity extends BaseTimeEntity {
  @Enumerated(EnumType.STRING)
  @Column(nullable=false,length=30)
  private ActivityStatus status;
+
+ /**
+  * 기관 담당자가 새로운 돌봄 활동을 등록한다.
+  */
+ public static CareActivity create(
+         CareRecipient recipient,
+         Institution institution,
+         User createdBy,
+         LocalDateTime scheduledAt,
+         Integer requiredPeople,
+         GenderCondition genderCondition
+ ) {
+  CareActivity activity =
+          new CareActivity();
+
+  activity.recipient =
+          recipient;
+
+  activity.institution =
+          institution;
+
+  activity.createdBy =
+          createdBy;
+
+  activity.scheduledAt =
+          scheduledAt;
+
+  activity.requiredPeople =
+          requiredPeople;
+
+  activity.genderCondition =
+          genderCondition;
+
+  // 새 활동은 모집 중 상태로 시작한다.
+  activity.status =
+          ActivityStatus.RECRUITING;
+
+  return activity;
+ }
+
+ /**
+  * 기관 담당자가 활동 일정과 필요 인원을 수정한다.
+  */
+ public void updateInformation(
+         LocalDateTime scheduledAt,
+         Integer requiredPeople
+ ) {
+  this.scheduledAt =
+          scheduledAt;
+
+  this.requiredPeople =
+          requiredPeople;
+ }
+ /**
+  * 활동 상태를 변경한다.
+  */
+ public void changeStatus(
+         ActivityStatus status
+ ) {
+  this.status = status;
+ }
+
+
 }

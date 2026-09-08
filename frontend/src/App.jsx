@@ -19,9 +19,14 @@ import VolunteerManagement from "./pages/institution/VolunteerManagement";
 import VolunteerDetail from "./pages/institution/VolunteerDetail";
 import ActivityManagement from "./pages/institution/ActivityManagement";
 import InstitutionStatistics from "./pages/institution/Statistics";
+import ActivityDetail from "./pages/institution/ActivityDetail";
+import ReportDetail from "./pages/institution/ReportDetail";
+
+import ActivityRecord from "./pages/activity/ActivityRecord";
 
 import UserManagement from "./pages/admin/UserManagement";
 import InstitutionManagement from "./pages/admin/InstitutionManagement";
+import NoticeManagement from "./pages/admin/NoticeManagement";
 
 import Login from "./auth/login";
 import Join from "./auth/join";
@@ -62,6 +67,15 @@ function App() {
           />
 
           <Route
+            path="/activity-records/:recordId"
+            element={
+              <RequireRole allowedRoles={["USER"]}>
+                <ActivityRecord />
+              </RequireRole>
+            }
+          />
+
+          <Route
             path="/mypage"
             element={
               <RequireRole allowedRoles={["USER"]}>
@@ -72,6 +86,7 @@ function App() {
 
           {/* 공개된 공지는 로그인하지 않아도 조회할 수 있습니다. */}
           <Route path="/notice" element={<Notice />} />
+          <Route path="notice/:noticeId" element={<Notice />} />
 
           <Route path="/login" element={<Login />} />
           <Route path="/join" element={<Join />} />
@@ -88,6 +103,7 @@ function App() {
         >
           <Route index element={<InstitutionDashboard />} />
           <Route path="reports" element={<ReportManagement />} />
+          <Route path="reports/:reportId" element={<ReportDetail />} />
           <Route path="care-targets" element={<CareTargetManagement />} />
           <Route
             path="care-targets/:recipientId"
@@ -98,6 +114,8 @@ function App() {
 
           <Route path="activities" element={<ActivityManagement />} />
           <Route path="statistics" element={<InstitutionStatistics />} />
+
+          <Route path="activities/:activityId" element={<ActivityDetail />} />
         </Route>
 
         {/* 관리자 전용 영역 */}
@@ -112,6 +130,7 @@ function App() {
           <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="institutions" element={<InstitutionManagement />} />
+          <Route path="notices" element={<NoticeManagement />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -5,10 +5,12 @@ import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.common.response.PageResponse;
 import com.dagachi.backend.common.util.AddressUtils;
 import com.dagachi.backend.domain.entity.ActivityApplication;
+import com.dagachi.backend.domain.entity.ActivityRecord;
 import com.dagachi.backend.domain.entity.CareActivity;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.UserGender;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
+import com.dagachi.backend.domain.repository.ActivityRecordRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
 import com.dagachi.backend.user.activity.dto.ActivityDetailResponse;
 import com.dagachi.backend.user.activity.dto.ActivityExecutionDetailResponse;
@@ -40,13 +42,16 @@ public class ActivityService {
 
     private final CareActivityRepository careActivityRepository;
     private final ActivityApplicationRepository activityApplicationRepository;
+    private final ActivityRecordRepository activityRecordRepository;
 
     public ActivityService(
             CareActivityRepository careActivityRepository,
-            ActivityApplicationRepository activityApplicationRepository
+            ActivityApplicationRepository activityApplicationRepository,
+            ActivityRecordRepository activityRecordRepository
     ) {
         this.careActivityRepository = careActivityRepository;
         this.activityApplicationRepository = activityApplicationRepository;
+        this.activityRecordRepository = activityRecordRepository;
     }
 
     public PageResponse<ActivityResponse> getActivities(
@@ -217,7 +222,15 @@ public class ActivityService {
                 .countApprovedMap(List.of(activityId))
                 .getOrDefault(activityId, 0L);
 
-        return ActivityExecutionDetailResponse.of(activity, approvedCount);
+        // 이미 다른 참여자가 활동을 시작해 IN_PROGRESS 상태라면
+        // 기존 ActivityRecord id를 함께 내려줘서 체크리스트로 바로 진입할 수 있게 한다.
+        // 아직 시작 전(READY)이면 Record가 없으므로 null.
+        Long activityRecordId = activityRecordRepository
+                .findByActivity_Id(activityId)
+                .map(ActivityRecord::getId)
+                .orElse(null);
+
+        return ActivityExecutionDetailResponse.of(activity, approvedCount, activityRecordId);
     }
 
     private CareActivity findActivity(Long activityId) {

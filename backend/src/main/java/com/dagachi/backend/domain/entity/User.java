@@ -75,4 +75,26 @@ public class User extends BaseTimeEntity {
 
         return user;
     }
+
+    // USER-02: 닉네임/전화번호만 변경 가능. null이면 기존 값 유지
+    public void updateProfile(String nickname, String phone) {
+        if (nickname != null) {
+            this.nickname = nickname;
+        }
+        if (phone != null) {
+            this.phone = phone;
+        }
+    }
+
+    // 비밀번호 변경. 반드시 암호화된 값을 받는다 (평문 저장 금지)
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
+    // USER-03: [팀 미확정 정책 임시 적용] Soft Delete + WITHDRAWN 처리
+    public void withdraw() {
+        this.status = UserStatus.WITHDRAWN;
+        this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
 }

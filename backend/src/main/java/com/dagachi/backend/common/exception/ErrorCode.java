@@ -82,6 +82,63 @@ public enum ErrorCode {
             "제보 사진은 최대 3장까지 첨부할 수 있습니다."
     ),
 
+    // ActivityRecord
+    ACTIVITY_RECORD_STATE_CONFLICT(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_RECORD_409",
+            "현재 상태에서는 활동기록을 변경할 수 없습니다."
+    ),
+
+    // Checklist
+    CHECKLIST_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "CHECKLIST_404",
+            "해당 버전의 체크리스트를 찾을 수 없습니다."
+    ),
+
+    REPORT_ALREADY_ASSIGNED(
+            HttpStatus.CONFLICT,
+            "REPORT_409_ALREADY_ASSIGNED",
+            "이미 다른 기관에 배정된 제보입니다."
+    ),
+
+    REPORT_INVALID_STATUS_TRANSITION(
+            HttpStatus.CONFLICT,
+            "REPORT_409_INVALID_STATUS_TRANSITION",
+            "현재 상태에서는 요청한 제보 상태로 변경할 수 없습니다."
+    ),
+
+    REPORT_CARE_RECIPIENT_ALREADY_LINKED(
+            HttpStatus.CONFLICT,
+            "REPORT_409_CARE_RECIPIENT_ALREADY_LINKED",
+            "이미 돌봄 대상자가 연결된 제보입니다."
+    ),
+
+    REPORT_INVALID_INITIAL_CONSENT_STATUS(
+            HttpStatus.BAD_REQUEST,
+            "REPORT_400_INVALID_INITIAL_CONSENT_STATUS",
+            "신규 대상자 등록 시 동의 상태는 PENDING 또는 AGREED만 가능합니다."
+    ),
+
+    // AI
+    AI_SERVICE_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AI_503_SERVICE_UNAVAILABLE",
+            "AI 서비스를 사용할 수 없습니다."
+    ),
+
+    AI_SERVICE_TIMEOUT(
+            HttpStatus.GATEWAY_TIMEOUT,
+            "AI_504_TIMEOUT",
+            "AI 서비스 응답 시간이 초과되었습니다."
+    ),
+
+    AI_SERVICE_INVALID_RESPONSE(
+            HttpStatus.BAD_GATEWAY,
+            "AI_502_INVALID_RESPONSE",
+            "AI 서비스가 올바르지 않은 응답을 반환했습니다."
+    ),
+
     // S3
     S3_UPLOAD_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -123,6 +180,62 @@ public enum ErrorCode {
             HttpStatus.NOT_FOUND,
             "COMMON_404",
             "요청한 리소스를 찾을 수 없습니다."
+    ),
+
+    ACTIVITY_NOT_RECRUITING(
+            HttpStatus.CONFLICT,
+        "ACTIVITY_409_NOT_RECRUITING",
+                "모집 중인 활동이 아닙니다."
+    ),
+
+    // ActivityApplication
+    APPLICATION_ALREADY_EXISTS(
+            HttpStatus.CONFLICT,
+        "APPLICATION_409_DUPLICATE",
+                "이미 신청한 활동입니다."
+    ),
+
+    APPLICATION_NOT_CANCELABLE(
+            HttpStatus.CONFLICT,
+            "APPLICATION_409_NOT_CANCELABLE",
+            "취소할 수 없는 신청입니다."
+    ),
+
+    // CareActivity / ActivityRecord
+    ACTIVITY_NOT_READY(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_NOT_READY",
+            "아직 시작할 수 없는 활동입니다."
+    ),
+
+    ACTIVITY_ALREADY_STARTED(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_ALREADY_STARTED",
+            "이미 시작된 활동입니다."
+    ),
+
+    ACTIVITY_GENDER_CONDITION_NOT_MET(
+            HttpStatus.CONFLICT,
+            "ACTIVITY_409_GENDER_CONDITION",
+            "성별 조건을 충족하지 않습니다."
+    ),
+
+    PASSWORD_MISMATCH(
+            HttpStatus.BAD_REQUEST,
+            "USER_400_PASSWORD_MISMATCH",
+            "비밀번호가 일치하지 않습니다."
+    ),
+
+    PASSWORD_SAME_AS_CURRENT(
+            HttpStatus.BAD_REQUEST,
+            "USER_400_PASSWORD_SAME_AS_CURRENT",
+            "새 비밀번호는 현재 비밀번호와 달라야 합니다."
+    ),
+
+    WITHDRAWAL_BLOCKED(
+            HttpStatus.CONFLICT,
+            "USER_409_WITHDRAWAL_BLOCKED",
+            "진행 중인 신청 또는 활동이 있어 탈퇴할 수 없습니다. 먼저 신청을 취소해 주세요."
     );
 
     private final HttpStatus status;
