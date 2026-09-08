@@ -11,6 +11,9 @@ import java.time.LocalDateTime;
 
 /**
  * APP-01/03/04/05 응답을 함께 담당하는 DTO.
+ *
+ * activityRecordId: APP-04(내 활동 목록)에서 activityStatus가 IN_PROGRESS일 때만
+ * 값이 채워진다. APP-01/03/05에서는 항상 null이다.
  */
 public record ApplicationResponse(
         Long applicationId,
@@ -25,9 +28,17 @@ public record ApplicationResponse(
         LocalDateTime scheduledAt,
         ActivityStatus activityStatus,
         boolean cancelable,
-        boolean reapplicable
+        boolean reapplicable,
+        Long activityRecordId
 ) {
+
+    // APP-01/03/05: activityRecordId가 필요 없는 기존 호출부를 위한 오버로드
     public static ApplicationResponse from(ActivityApplication application) {
+        return from(application, null);
+    }
+
+    // APP-04: activityRecordId를 함께 전달받아 채운다
+    public static ApplicationResponse from(ActivityApplication application, Long activityRecordId) {
         CareActivity activity = application.getActivity();
         var recipient = activity.getRecipient();
 
@@ -44,7 +55,8 @@ public record ApplicationResponse(
                 activity.getScheduledAt(),
                 activity.getStatus(),
                 isCancelable(application, activity),
-                isReapplicable(application, activity)
+                isReapplicable(application, activity),
+                activityRecordId
         );
     }
 
