@@ -12,7 +12,9 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+
 /**
  * 기관 담당자의 활동 관리 조회를 담당하는 Repository.
  *
@@ -30,8 +32,6 @@ public interface InstitutionActivityRepository
      * - 활동 상태
      * - 돌봄 대상자
      * - 활동 예정 기간
-     *
-     * Service에서 필터 사용 여부와 기본값을 정리한 후 전달한다.
      */
     @Query(
             value = """
@@ -122,8 +122,8 @@ public interface InstitutionActivityRepository
     /**
      * 해당 활동에서 특정 신청 상태인 인원수를 계산한다.
      *
-     * status에 APPROVED를 전달하면 승인 인원,
-     * PENDING을 전달하면 대기 인원이 계산된다.
+     * APPROVED를 전달하면 승인 인원,
+     * PENDING을 전달하면 승인 대기 인원이 계산된다.
      */
     @Query("""
             SELECT COUNT(application.id)
@@ -141,9 +141,6 @@ public interface InstitutionActivityRepository
 
     /**
      * 해당 활동의 결과 기록을 조회한다.
-     *
-     * 아직 결과가 작성되지 않았다면
-     * Optional.empty()가 반환된다.
      */
     @Query("""
             SELECT record
@@ -154,38 +151,40 @@ public interface InstitutionActivityRepository
             @Param("activityId")
             Long activityId
     );
+
     /**
      * 새로운 기관 활동을 저장한다.
      */
     CareActivity save(
             CareActivity activity
     );
+
     /**
      * 특정 기관 활동의 신청자 목록을 조회한다.
      */
     @Query(
             value = """
-                SELECT application
-                FROM ActivityApplication application
-                JOIN FETCH application.user volunteer
-                LEFT JOIN FETCH application.approvedBy
-                WHERE application.activity.id = :activityId
-                  AND application.activity.institution.id = :institutionId
-                  AND (
-                      :hasStatus = false
-                      OR application.status = :status
-                  )
-                """,
+                    SELECT application
+                    FROM ActivityApplication application
+                    JOIN FETCH application.user volunteer
+                    LEFT JOIN FETCH application.approvedBy
+                    WHERE application.activity.id = :activityId
+                      AND application.activity.institution.id = :institutionId
+                      AND (
+                          :hasStatus = false
+                          OR application.status = :status
+                      )
+                    """,
             countQuery = """
-                SELECT COUNT(application.id)
-                FROM ActivityApplication application
-                WHERE application.activity.id = :activityId
-                  AND application.activity.institution.id = :institutionId
-                  AND (
-                      :hasStatus = false
-                      OR application.status = :status
-                  )
-                """
+                    SELECT COUNT(application.id)
+                    FROM ActivityApplication application
+                    WHERE application.activity.id = :activityId
+                      AND application.activity.institution.id = :institutionId
+                      AND (
+                          :hasStatus = false
+                          OR application.status = :status
+                      )
+                    """
     )
     Page<ActivityApplication> findActivityApplications(
             @Param("institutionId")
@@ -202,18 +201,19 @@ public interface InstitutionActivityRepository
 
             Pageable pageable
     );
+
     /**
      * 기관, 활동, 신청 번호가 모두 일치하는 신청서를 조회한다.
      */
     @Query("""
-        SELECT application
-        FROM ActivityApplication application
-        JOIN FETCH application.user
-        LEFT JOIN FETCH application.approvedBy
-        WHERE application.id = :applicationId
-          AND application.activity.id = :activityId
-          AND application.activity.institution.id = :institutionId
-        """)
+            SELECT application
+            FROM ActivityApplication application
+            JOIN FETCH application.user
+            LEFT JOIN FETCH application.approvedBy
+            WHERE application.id = :applicationId
+              AND application.activity.id = :activityId
+              AND application.activity.institution.id = :institutionId
+            """)
     Optional<ActivityApplication>
     findActivityApplication(
             @Param("institutionId")
@@ -225,4 +225,84 @@ public interface InstitutionActivityRepository
             @Param("applicationId")
             Long applicationId
     );
+
+    /**
+     * 해당 기관에서 처리 가능한 전체 승인 대기 신청자 수를 조회한다.
+     *
+     * 모집 중인 활동의 PENDING 신청만 집계한다.
+     * 사이드바 활동 관리 배지에 사용한다.
+     */
+    @Query("""
+            SELECT COUNT(application.id)
+            FROM ActivityApplication application
+            WHERE application.activity.institution.id = :institutionId
+              AND application.activity.status = :activityStatus
+              AND application.status = :applicationStatus
+            """)
+    long countInstitutionApplications(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("activityStatus")
+            ActivityStatus activityStatus,
+
+            @Param("applicationStatus")
+            ApplicationStatus applicationStatus
+    );
+
+    /**
+     * 승인 대기 신청이 존재하는 활동을 활동별로 집계한다.
+     *
+     * 모집 중인 활동만 조회하며,
+     * 승인 대기 인원이 많은 활동부터 정렬한다.
+     */
+    @Query("""
+            SELECT
+                activity.id AS activityId,
+                recipient.id AS recipientId,
+                recipient.name AS recipientName,
+                activity.scheduledAt AS scheduledAt,
+                COUNT(application.id) AS pendingCount
+            FROM ActivityApplication application
+            JOIN application.activity activity
+            JOIN activity.recipient recipient
+            WHERE activity.institution.id = :institutionId
+              AND activity.status = :activityStatus
+              AND application.status = :applicationStatus
+            GROUP BY
+                activity.id,
+                recipient.id,
+                recipient.name,
+                activity.scheduledAt
+            ORDER BY
+                COUNT(application.id) DESC,
+                activity.scheduledAt ASC
+            """)
+    List<PendingApplicationActivityProjection>
+    findPendingApplicationActivities(
+            @Param("institutionId")
+            Long institutionId,
+
+            @Param("activityStatus")
+            ActivityStatus activityStatus,
+
+            @Param("applicationStatus")
+            ApplicationStatus applicationStatus
+    );
+
+    /**
+     * 활동별 승인 대기 신청 현황 Projection.
+     */
+    interface PendingApplicationActivityProjection {
+
+        Long getActivityId();
+
+        Long getRecipientId();
+
+        String getRecipientName();
+
+        LocalDateTime getScheduledAt();
+
+        Long getPendingCount();
+    }
 }

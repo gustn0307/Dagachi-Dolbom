@@ -103,4 +103,51 @@ public class ActivityRecord extends BaseTimeEntity {
 
   return record;
  }
+
+    /**
+     * 제출된 활동기록을 기관 담당자가 승인한다.
+     */
+    public void approveReview(
+            User reviewedBy
+    ) {
+        if (
+                this.reviewStatus !=
+                        ActivityReviewStatus.SUBMITTED
+        ) {
+            throw new IllegalStateException(
+                    "SUBMITTED 상태의 활동기록만 승인할 수 있습니다."
+            );
+        }
+
+        this.reviewStatus =
+                ActivityReviewStatus.APPROVED;
+
+        this.reviewedBy = reviewedBy;
+        this.reviewedAt = LocalDateTime.now();
+        this.reviewNote = null;
+    }
+
+    /**
+     * 제출된 활동기록에 기관 담당자가 보완을 요청한다.
+     */
+    public void requestRevision(
+            User reviewedBy,
+            String reviewNote
+    ) {
+        if (
+                this.reviewStatus !=
+                        ActivityReviewStatus.SUBMITTED
+        ) {
+            throw new IllegalStateException(
+                    "SUBMITTED 상태의 활동기록만 보완 요청할 수 있습니다."
+            );
+        }
+
+        this.reviewStatus =
+                ActivityReviewStatus.NEEDS_REVISION;
+
+        this.reviewedBy = reviewedBy;
+        this.reviewedAt = LocalDateTime.now();
+        this.reviewNote = reviewNote;
+    }
 }

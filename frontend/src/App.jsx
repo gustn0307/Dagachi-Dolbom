@@ -20,6 +20,7 @@ import VolunteerDetail from "./pages/institution/VolunteerDetail";
 import ActivityManagement from "./pages/institution/ActivityManagement";
 import InstitutionStatistics from "./pages/institution/Statistics";
 import ActivityDetail from "./pages/institution/ActivityDetail";
+import ReportDetail from "./pages/institution/ReportDetail";
 
 import ActivityRecord from "./pages/activity/ActivityRecord";
 
@@ -102,6 +103,7 @@ function App() {
         >
           <Route index element={<InstitutionDashboard />} />
           <Route path="reports" element={<ReportManagement />} />
+          <Route path="reports/:reportId" element={<ReportDetail />} />
           <Route path="care-targets" element={<CareTargetManagement />} />
           <Route
             path="care-targets/:recipientId"

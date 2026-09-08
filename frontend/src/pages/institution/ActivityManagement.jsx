@@ -53,6 +53,17 @@ function ActivityManagement() {
   });
 
   /*
+   * 기관의 승인 대기 봉사 신청 현황
+   */
+  const [
+    pendingSummary,
+    setPendingSummary,
+  ] = useState({
+    totalPendingCount: 0,
+    activities: [],
+  });
+
+  /*
    * 현재 선택된 조건의 활동 목록 조회
    */
   const {
@@ -98,67 +109,80 @@ function ActivityManagement() {
     data?.last ?? true;
 
   /*
+   * 활동 ID별 승인 대기 신청 인원을 저장한다.
+   */
+  const pendingCountByActivityId =
+    new Map(
+      (
+        pendingSummary.activities ?? []
+      ).map((activity) => [
+        Number(activity.activityId),
+        Number(
+          activity.pendingCount ?? 0,
+        ),
+      ]),
+    );
+
+  /*
    * 전체 데이터 기준으로
    * 활동 상태별 건수를 조회한다.
-   *
-   * 목록 API의 totalElements만 사용하므로
-   * size는 1로 요청한다.
    */
   useEffect(() => {
     let ignore = false;
 
-    const loadActivityCounts = async () => {
-      try {
-        const [
-          totalResponse,
-          recruitingResponse,
-          completedResponse,
-        ] = await Promise.all([
-          institutionApi.getActivities({
-            page: 0,
-            size: 1,
-          }),
+    const loadActivityCounts =
+      async () => {
+        try {
+          const [
+            totalResponse,
+            recruitingResponse,
+            completedResponse,
+          ] = await Promise.all([
+            institutionApi.getActivities({
+              page: 0,
+              size: 1,
+            }),
 
-          institutionApi.getActivities({
-            page: 0,
-            size: 1,
-            status: "RECRUITING",
-          }),
+            institutionApi.getActivities({
+              page: 0,
+              size: 1,
+              status: "RECRUITING",
+            }),
 
-          institutionApi.getActivities({
-            page: 0,
-            size: 1,
-            status: "COMPLETED",
-          }),
-        ]);
+            institutionApi.getActivities({
+              page: 0,
+              size: 1,
+              status: "COMPLETED",
+            }),
+          ]);
 
-        if (ignore) {
-          return;
-        }
+          if (ignore) {
+            return;
+          }
 
-        setActivityCounts({
-          total:
-            totalResponse?.totalElements ??
-            0,
-
-          recruiting:
-            recruitingResponse
-              ?.totalElements ?? 0,
-
-          completed:
-            completedResponse
-              ?.totalElements ?? 0,
-        });
-      } catch {
-        if (!ignore) {
           setActivityCounts({
-            total: 0,
-            recruiting: 0,
-            completed: 0,
+            total:
+              totalResponse
+                ?.totalElements ?? 0,
+
+            recruiting:
+              recruitingResponse
+                ?.totalElements ?? 0,
+
+            completed:
+              completedResponse
+                ?.totalElements ?? 0,
           });
+        } catch {
+          if (!ignore) {
+            setActivityCounts({
+              total: 0,
+              recruiting: 0,
+              completed: 0,
+            });
+          }
         }
-      }
-    };
+      };
 
     loadActivityCounts();
 
@@ -168,9 +192,60 @@ function ActivityManagement() {
   }, [data]);
 
   /*
+   * 승인 대기 봉사 신청 현황을 조회한다.
+   */
+  useEffect(() => {
+    let ignore = false;
+
+    const loadPendingSummary =
+      async () => {
+        try {
+          const response =
+            await institutionApi
+              .getPendingApplicationSummary();
+
+          if (ignore) {
+            return;
+          }
+
+          setPendingSummary({
+            totalPendingCount:
+              Number(
+                response
+                  ?.totalPendingCount ??
+                  0,
+              ),
+
+            activities:
+              Array.isArray(
+                response?.activities,
+              )
+                ? response.activities
+                : [],
+          });
+        } catch {
+          if (!ignore) {
+            setPendingSummary({
+              totalPendingCount: 0,
+              activities: [],
+            });
+          }
+        }
+      };
+
+    loadPendingSummary();
+
+    return () => {
+      ignore = true;
+    };
+  }, [data]);
+
+  /*
    * 활동 상태 필터 변경
    */
-  const handleStatusChange = (event) => {
+  const handleStatusChange = (
+    event,
+  ) => {
     setStatus(event.target.value);
     setPage(0);
   };
@@ -178,7 +253,9 @@ function ActivityManagement() {
   /*
    * 활동 상세 페이지 이동
    */
-  const openDetail = (activityId) => {
+  const openDetail = (
+    activityId,
+  ) => {
     navigate(
       `/institution/activities/${activityId}`,
     );
@@ -207,24 +284,18 @@ function ActivityManagement() {
   /*
    * 기관 활동 등록
    */
-  const handleCreate = async (request) => {
+  const handleCreate = async (
+    request,
+  ) => {
     setSubmitting(true);
     setSubmitError("");
 
     try {
-      await institutionApi.createActivity(
-        request,
-      );
+      await institutionApi
+        .createActivity(request);
 
       setShowCreateForm(false);
 
-      /*
-       * 첫 페이지가 아니면 첫 페이지로 이동한다.
-       * 이미 첫 페이지라면 목록을 즉시 다시 조회한다.
-       *
-       * 목록이 갱신되면 useEffect가 실행되어
-       * 위쪽 활동 건수도 다시 조회된다.
-       */
       if (page === 0) {
         await reload();
       } else {
@@ -232,7 +303,8 @@ function ActivityManagement() {
       }
     } catch (requestError) {
       setSubmitError(
-        requestError?.response?.data?.message ??
+        requestError?.response?.data
+          ?.message ??
           "활동 등록에 실패했습니다.",
       );
     } finally {
@@ -259,12 +331,13 @@ function ActivityManagement() {
           <p>활동 관리</p>
 
           <h1>
-            돌봄 활동과 일정을 관리하세요
+            돌봄 활동과 일정을
+            관리하세요
           </h1>
 
           <span>
-            기관의 돌봄 활동과 신청 인원을
-            확인합니다.
+            기관의 돌봄 활동과 신청
+            인원을 확인합니다.
           </span>
         </div>
 
@@ -293,7 +366,11 @@ function ActivityManagement() {
             <span>모집 중 활동</span>
 
             <strong>
-              {activityCounts.recruiting}건
+              {
+                activityCounts
+                  .recruiting
+              }
+              건
             </strong>
           </div>
         </article>
@@ -303,11 +380,94 @@ function ActivityManagement() {
             <span>완료된 활동</span>
 
             <strong>
-              {activityCounts.completed}건
+              {
+                activityCounts
+                  .completed
+              }
+              건
             </strong>
           </div>
         </article>
       </section>
+            {pendingSummary.activities.length > 0 && (
+        <section className="panel pending-application-panel">
+          <div className="pending-application-header">
+            <div>
+              <h2>승인 대기 신청</h2>
+
+              <p>
+                봉사 신청이 들어온 돌봄 활동을 확인하세요.
+              </p>
+            </div>
+
+            <strong>
+              총 {pendingSummary.totalPendingCount}명
+            </strong>
+          </div>
+
+          <div className="pending-application-list">
+            {pendingSummary.activities.map(
+              (pendingActivity) => {
+                const scheduledDate = new Date(
+                  pendingActivity.scheduledAt,
+                );
+
+                const scheduledText =
+                  Number.isNaN(scheduledDate.getTime())
+                    ? ""
+                    : scheduledDate.toLocaleString(
+                        "ko-KR",
+                        {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      );
+
+                return (
+                  <article
+                    key={pendingActivity.activityId}
+                    className="pending-application-item"
+                  >
+                    <div className="pending-application-icon">
+                      !
+                    </div>
+
+                    <div className="pending-application-content">
+                      <h3>
+                        {pendingActivity.recipientName}
+                        {" "}
+                        돌봄 활동
+                      </h3>
+
+                      <p>
+                        {scheduledText}
+                      </p>
+                    </div>
+
+                    <span className="pending-application-count">
+                      신청 {pendingActivity.pendingCount}명
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openDetail(
+                          pendingActivity.activityId,
+                        )
+                      }
+                    >
+                      신청 확인
+                    </button>
+                  </article>
+                );
+              },
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="panel table-panel">
         <div className="panel-title activity-title">
@@ -317,6 +477,23 @@ function ActivityManagement() {
             <p>
               활동 일정과 모집 상태를
               확인하세요.
+
+              {pendingSummary
+                .totalPendingCount >
+                0 && (
+                <>
+                  {" · "}
+
+                  <strong className="activity-pending-text">
+                    승인 대기 신청{" "}
+                    {
+                      pendingSummary
+                        .totalPendingCount
+                    }
+                    명
+                  </strong>
+                </>
+              )}
             </p>
           </div>
 
@@ -326,7 +503,9 @@ function ActivityManagement() {
             <select
               value={status}
               aria-label="활동 상태 선택"
-              onChange={handleStatusChange}
+              onChange={
+                handleStatusChange
+              }
             >
               <option value="">
                 전체
@@ -362,7 +541,10 @@ function ActivityManagement() {
             </div>
           ) : (
             activities.map(
-              (activity, index) => {
+              (
+                activity,
+                index,
+              ) => {
                 const scheduledDate =
                   new Date(
                     activity.scheduledAt,
@@ -379,15 +561,18 @@ function ActivityManagement() {
                     .toLocaleTimeString(
                       "ko-KR",
                       {
-                        hour: "2-digit",
-                        minute: "2-digit",
+                        hour:
+                          "2-digit",
+                        minute:
+                          "2-digit",
                       },
                     );
 
                 const statusLabel =
                   STATUS_LABELS[
                     activity.status
-                  ] ?? activity.status;
+                  ] ??
+                  activity.status;
 
                 const statusClass =
                   statusLabel.replace(
@@ -395,12 +580,26 @@ function ActivityManagement() {
                     "-",
                   );
 
+                const pendingCount =
+                  pendingCountByActivityId
+                    .get(
+                      Number(
+                        activity
+                          .activityId,
+                      ),
+                    ) ?? 0;
+
                 return (
                   <article
-                    key={activity.activityId}
+                    key={
+                      activity
+                        .activityId
+                    }
                   >
                     <time>
-                      <b>{dateText}</b>
+                      <b>
+                        {dateText}
+                      </b>
 
                       <small>
                         {timeText}
@@ -419,17 +618,53 @@ function ActivityManagement() {
 
                     <div>
                       <h3>
-                        {activity.recipientName}
-                        {" "}
+                        {
+                          activity
+                            .recipientName
+                        }{" "}
                         돌봄 활동
+
+                        {pendingCount >
+                          0 && (
+                          <span className="activity-pending-badge">
+                            신청{" "}
+                            {
+                              pendingCount
+                            }
+                            명
+                          </span>
+                        )}
                       </h3>
 
                       <p>
                         모집{" "}
-                        {activity.requiredPeople}명
+                        {
+                          activity
+                            .requiredPeople
+                        }
+                        명
                         {" · "}
                         승인{" "}
-                        {activity.approvedCount}명
+                        {
+                          activity
+                            .approvedCount
+                        }
+                        명
+
+                        {pendingCount >
+                          0 && (
+                          <>
+                            {" · "}
+
+                            <strong className="activity-pending-text">
+                              승인 대기{" "}
+                              {
+                                pendingCount
+                              }
+                              명
+                            </strong>
+                          </>
+                        )}
                       </p>
                     </div>
 
@@ -445,7 +680,8 @@ function ActivityManagement() {
                       type="button"
                       onClick={() =>
                         openDetail(
-                          activity.activityId,
+                          activity
+                            .activityId,
                         )
                       }
                     >
@@ -462,7 +698,8 @@ function ActivityManagement() {
           <div className="table-footer care-pagination">
             <span>
               전체 {totalElements}건 ·{" "}
-              {page + 1}/{totalPages} 페이지
+              {page + 1}/{totalPages}{" "}
+              페이지
             </span>
 
             <div>
@@ -470,11 +707,12 @@ function ActivityManagement() {
                 type="button"
                 disabled={isFirst}
                 onClick={() =>
-                  setPage((current) =>
-                    Math.max(
-                      current - 1,
-                      0,
-                    ),
+                  setPage(
+                    (current) =>
+                      Math.max(
+                        current - 1,
+                        0,
+                      ),
                   )
                 }
               >
@@ -483,40 +721,50 @@ function ActivityManagement() {
 
               {Array.from(
                 {
-                  length: totalPages,
+                  length:
+                    totalPages,
                 },
-                (_, index) => index,
-              ).map((pageNumber) => (
-                <button
-                  type="button"
-                  key={pageNumber}
-                  className={
-                    pageNumber === page
-                      ? "active"
-                      : ""
-                  }
-                  aria-current={
-                    pageNumber === page
-                      ? "page"
-                      : undefined
-                  }
-                  onClick={() =>
-                    setPage(pageNumber)
-                  }
-                >
-                  {pageNumber + 1}
-                </button>
-              ))}
+                (_, index) =>
+                  index,
+              ).map(
+                (pageNumber) => (
+                  <button
+                    type="button"
+                    key={pageNumber}
+                    className={
+                      pageNumber ===
+                      page
+                        ? "active"
+                        : ""
+                    }
+                    aria-current={
+                      pageNumber ===
+                      page
+                        ? "page"
+                        : undefined
+                    }
+                    onClick={() =>
+                      setPage(
+                        pageNumber,
+                      )
+                    }
+                  >
+                    {pageNumber + 1}
+                  </button>
+                ),
+              )}
 
               <button
                 type="button"
                 disabled={isLast}
                 onClick={() =>
-                  setPage((current) =>
-                    Math.min(
-                      current + 1,
-                      totalPages - 1,
-                    ),
+                  setPage(
+                    (current) =>
+                      Math.min(
+                        current + 1,
+                        totalPages -
+                          1,
+                      ),
                   )
                 }
               >
@@ -527,16 +775,11 @@ function ActivityManagement() {
         )}
       </section>
 
-      {/* 기관 활동 등록 모달 */}
       {showCreateForm && (
         <div
           className="care-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            /*
-             * 모달 바깥 영역을 눌렀을 때만
-             * 모달을 닫는다.
-             */
             if (
               event.target ===
               event.currentTarget
@@ -549,29 +792,20 @@ function ActivityManagement() {
             className="care-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="activity-create-title"
+            aria-label="활동 등록"
           >
-            <div className="care-modal-header">
-              <div>
-                <p>활동 관리</p>
+            
+            <div>
+              <h2>활동 등록</h2>
 
-                <h2 id="activity-create-title">
-                  신규 활동 등록
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                aria-label="닫기"
-                disabled={submitting}
-                onClick={closeCreateForm}
-              >
-                ×
-              </button>
+              <p>
+                돌봄 대상자와 활동
+                일정을 입력해 주세요.
+              </p>
             </div>
 
             {submitError && (
-              <div className="care-form-error">
+              <div className="data-state error">
                 {submitError}
               </div>
             )}
