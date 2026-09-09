@@ -115,6 +115,30 @@ public interface CareActivityRepository extends JpaRepository<CareActivity, Long
     Optional<CareActivity> findDetailById(@Param("activityId") Long activityId);
 
     /**
+     * APP-02 자동배정 후보 조회.
+     * RECRUITING/READY 상태이면서, 이 유저가 이미 신청 행(어떤 상태든)을
+     * 가지고 있지 않고, excludeActivityIds에 없는 활동만 후보로 삼는다.
+     */
+    @Query("""
+        SELECT ca
+        FROM CareActivity ca
+        JOIN FETCH ca.recipient cr
+        WHERE ca.status IN (
+                com.dagachi.backend.domain.enums.ActivityStatus.RECRUITING,
+                com.dagachi.backend.domain.enums.ActivityStatus.READY
+              )
+          AND ca.id NOT IN :excludeActivityIds
+          AND NOT EXISTS (
+                SELECT 1 FROM ActivityApplication aa
+                WHERE aa.activity = ca AND aa.user.id = :userId
+              )
+        """)
+    List<CareActivity> findAutoMatchCandidates(
+            @Param("userId") Long userId,
+            @Param("excludeActivityIds") List<Long> excludeActivityIds
+    );
+
+    /**
      * APP-05 승인 취소 시 정원/상태 경쟁 조건 방지용 락 조회.
      * DB_ENTITY_GUIDE 06번 문서 동시성 규칙에 따라 신청 승인/승인취소/활동시작 시 사용한다.
      */
