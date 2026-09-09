@@ -10,6 +10,8 @@ import {
   fetchMyActivities,
   cancelApplication,
   startActivity,
+  fetchAutoMatchCandidate,
+  applyAutoMatch,
 } from "../../api/userApi";
 
 const PAGE_SIZE = 10;
@@ -123,6 +125,14 @@ function Volunteer() {
   const [myPage, setMyPage] = useState(0);
   const [myTotalPages, setMyTotalPages] = useState(0);
   const [myTotalElements, setMyTotalElements] = useState(0);
+
+  // ---- 배정 받기 탭 state (APP-02) ----
+  const [autoCandidate, setAutoCandidate] = useState(null);
+  const [autoLoading, setAutoLoading] = useState(false);
+  const [autoError, setAutoError] = useState(null);
+  const [autoApplying, setAutoApplying] = useState(false);
+  const [autoApplyError, setAutoApplyError] = useState(null);
+  const [seenActivityIds, setSeenActivityIds] = useState([]);
 
   // ---- 내 활동 탭 state (APP-04) ----
   const [myActivities, setMyActivities] = useState([]);
@@ -302,6 +312,79 @@ function Volunteer() {
     document
       .querySelector(".visit-list")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // 배정 받기 탭에서 후보를 새로 요청한다. 위치 권한이 없어도 진행한다.
+  const loadAutoMatchCandidate = (excludeIds = seenActivityIds) => {
+    setAutoLoading(true);
+    setAutoError(null);
+    setAutoApplyError(null);
+    setAutoCandidate(null);
+
+    const fetchWithCoords = (coords) =>
+      fetchAutoMatchCandidate({
+        ...(coords ?? {}),
+        excludeActivityIds: excludeIds,
+      })
+        .then((data) => {
+          setAutoCandidate(data);
+          setSeenActivityIds((prev) => [...prev, data.activityId]);
+        })
+        .catch((err) => {
+          const code = err?.response?.data?.code;
+          setAutoError(
+            code === "ACT_404_NO_AUTO_MATCH_CANDIDATE"
+              ? excludeIds.length > 0
+                ? "더 이상 추천할 활동이 없습니다. 처음부터 다시 볼까요?"
+                : "지금 배정 가능한 활동이 없습니다. 잠시 후 다시 시도해주세요."
+              : (err?.response?.data?.message ??
+                  "추천 활동을 불러오지 못했습니다."),
+          );
+        })
+        .finally(() => setAutoLoading(false));
+
+    if (!navigator.geolocation) {
+      fetchWithCoords(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        fetchWithCoords({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        }),
+      () => fetchWithCoords(null),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+    );
+  };
+
+  // 탭 진입 시 "본 목록" 초기화하고 새로 시작
+  useEffect(() => {
+    if (activeTab !== "auto") return;
+    setSeenActivityIds([]);
+    loadAutoMatchCandidate([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // 배정받은 후보에 실제 신청
+  const handleApplyAutoMatch = async () => {
+    if (!autoCandidate) return;
+
+    setAutoApplying(true);
+    setAutoApplyError(null);
+
+    try {
+      await applyAutoMatch(autoCandidate.activityId);
+      setToastMessage("신청이 완료되었습니다. 기관 승인을 기다려주세요.");
+      setAutoCandidate(null);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ?? "신청 중 오류가 발생했습니다.";
+      setAutoApplyError(message);
+    } finally {
+      setAutoApplying(false);
+    }
   };
 
   const handleApply = async () => {
@@ -1206,11 +1289,116 @@ function Volunteer() {
 
       {activeTab === "auto" && (
         <section className="visit-list">
-          <p
-            style={{ textAlign: "center", color: "#897e75", padding: "24px 0" }}
-          >
-            자동배정 기능은 준비 중입니다.
-          </p>
+          {autoLoading && (
+            <p
+              style={{
+                textAlign: "center",
+                color: "#897e75",
+                padding: "24px 0",
+              }}
+            >
+              어울리는 활동을 찾는 중입니다...
+            </p>
+          )}
+
+          {!autoLoading && autoError && (
+            <div style={{ textAlign: "center", padding: "24px 0" }}>
+              <p style={{ color: "#897e75", marginBottom: 12 }}>{autoError}</p>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => {
+                  setSeenActivityIds([]);
+                  loadAutoMatchCandidate([]);
+                }}
+              >
+                처음부터 다시 보기
+              </button>
+            </div>
+          )}
+
+          {!autoLoading && !autoError && autoCandidate && (
+            <div
+              className="visit"
+              style={{
+                cursor: "default",
+                alignItems: "center",
+                flexWrap: "nowrap",
+                gap: 16,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2 style={{ fontSize: "15px" }}>
+                  안부확인
+                  <small> · {formatSchedule(autoCandidate.scheduledAt)}</small>
+                </h2>
+                <p>
+                  {autoCandidate.region} · {autoCandidate.ageGroup} ·{" "}
+                  {autoCandidate.gender === "FEMALE" ? "여성" : "남성"} 어르신
+                  {" · "}모집 {autoCandidate.approvedCount}/
+                  {autoCandidate.requiredPeople}명
+                  {autoCandidate.distanceKm != null &&
+                    ` · 약 ${autoCandidate.distanceKm}km`}
+                </p>
+
+                {autoApplyError && (
+                  <p style={{ color: "#c0392b", fontSize: 13, marginTop: 8 }}>
+                    {autoApplyError}
+                  </p>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexShrink: 0,
+                  marginLeft: "auto",
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={autoApplying}
+                  onClick={() => loadAutoMatchCandidate()}
+                  style={{
+                    minHeight: 44,
+                    padding: "0 16px",
+                    border: "1px solid #ece5dd",
+                    borderRadius: 10,
+                    background: "#fff",
+                    color: "#685d52",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    whiteSpace: "nowrap",
+                    cursor: autoApplying ? "not-allowed" : "pointer",
+                  }}
+                >
+                  다른 활동 보기
+                </button>
+
+                <button
+                  type="button"
+                  disabled={autoApplying}
+                  onClick={handleApplyAutoMatch}
+                  style={{
+                    minHeight: 44,
+                    padding: "0 20px",
+                    border: "1px solid #f4771c",
+                    borderRadius: 10,
+                    background: "#f4771c",
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    whiteSpace: "nowrap",
+                    cursor: autoApplying ? "not-allowed" : "pointer",
+                    opacity: autoApplying ? 0.7 : 1,
+                  }}
+                >
+                  {autoApplying ? "신청 중..." : "신청하기"}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

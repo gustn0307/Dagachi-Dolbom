@@ -8,52 +8,32 @@ export const getActivity = (activityId) =>
 
 // CHECK-01 해당 활동기록 버전의 체크리스트 문항을 조회합니다.
 export const getActivityChecklist = (recordId) =>
-  unwrapData(
-    api.get(`/api/activity-records/${recordId}/checklist`),
-  );
+  unwrapData(api.get(`/api/activity-records/${recordId}/checklist`));
 
 // RECORD-02 현재 공동 ActivityRecord Draft를 조회합니다.
 export const getActivityRecord = (recordId) =>
-  unwrapData(
-    api.get(`/api/activity-records/${recordId}`),
-  );
+  unwrapData(api.get(`/api/activity-records/${recordId}`));
 
 // RECORD-03 현재 공동 Draft 전체를 저장합니다.
-export const saveActivityRecordDraft = (
-  recordId,
-  request,
-) =>
-  unwrapData(
-    api.put(
-      `/api/activity-records/${recordId}/draft`,
-      request,
-    ),
-  );
+export const saveActivityRecordDraft = (recordId, request) =>
+  unwrapData(api.put(`/api/activity-records/${recordId}/draft`, request));
 
 // RECORD-04 대상자 서명 이미지를 업로드합니다.
-export const uploadActivityRecordSignature = (
-  recordId,
-  signature,
-) => {
+export const uploadActivityRecordSignature = (recordId, signature) => {
   const formData = new FormData();
 
   // 백엔드 multipart part명이 "signature"로 확정되어 있습니다.
   formData.append("signature", signature);
 
   return unwrapData(
-    api.post(
-      `/api/activity-records/${recordId}/signature`,
-      formData,
-    ),
+    api.post(`/api/activity-records/${recordId}/signature`, formData),
   );
 };
 
 // RECORD-05 활동기록을 최종 제출합니다.
 // Submit API는 별도의 Request Body를 받지 않습니다.
 export const submitActivityRecord = (recordId) =>
-  unwrapData(
-    api.post(`/api/activity-records/${recordId}/submit`),
-  );
+  unwrapData(api.post(`/api/activity-records/${recordId}/submit`));
 
 // 회원/비회원 공통 제보 등록
 // FormData의 request에는 JSON Blob,
@@ -69,21 +49,15 @@ export const createReport = (formData) =>
 
 // 로그인 사용자의 제보 목록 조회
 export const getMyReports = (params = {}) =>
-  unwrapData(
-    api.get("/api/users/me/reports", { params }),
-  );
+  unwrapData(api.get("/api/users/me/reports", { params }));
 
 // 공개 공지 목록 조회 API
 export const getNotices = (params = {}) =>
-  unwrapData(
-    api.get("/api/notices", { params }),
-  );
+  unwrapData(api.get("/api/notices", { params }));
 
 // 공개 공지 상세 조회 API
 export const getNotice = (noticeId) =>
-  unwrapData(
-    api.get(`/api/notices/${noticeId}`),
-  );
+  unwrapData(api.get(`/api/notices/${noticeId}`));
 
 export const userApi = {
   getActivities,
@@ -132,20 +106,13 @@ export const fetchActivities = async ({
     params.longitude = longitude;
   }
 
-  const response = await api.get(
-    "/api/activities",
-    { params },
-  );
+  const response = await api.get("/api/activities", { params });
 
   return response.data.data;
 };
 
-export const fetchActivityDetail = async (
-  activityId,
-) => {
-  const response = await api.get(
-    `/api/activities/${activityId}`,
-  );
+export const fetchActivityDetail = async (activityId) => {
+  const response = await api.get(`/api/activities/${activityId}`);
 
   return response.data.data;
 };
@@ -160,6 +127,25 @@ export const fetchExecutionDetail = async (activityId) => {
 // 활동 신청 API
 export const applyForActivity = (activityId) =>
   unwrapData(api.post(`/api/activities/${activityId}/applications`));
+
+// APP-02 (1단계) 자동배정 후보 조회 - 신청 생성 안 함
+export const fetchAutoMatchCandidate = async ({ latitude, longitude, excludeActivityIds } = {}) => {
+  const params = {};
+  if (latitude != null && longitude != null) {
+    params.latitude = latitude;
+    params.longitude = longitude;
+  }
+  if (excludeActivityIds && excludeActivityIds.length > 0) {
+    params.excludeActivityIds = excludeActivityIds;
+  }
+
+  const response = await api.get("/api/activity-applications/auto-match/candidate", { params });
+  return response.data.data;
+};
+
+// APP-02 (2단계) 자동배정 신청 확정
+export const applyAutoMatch = (activityId) =>
+  unwrapData(api.post("/api/activity-applications/auto-match", { activityId }));
 
 // 내 신청 목록 조회 (APP-03)
 export const fetchMyApplications = async ({
