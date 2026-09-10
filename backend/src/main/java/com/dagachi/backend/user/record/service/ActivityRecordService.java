@@ -397,12 +397,6 @@ public class ActivityRecordService {
         // DRAFT / NEEDS_REVISION 상태에서만 Draft를 저장할 수 있습니다.
         validateDraftEditableStatus(activityRecord);
 
-        /*
-         * TODO: 완료
-         * DRAFT / NEEDS_REVISION 상태에서만 저장할 수 있도록 검사합니다.
-         * 상태충돌 409 ErrorCode는 팀장 확인 후 추가합니다.
-         */
-
         // 이미 서명이 등록된 MET 기록은 MET 이외의 상태로 변경할 수 없습니다.
         if (activityRecord.getVisitResult() == VisitResult.MET
                 && request.visitResult() != VisitResult.MET
