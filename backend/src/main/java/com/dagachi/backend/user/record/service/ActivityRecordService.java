@@ -397,12 +397,6 @@ public class ActivityRecordService {
         // DRAFT / NEEDS_REVISION 상태에서만 Draft를 저장할 수 있습니다.
         validateDraftEditableStatus(activityRecord);
 
-        /*
-         * TODO: 완료
-         * DRAFT / NEEDS_REVISION 상태에서만 저장할 수 있도록 검사합니다.
-         * 상태충돌 409 ErrorCode는 팀장 확인 후 추가합니다.
-         */
-
         // 이미 서명이 등록된 MET 기록은 MET 이외의 상태로 변경할 수 없습니다.
         if (activityRecord.getVisitResult() == VisitResult.MET
                 && request.visitResult() != VisitResult.MET
@@ -476,9 +470,20 @@ public class ActivityRecordService {
         );
     }
 
-    // ActivityRecord별 서명 파일 저장용 S3 prefix를 생성합니다.
-    private String buildSignaturePrefix(Long recordId) {
-        return "signatures/activity-records/" + recordId;
+    // 서명 파일명에서 대상자와 ActivityRecord를 식별할 수 있도록 앞부분을 생성합니다.
+    private String buildSignatureFileNamePrefix(
+            ActivityRecord activityRecord
+    ) {
+        String recipientName =
+                activityRecord
+                        .getActivity()
+                        .getRecipient()
+                        .getName();
+
+        return "%s_record-%d".formatted(
+                recipientName,
+                activityRecord.getId()
+        );
     }
 
     // Submit할 활동기록의 시작 시각과 완료 시각이 유효한지 확인합니다.
@@ -680,7 +685,8 @@ public class ActivityRecordService {
         // 새 서명 이미지를 S3에 먼저 업로드합니다.
         String newSignatureKey = s3StorageService.upload(
                 signature,
-                buildSignaturePrefix(recordId)
+                "signatures",
+                buildSignatureFileNamePrefix(activityRecord)
         );
 
         // 이후 DB 트랜잭션이 실패하면 새로 올린 서명을 S3에서 삭제합니다.
