@@ -5,6 +5,7 @@ import com.dagachi.backend.domain.enums.AIAnalysisType;
 import com.dagachi.backend.domain.enums.AITargetType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -32,5 +33,23 @@ public interface AIAnalysisRepository
             AITargetType targetType,
             Long targetId,
             AIAnalysisType analysisType
+    );
+
+    /**
+     * 여러 targetId의 AIAnalysis를 한 번에 조회합니다.
+     *
+     * 목록 화면(REPORT-03, 미배정 제보 목록)에서 각 Report마다
+     * 최신 REPORT_SUMMARY를 개별 쿼리로 조회하면 N+1이 발생하므로,
+     * 페이지에 보이는 reportId를 모아 한 번에 조회한 뒤
+     * Service에서 targetId별 최신 1건만 골라 사용합니다.
+     *
+     * targetId ASC, createdAt DESC, id DESC로 정렬하면
+     * 같은 targetId의 결과가 모이고 그 안에서 최신 것이 먼저 옵니다.
+     */
+    List<AIAnalysis>
+    findByTargetTypeAndAnalysisTypeAndTargetIdInOrderByTargetIdAscCreatedAtDescIdDesc(
+            AITargetType targetType,
+            AIAnalysisType analysisType,
+            List<Long> targetIds
     );
 }

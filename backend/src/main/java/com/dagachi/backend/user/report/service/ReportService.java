@@ -11,6 +11,7 @@ import com.dagachi.backend.domain.entity.User;
 import com.dagachi.backend.domain.repository.ReportImageRepository;
 import com.dagachi.backend.domain.repository.ReportRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
+import com.dagachi.backend.institution.report.service.ReportTitleGenerationService;
 import com.dagachi.backend.user.report.dto.ReportCreateRequest;
 import com.dagachi.backend.user.report.dto.ReportCreateResponse;
 import com.dagachi.backend.institution.report.service.ReportEmbeddingService;
@@ -39,6 +40,7 @@ public class ReportService {
     private final S3StorageService s3StorageService;
     private final KakaoLocalClient kakaoLocalClient;
     private final ReportEmbeddingService reportEmbeddingService;
+    private final ReportTitleGenerationService reportTitleGenerationService;
 
     public ReportService(
             ReportRepository reportRepository,
@@ -46,7 +48,8 @@ public class ReportService {
             UserRepository userRepository,
             S3StorageService s3StorageService,
             KakaoLocalClient kakaoLocalClient,
-            ReportEmbeddingService reportEmbeddingService
+            ReportEmbeddingService reportEmbeddingService,
+            ReportTitleGenerationService reportTitleGenerationService // 파라미터 추가
     ) {
         this.reportRepository = reportRepository;
         this.reportImageRepository = reportImageRepository;
@@ -54,6 +57,7 @@ public class ReportService {
         this.s3StorageService = s3StorageService;
         this.kakaoLocalClient = kakaoLocalClient;
         this.reportEmbeddingService = reportEmbeddingService;
+        this.reportTitleGenerationService = reportTitleGenerationService; // 대입 추가
     }
 
     @Transactional
@@ -116,8 +120,40 @@ public class ReportService {
 
         // Report와 이미지 저장이 최종 commit된 뒤 embedding 생성을 시도합니다.
         registerEmbeddingAfterCommit(savedReport.getId());
+        registerTitleGenerationAfterCommit(savedReport.getId(), savedReport.getContent()); // 추가
 
         return ReportCreateResponse.from(savedReport);
+    }
+
+    /**
+     * 신규 제보 트랜잭션 commit 이후 AI 제목(REPORT_TITLE) 생성을 트리거합니다.
+     *
+     * generateAndSaveTitleAsync가 @Async이므로 이 afterCommit()은 즉시 반환되고,
+     * 실제 OpenAI 호출은 별도 스레드풀에서 처리됩니다.
+     */
+    private void registerTitleGenerationAfterCommit(
+            Long reportId,
+            String content
+    ) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            log.warn(
+                    "제보 AI 제목 생성 후처리를 등록할 트랜잭션이 활성화되어 있지 않습니다. reportId={}",
+                    reportId
+            );
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        reportTitleGenerationService.generateAndSaveTitleAsync(
+                                reportId,
+                                content
+                        );
+                    }
+                }
+        );
     }
 
     /**
