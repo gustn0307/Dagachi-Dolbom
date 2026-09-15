@@ -2,10 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { institutionApi } from "../../api/institutionApi";
-import {
-  DataState,
-  useInstitutionData,
-} from "../../hooks/useInstitutionData";
+import { DataState, useInstitutionData } from "../../hooks/useInstitutionData";
 
 const STATUS_OPTIONS = [
   {
@@ -52,21 +49,15 @@ function formatDate(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleDateString(
-    "ko-KR",
-    {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    },
-  );
+  return new Date(value).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 }
 
 function formatDistance(value) {
-  if (
-    value === null ||
-    value === undefined
-  ) {
+  if (value === null || value === undefined) {
     return "거리 정보 없음";
   }
 
@@ -84,75 +75,46 @@ function getErrorMessage(error) {
 function ReportManagement() {
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] =
-    useState("unassigned");
+  const [activeTab, setActiveTab] = useState("unassigned");
 
-  const [page, setPage] =
-    useState(0);
+  const [page, setPage] = useState(0);
 
-  const [status, setStatus] =
-    useState("");
+  const [status, setStatus] = useState("");
 
-  const [from, setFrom] =
-    useState("");
+  const [from, setFrom] = useState("");
 
-  const [to, setTo] =
-    useState("");
+  const [to, setTo] = useState("");
 
-  const [
-    assigningReportId,
-    setAssigningReportId,
-  ] = useState(null);
+  const [assigningReportId, setAssigningReportId] = useState(null);
 
-  const {
-    data,
-    loading,
-    error,
-    reload,
-  } = useInstitutionData(
-    () => {
-      const params = {
-        page,
-        size: 20,
-        status: status || undefined,
-        from: from || undefined,
-        to: to || undefined,
-      };
-
-      if (activeTab === "unassigned") {
-        return institutionApi
-          .getUnassignedReports(params);
-      }
-
-      return institutionApi.getReports(
-        params,
-      );
-    },
-    [
-      activeTab,
+  const { data, loading, error, reload } = useInstitutionData(() => {
+    const params = {
       page,
-      status,
-      from,
-      to,
-    ],
-  );
+      size: 20,
+      status: status || undefined,
+      from: from || undefined,
+      to: to || undefined,
+    };
 
-  const reports =
-    Array.isArray(data?.content)
-      ? data.content
-      : [];
+    if (activeTab === "unassigned") {
+      return institutionApi.getUnassignedReports(params);
+    }
 
-  const totalElements =
-    data?.totalElements ?? 0;
+    return institutionApi.getReports(params);
+  }, [activeTab, page, status, from, to]);
 
-  const totalPages =
-    data?.totalPages ?? 0;
+  const [retrying, setRetrying] = useState(false);
+  const [retryMessage, setRetryMessage] = useState("");
 
-  const isFirst =
-    data?.first ?? true;
+  const reports = Array.isArray(data?.content) ? data.content : [];
 
-  const isLast =
-    data?.last ?? true;
+  const totalElements = data?.totalElements ?? 0;
+
+  const totalPages = data?.totalPages ?? 0;
+
+  const isFirst = data?.first ?? true;
+
+  const isLast = data?.last ?? true;
 
   const changeTab = (tab) => {
     setActiveTab(tab);
@@ -184,96 +146,89 @@ function ReportManagement() {
     setPage(0);
   };
 
-  const handleAssignReport = async (
-  reportId,
-) => {
-  const confirmed = window.confirm(
-    `제보 #${reportId}을(를) 우리 기관의 관할로 지정하시겠습니까?`,
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    setAssigningReportId(reportId);
-
-    await institutionApi.assignReport(
-      reportId,
+  const handleAssignReport = async (reportId) => {
+    const confirmed = window.confirm(
+      `제보 #${reportId}을(를) 우리 기관의 관할로 지정하시겠습니까?`,
     );
 
-    window.dispatchEvent(
-      new Event(
-        "institution-report-count-changed",
-      ),
-    );
-
-    window.alert(
-      "제보를 우리 기관의 관할로 지정했습니다.",
-    );
-
-    if (
-      reports.length === 1 &&
-      page > 0
-    ) {
-      setPage((current) =>
-        Math.max(current - 1, 0),
-      );
-    } else {
-      await reload();
-    }
-  } catch (assignError) {
-    const statusCode =
-      assignError?.response?.status;
-
-    const errorCode =
-      assignError?.response?.data?.code;
-
-    if (
-      statusCode === 409 ||
-      errorCode ===
-        "REPORT_409_ALREADY_ASSIGNED"
-    ) {
-      window.alert(
-        "다른 기관이 먼저 관할로 지정한 제보입니다. 목록을 다시 불러옵니다.",
-      );
-
-      await reload();
-
-      window.dispatchEvent(
-        new Event(
-          "institution-report-count-changed",
-        ),
-      );
-
+    if (!confirmed) {
       return;
     }
 
-    window.alert(
-      getErrorMessage(assignError),
-    );
-  } finally {
-    setAssigningReportId(null);
-  }
-};
+    try {
+      setAssigningReportId(reportId);
+
+      await institutionApi.assignReport(reportId);
+
+      window.dispatchEvent(new Event("institution-report-count-changed"));
+
+      window.alert("제보를 우리 기관의 관할로 지정했습니다.");
+
+      if (reports.length === 1 && page > 0) {
+        setPage((current) => Math.max(current - 1, 0));
+      } else {
+        await reload();
+      }
+    } catch (assignError) {
+      const statusCode = assignError?.response?.status;
+
+      const errorCode = assignError?.response?.data?.code;
+
+      if (statusCode === 409 || errorCode === "REPORT_409_ALREADY_ASSIGNED") {
+        window.alert(
+          "다른 기관이 먼저 관할로 지정한 제보입니다. 목록을 다시 불러옵니다.",
+        );
+
+        await reload();
+
+        window.dispatchEvent(new Event("institution-report-count-changed"));
+
+        return;
+      }
+
+      window.alert(getErrorMessage(assignError));
+    } finally {
+      setAssigningReportId(null);
+    }
+  };
 
   const handleOpenDetail = (reportId) => {
-    navigate(
-      `/institution/reports/${reportId}`,
-    );
+    navigate(`/institution/reports/${reportId}`);
   };
 
   if (loading || error) {
     return (
       <div className="institution-page">
-        <DataState
-          loading={loading}
-          error={error}
-          onRetry={reload}
-        />
+        <DataState loading={loading} error={error} onRetry={reload} />
       </div>
     );
   }
+
+  const handleRetryMissingTitles = async () => {
+    const scope = activeTab === "unassigned" ? "UNASSIGNED" : "MY_INSTITUTION";
+
+    setRetrying(true);
+    setRetryMessage("");
+
+    try {
+      const result = await institutionApi.retryMissingReportAiTitles(scope);
+
+      const base = `요약 ${result.targetCount}건 중 ${result.succeededCount}건 완료`;
+      const fail =
+        result.failedCount > 0 ? ` (${result.failedCount}건 실패)` : "";
+      const more = result.hasMore
+        ? " · 남은 건이 있어요, 한 번 더 눌러주세요."
+        : "";
+
+      setRetryMessage(base + fail + more);
+
+      await reload();
+    } catch (retryError) {
+      window.alert(getErrorMessage(retryError));
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <div className="institution-page">
@@ -281,14 +236,9 @@ function ReportManagement() {
         <div>
           <p>제보 관리</p>
 
-          <h1>
-            접수된 제보를 확인하세요
-          </h1>
+          <h1>접수된 제보를 확인하세요</h1>
 
-          <span>
-            미배정 제보를 확인하고 기관에
-            배정된 제보를 관리합니다.
-          </span>
+          <span>미배정 제보를 확인하고 기관에 배정된 제보를 관리합니다.</span>
         </div>
       </div>
 
@@ -296,28 +246,16 @@ function ReportManagement() {
         <div className="report-main-tabs">
           <button
             type="button"
-            className={
-              activeTab === "unassigned"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              changeTab("unassigned")
-            }
+            className={activeTab === "unassigned" ? "active" : ""}
+            onClick={() => changeTab("unassigned")}
           >
             미배정 제보
           </button>
 
           <button
             type="button"
-            className={
-              activeTab === "assigned"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              changeTab("assigned")
-            }
+            className={activeTab === "assigned" ? "active" : ""}
+            onClick={() => changeTab("assigned")}
           >
             내 기관 제보
           </button>
@@ -330,10 +268,7 @@ function ReportManagement() {
             onChange={handleStatusChange}
           >
             {STATUS_OPTIONS.map((option) => (
-              <option
-                key={option.value}
-                value={option.value}
-              >
+              <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
@@ -368,6 +303,17 @@ function ReportManagement() {
           >
             초기화
           </button>
+          <button
+            type="button"
+            className="report-filter-reset"
+            disabled={retrying}
+            onClick={handleRetryMissingTitles}
+          >
+            {retrying ? "재생성 중..." : "AI 요약 재생성"}
+          </button>
+          {retryMessage && (
+            <div className="report-retry-message">{retryMessage}</div>
+          )}
         </div>
 
         <div
@@ -406,113 +352,63 @@ function ReportManagement() {
             </div>
           ) : activeTab === "unassigned" ? (
             reports.map((report) => {
-              const statusLabel =
-                STATUS_LABELS[report.status] ??
-                report.status;
+              const statusLabel = STATUS_LABELS[report.status] ?? report.status;
 
-              const isAssigning =
-                assigningReportId ===
-                report.reportId;
+              const isAssigning = assigningReportId === report.reportId;
 
               return (
-                <article
-                  key={report.reportId}
-                >
-                  <span className="id-cell">
-                    #{report.reportId}
-                  </span>
+                <article key={report.reportId}>
+                  <span className="id-cell">#{report.reportId}</span>
 
                   <span className="main-cell">
-                    <strong>
-                      {report.contentPreview}
-                    </strong>
+                    <strong>{report.aiSummary ?? report.contentPreview}</strong>
                   </span>
 
-                  <span>
-                    {report.region || "-"}
-                  </span>
+                  <span>{report.region || "-"}</span>
+
+                  <span>{formatDistance(report.distanceKm)}</span>
+
+                  <span>{formatDate(report.createdAt)}</span>
 
                   <span>
-                    {formatDistance(
-                      report.distanceKm,
-                    )}
-                  </span>
-
-                  <span>
-                    {formatDate(
-                      report.createdAt,
-                    )}
-                  </span>
-
-                  <span>
-                    <i className="table-status">
-                      {statusLabel}
-                    </i>
+                    <i className="table-status">{statusLabel}</i>
                   </span>
 
                   <button
                     type="button"
                     className="report-assign-button"
-                    disabled={
-                      assigningReportId !== null
-                    }
-                    onClick={() =>
-                      handleAssignReport(
-                        report.reportId,
-                      )
-                    }
+                    disabled={assigningReportId !== null}
+                    onClick={() => handleAssignReport(report.reportId)}
                   >
-                    {isAssigning
-                      ? "처리 중"
-                      : "관할 지정"}
+                    {isAssigning ? "처리 중" : "관할 지정"}
                   </button>
                 </article>
               );
             })
           ) : (
             reports.map((report) => {
-              const statusLabel =
-                STATUS_LABELS[report.status] ??
-                report.status;
+              const statusLabel = STATUS_LABELS[report.status] ?? report.status;
 
               return (
-                <article
-                  key={report.reportId}
-                >
-                  <span className="id-cell">
-                    #{report.reportId}
-                  </span>
+                <article key={report.reportId}>
+                  <span className="id-cell">#{report.reportId}</span>
 
                   <span className="main-cell">
-                    <strong>
-                      {report.content}
-                    </strong>
+                    <strong>{report.aiSummary ?? report.content}</strong>
                   </span>
 
-                  <span>
-                    {report.address || "-"}
-                  </span>
+                  <span>{report.address || "-"}</span>
+
+                  <span>{formatDate(report.createdAt)}</span>
 
                   <span>
-                    {formatDate(
-                      report.createdAt,
-                    )}
-                  </span>
-
-                  <span>
-                    <i className="table-status">
-                      {statusLabel}
-                    </i>
+                    <i className="table-status">{statusLabel}</i>
                   </span>
 
                   <button
                     type="button"
                     className="report-detail-button"
-                    onClick={() =>
-                      handleOpenDetail(
-                        report.reportId,
-                      )
-                    }
+                    onClick={() => handleOpenDetail(report.reportId)}
                   >
                     상세 보기
                   </button>
@@ -525,22 +421,14 @@ function ReportManagement() {
         {totalPages > 0 && (
           <div className="table-footer care-pagination">
             <span>
-              전체 {totalElements}건 ·{" "}
-              {page + 1}/{totalPages} 페이지
+              전체 {totalElements}건 · {page + 1}/{totalPages} 페이지
             </span>
 
             <div>
               <button
                 type="button"
                 disabled={isFirst}
-                onClick={() =>
-                  setPage((current) =>
-                    Math.max(
-                      current - 1,
-                      0,
-                    ),
-                  )
-                }
+                onClick={() => setPage((current) => Math.max(current - 1, 0))}
               >
                 이전
               </button>
@@ -554,19 +442,9 @@ function ReportManagement() {
                 <button
                   type="button"
                   key={pageNumber}
-                  className={
-                    pageNumber === page
-                      ? "active"
-                      : ""
-                  }
-                  aria-current={
-                    pageNumber === page
-                      ? "page"
-                      : undefined
-                  }
-                  onClick={() =>
-                    setPage(pageNumber)
-                  }
+                  className={pageNumber === page ? "active" : ""}
+                  aria-current={pageNumber === page ? "page" : undefined}
+                  onClick={() => setPage(pageNumber)}
                 >
                   {pageNumber + 1}
                 </button>
@@ -576,12 +454,7 @@ function ReportManagement() {
                 type="button"
                 disabled={isLast}
                 onClick={() =>
-                  setPage((current) =>
-                    Math.min(
-                      current + 1,
-                      totalPages - 1,
-                    ),
-                  )
+                  setPage((current) => Math.min(current + 1, totalPages - 1))
                 }
               >
                 다음
