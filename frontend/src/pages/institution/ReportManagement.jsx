@@ -196,14 +196,6 @@ function ReportManagement() {
     navigate(`/institution/reports/${reportId}`);
   };
 
-  if (loading || error) {
-    return (
-      <div className="institution-page">
-        <DataState loading={loading} error={error} onRetry={reload} />
-      </div>
-    );
-  }
-
   const handleRetryMissingTitles = async () => {
     const scope = activeTab === "unassigned" ? "UNASSIGNED" : "MY_INSTITUTION";
 
@@ -229,6 +221,14 @@ function ReportManagement() {
       setRetrying(false);
     }
   };
+
+  if (loading || error) {
+    return (
+      <div className="institution-page">
+        <DataState loading={loading} error={error} onRetry={reload} />
+      </div>
+    );
+  }
 
   return (
     <div className="institution-page">
