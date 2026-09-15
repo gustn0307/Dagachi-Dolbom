@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '4.0.7'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -9,6 +10,7 @@ version = '0.0.1-SNAPSHOT'
 
 java {
 	toolchain {
+		// 프로젝트 Backend는 Java 21을 기준으로 빌드·테스트한다.
 		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
@@ -18,39 +20,131 @@ repositories {
 }
 
 dependencies {
+	// JPA / Hibernate
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+	// PostgreSQL pgvector의 vector 타입을 Hibernate에서 사용하기 위한 지원 라이브러리
 	implementation 'org.hibernate.orm:hibernate-vector'
 
+	// Flyway DB Migration
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+
+	// Spring Security
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
 	// AWS SDK for S3
 	implementation 'software.amazon.awssdk:s3:2.32.30'
 	implementation 'software.amazon.awssdk:sts:2.32.30'
 
-	// jjwt-api → 우리가 코드에서 사용하는 JWT API
+	// jjwt-api → 코드에서 사용하는 JWT API
 	// jjwt-impl → 실제 JWT 처리 구현체
-	// jjwt-jackson → JWT의 JSON 직렬화/역직렬화
+	// jjwt-jackson → JWT JSON 직렬화/역직렬화
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
+	// Bean Validation
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	// Spring MVC / REST API
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+	// PostgreSQL용 Flyway 지원
 	implementation 'org.flywaydb:flyway-database-postgresql'
+
+	// Lombok은 compile 시에만 사용한다.
 	compileOnly 'org.projectlombok:lombok'
-	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
+
+	// 실제 실행 시 PostgreSQL JDBC Driver 사용
+	runtimeOnly 'org.postgresql:postgresql'
+
+
+	/*
+     * ============================================================
+     * Backend Test Dependencies
+     * ============================================================
+     *
+     * 테스트 계층은 크게 다음과 같이 사용한다.
+     *
+     * 1. Unit Test
+     *    - JUnit + Mockito
+     *    - 실제 Spring Context / DB 없이 Service 로직을 빠르게 검증
+     *
+     * 2. Repository / Integration Test
+     *    - Spring + Testcontainers
+     *    - 실제 PostgreSQL + pgvector 환경에서 Query / Migration /
+     *      DB 제약조건 등을 검증
+     *
+     * 3. Controller / Security Test
+     *    - Spring MVC / Security Test 지원 사용
+     */
+
+
+	// JPA Repository 및 Persistence Layer 테스트 지원
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+
+	// 테스트 환경에서 Flyway Migration 동작을 검증하기 위한 지원
 	testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
+
+	// Spring Security 인증/인가 테스트 지원
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+
+	// Validation 관련 테스트 지원
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+
+	// MockMvc 등 Spring MVC Controller 테스트 지원
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+
+
+	/*
+     * Testcontainers
+     *
+     * 테스트 실행 시 Docker를 이용하여
+     * 독립된 PostgreSQL + pgvector DB를 임시로 생성한다.
+     *
+     * 로컬 개발 DB 또는 production DB를 테스트에 직접 사용하지 않으므로
+     * 테스트 데이터가 실제 개발 데이터에 영향을 주지 않는다.
+     */
+
+	// Spring Boot와 Testcontainers의 ServiceConnection 연동 지원
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+
+	// JUnit과 Testcontainers의 컨테이너 생명주기 연동
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+
+	// PostgreSQL Testcontainer 지원
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
+
+
+	// 테스트 코드에서도 Lombok annotation processing 지원
 	testCompileOnly 'org.projectlombok:lombok'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	// JUnit Platform 실행기
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
+	// Gradle test task에서 JUnit Platform(JUnit Jupiter)을 사용한다.
 	useJUnitPlatform()
+
+	// 전체 테스트가 끝나면 JaCoCo 코드 커버리지 리포트를 자동 생성한다.
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.named('jacocoTestReport') {
+	// 커버리지 리포트를 생성하기 전에 반드시 test가 먼저 실행되어야 한다.
+	dependsOn tasks.named('test')
+
+	reports {
+		// CI 또는 다른 도구에서 분석할 수 있는 XML 리포트
+		xml.required = true
+
+		// 사람이 브라우저에서 확인하기 위한 HTML 리포트
+		html.required = true
+
+		// CSV는 현재 프로젝트에서 사용하지 않으므로 생성하지 않는다.
+		csv.required = false
+	}
 }
