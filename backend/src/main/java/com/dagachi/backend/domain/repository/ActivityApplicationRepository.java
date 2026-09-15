@@ -5,6 +5,8 @@ import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
 import com.dagachi.backend.domain.enums.UserGender;
+import com.dagachi.backend.domain.enums.ActivityReviewStatus;
+import com.dagachi.backend.domain.enums.VisitResult;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -112,4 +114,56 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
      * [팀 미확정 정책 임시 적용] PENDING 또는 APPROVED가 하나라도 있으면 탈퇴를 막는다.
      */
     boolean existsByUser_IdAndStatusIn(Long userId, List<ApplicationStatus> statuses);
+
+    /**
+     * STAT-01 내 활동 통계 - 완료한 안부 확인 횟수.
+     *
+     * 로그인 사용자가 APPROVED 참여자로 참여한 CareActivity 중,
+     * 공동 ActivityRecord가 기관에 의해 APPROVED되었고
+     * visitResult가 MET인 활동 수를 센다.
+     *
+     * CareActivity : ActivityRecord = 1 : 0..1 이므로
+     * activity.id 기준 distinct count가 record 기준 count와 동일하다.
+     */
+    @Query("""
+            SELECT COUNT(DISTINCT application.activity.id)
+            FROM ActivityApplication application
+            JOIN application.activity activity
+            JOIN ActivityRecord record
+                ON record.activity = activity
+            WHERE application.user.id = :userId
+              AND application.status = :applicationStatus
+              AND record.reviewStatus = :reviewStatus
+              AND record.visitResult = :visitResult
+            """)
+    long countCompletedCareChecks(
+            @Param("userId") Long userId,
+            @Param("applicationStatus") ApplicationStatus applicationStatus,
+            @Param("reviewStatus") ActivityReviewStatus reviewStatus,
+            @Param("visitResult") VisitResult visitResult
+    );
+
+    /**
+     * STAT-01 내 활동 통계 - 함께한 이웃(고유 대상자) 수.
+     *
+     * 위와 동일한 조건에서 서로 다른 CareRecipient가 몇 명인지 센다.
+     * 같은 어르신을 여러 번 방문해도 1명으로만 계산한다.
+     */
+    @Query("""
+            SELECT COUNT(DISTINCT activity.recipient.id)
+            FROM ActivityApplication application
+            JOIN application.activity activity
+            JOIN ActivityRecord record
+                ON record.activity = activity
+            WHERE application.user.id = :userId
+              AND application.status = :applicationStatus
+              AND record.reviewStatus = :reviewStatus
+              AND record.visitResult = :visitResult
+            """)
+    long countDistinctCareRecipients(
+            @Param("userId") Long userId,
+            @Param("applicationStatus") ApplicationStatus applicationStatus,
+            @Param("reviewStatus") ActivityReviewStatus reviewStatus,
+            @Param("visitResult") VisitResult visitResult
+    );
 }

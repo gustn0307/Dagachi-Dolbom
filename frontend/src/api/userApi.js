@@ -201,3 +201,7 @@ export const changePassword = (currentPassword, newPassword) =>
 // USER-03 회원 탈퇴 (본인확인용 비밀번호 필요)
 export const withdrawUser = (password) =>
   unwrapData(api.delete("/api/users/me", { data: { password } }));
+
+// STAT-01 마이페이지 회원 통계 표시
+export const getMyActivityStatistics = () =>
+  unwrapData(api.get("/api/users/me/activity-statistics"));

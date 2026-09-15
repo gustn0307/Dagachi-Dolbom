@@ -7,6 +7,7 @@ import {
   updateMyProfile,
   changePassword,
   withdrawUser,
+  getMyActivityStatistics,
 } from "../../api/userApi";
 
 const STATUS_LABELS = {
@@ -67,6 +68,10 @@ function MyPage() {
   const [withdrawError, setWithdrawError] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
 
+  // ---- 내 활동 통계 (STAT-01) ----
+  const [stats, setStats] = useState(null);
+  const [statsError, setStatsError] = useState("");
+
   useEffect(() => {
     const loadReports = async () => {
       try {
@@ -108,8 +113,24 @@ function MyPage() {
       }
     };
 
+    // STAT-01: 완료한 안부 확인 / 함께한 이웃 통계를 조회합니다.
+    const loadStatistics = async () => {
+      try {
+        setStatsError("");
+
+        const data = await getMyActivityStatistics();
+        setStats(data);
+      } catch (requestError) {
+        setStatsError(
+          requestError?.response?.data?.message ??
+            "활동 통계를 불러오지 못했습니다.",
+        );
+      }
+    };
+
     loadReports();
     loadProfile();
+    loadStatistics();
   }, []);
 
   // ---- 내 정보 수정 핸들러 ----
@@ -457,27 +478,56 @@ function MyPage() {
         </div>
       )}
 
-      {/* ---- 마일리지/통계 (기존 그대로 - 이번 범위 아님) ---- */}
-      <section className="profile-grid">
-        <article className="mileage">
-          <span>✦</span>
-          <p>나의 마일리지</p>
-          <strong>
-            - <small>점</small>
-          </strong>
-          <button type="button">내역 보기 ›</button>
-        </article>
-
-        <article className="profile-stat">
-          <strong>
-            -<span>회</span>
+      {/* ---- 내 활동 통계 (STAT-01) - 마일리지 카드 삭제, 실데이터 연동 ---- */}
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "15px",
+          width: "100%",
+          maxWidth: "816px",
+          margin: "0 auto",
+          boxSizing: "border-box",
+        }}
+      >
+        <article
+          className="profile-stat"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            background: "white",
+            border: "1px solid #eee7df",
+            borderRadius: "16px",
+            padding: "24px",
+          }}
+        >
+          <strong
+            aria-label={`완료한 안부 확인 ${
+              stats?.completedCareCheckCount ?? "-"
+            }회`}
+          >
+            {statsError ? "-" : (stats?.completedCareCheckCount ?? "-")}
+            <span>회</span>
           </strong>
           <p>완료한 안부 확인</p>
         </article>
 
-        <article className="profile-stat">
-          <strong>
-            -<span>명</span>
+        <article
+          className="profile-stat"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            background: "white",
+            border: "1px solid #eee7df",
+            borderRadius: "16px",
+            padding: "24px",
+          }}
+        >
+          <strong
+            aria-label={`함께한 이웃 ${stats?.careRecipientCount ?? "-"}명`}
+          >
+            {statsError ? "-" : (stats?.careRecipientCount ?? "-")}
+            <span>명</span>
           </strong>
           <p>함께한 이웃</p>
         </article>
