@@ -1,9 +1,6 @@
 package com.dagachi.backend.common.ai.client;
 
-import com.dagachi.backend.common.ai.dto.AiReportSummaryRequest;
-import com.dagachi.backend.common.ai.dto.AiReportSummaryResponse;
-import com.dagachi.backend.common.ai.dto.AiReportEmbeddingRequest;
-import com.dagachi.backend.common.ai.dto.AiReportEmbeddingResponse;
+import com.dagachi.backend.common.ai.dto.*;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -135,6 +132,49 @@ public class AiServiceClient {
             throw new CustomException(
                     ErrorCode.AI_SERVICE_INVALID_RESPONSE
             );
+        }
+
+        return response;
+    }
+
+    // 신규 메서드 추가
+    public AiReportTitleResponse generateReportTitle(String content) {
+
+        AiReportTitleRequest request = new AiReportTitleRequest(content);
+
+        AiReportTitleResponse response;
+
+        try {
+            response = aiServiceRestClient
+                    .post()
+                    .uri("/internal/ai/report-title")
+                    .body(request)
+                    .retrieve()
+                    .body(AiReportTitleResponse.class);
+
+        } catch (ResourceAccessException exception) {
+            String message = exception.getMessage();
+
+            if (message != null && message.toLowerCase().contains("timed out")) {
+                throw new CustomException(ErrorCode.AI_SERVICE_TIMEOUT);
+            }
+
+            throw new CustomException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (RestClientResponseException exception) {
+            throw new CustomException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+
+        } catch (RestClientException exception) {
+            throw new CustomException(ErrorCode.AI_SERVICE_INVALID_RESPONSE);
+        }
+
+        if (response == null) {
+            throw new CustomException(ErrorCode.AI_SERVICE_INVALID_RESPONSE);
+        }
+
+        if (!StringUtils.hasText(response.title())
+                || !StringUtils.hasText(response.model())) {
+            throw new CustomException(ErrorCode.AI_SERVICE_INVALID_RESPONSE);
         }
 
         return response;

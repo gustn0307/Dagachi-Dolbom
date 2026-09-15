@@ -113,9 +113,14 @@ public class ActivityRecordService {
 
         // 성별 조건 재검증
         if (activity.getGenderCondition() == GenderCondition.SAME_GENDER_ONE) {
-            List<UserGender> genders = activityApplicationRepository.findApprovedUserGenders(activityId);
-            boolean allSameGender = genders.stream().distinct().count() <= 1;
-            if (!allSameGender) {
+            UserGender recipientGender = activity.getRecipient().getGender();
+
+            List<UserGender> approvedGenders = activityApplicationRepository.findApprovedUserGenders(activityId);
+
+            boolean hasSameGenderAsRecipient = approvedGenders.stream()
+                    .anyMatch(gender -> gender == recipientGender);
+
+            if (!hasSameGenderAsRecipient) {
                 throw new CustomException(ErrorCode.ACTIVITY_GENDER_CONDITION_NOT_MET);
             }
         }

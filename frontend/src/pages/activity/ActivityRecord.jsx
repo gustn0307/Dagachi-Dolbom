@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { userApi } from "../../api/userApi";
@@ -89,15 +89,92 @@ function ActivityRecord() {
   });
 
   /*
-   * RECORD-04에서 업로드할 대상자 서명 파일입니다.
+   * 대상자가 화면에 직접 서명할 Canvas입니다.
    */
-  const [signatureFile, setSignatureFile] = useState(null);
+  const signatureCanvasRef = useRef(null);
+
+  /*
+   * 현재 Pointer가 눌린 상태에서
+   * 서명선을 그리고 있는지 보관합니다.
+   */
+  const signatureDrawingRef = useRef(false);
+
+  /*
+   * 현재 서명에 사용 중인 Pointer의 ID입니다.
+   * 두 손가락이 동시에 닿더라도 하나의 Pointer만 서명에 사용합니다.
+   */
+  const signaturePointerIdRef = useRef(null);
+
+  /*
+   * 선을 이어 그리기 위해
+   * 직전에 지나간 좌표를 보관합니다.
+   */
+  const signatureLastPointRef = useRef(null);
+
+  /*
+   * 서명을 구성하는 원본 좌표 데이터입니다.
+   * Canvas 크기가 바뀌어도 이 좌표를 기준으로 다시 그립니다.
+   */
+  const signatureStrokesRef = useRef([]);
+
+  /*
+   * 현재 그리고 있는 한 획(stroke)을 가리킵니다.
+   */
+  const signatureCurrentStrokeRef = useRef(null);
+
+  /*
+   * 서명을 처음 작성한 Canvas의 기준 크기입니다.
+   * 이후 리사이즈 시 이 크기를 기준으로 비율을 계산합니다.
+   */
+  const signatureBaseSizeRef = useRef(null);
+
+  const getSignatureTransform = (canvas) => {
+    const baseSize = signatureBaseSizeRef.current;
+
+    if (!canvas || !baseSize) {
+      return null;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+
+    if (rect.width === 0 || rect.height === 0) {
+      return null;
+    }
+
+    /*
+     * 가로/세로 중 더 작은 비율을 사용해서
+     * 서명의 원래 비율을 유지합니다.
+     */
+    const scale = Math.min(
+      rect.width / baseSize.width,
+      rect.height / baseSize.height,
+    );
+
+    const drawWidth = baseSize.width * scale;
+    const drawHeight = baseSize.height * scale;
+
+    return {
+      scale,
+      offsetX: (rect.width - drawWidth) / 2,
+      offsetY: (rect.height - drawHeight) / 2,
+    };
+  };
+
+  /*
+   * ResizeObserver 같은 비동기 Canvas 로직에서도
+   * 현재 서명 존재 여부를 항상 최신 값으로 확인하기 위한 Ref입니다.
+   */
+  const hasSignatureDrawingRef = useRef(false);
+
+  /*
+   * 실제로 서명선이 하나라도 그려졌는지 관리합니다.
+   * 빈 Canvas 업로드와 최종 제출 여부 판단에 사용합니다.
+   */
+  const [hasSignatureDrawing, setHasSignatureDrawing] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-
   const [actionError, setActionError] = useState("");
-
   const [successMessage, setSuccessMessage] = useState("");
 
   /*
@@ -213,6 +290,12 @@ function ActivityRecord() {
           selectedValue: null,
         })),
       );
+
+      /*
+       * 아직 서버에 등록하지 않은 서명은
+       * NOT_MET으로 변경할 때 함께 초기화합니다.
+       */
+      clearSignatureCanvas();
     }
   };
 
@@ -249,6 +332,429 @@ function ActivityRecord() {
       ),
     );
   };
+
+  /*
+   * 서명 Canvas에서 Pointer가 눌렸을 때
+   * 서명 시작 위치를 기억합니다.
+   *
+   * 마우스, 손가락, 터치펜 모두 Pointer Event로 동일하게 처리합니다.
+   */
+  const handleSignaturePointerDown = (event) => {
+    const canvas = signatureCanvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    /*
+     * 이미 다른 Pointer로 서명 중이라면
+     * 두 번째 손가락 입력은 무시합니다.
+     */
+    if (signaturePointerIdRef.current !== null) {
+      return;
+    }
+
+    /*
+     * 마우스는 왼쪽 버튼만 서명 입력으로 사용합니다.
+     * 오른쪽 클릭이나 휠 클릭은 무시합니다.
+     */
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    /*
+     * 지금 눌린 Pointer를
+     * 현재 서명에 사용하는 Pointer로 기억합니다.
+     */
+    signaturePointerIdRef.current = event.pointerId;
+
+    /*
+     * Canvas가 화면에서 실제로 표시되는 위치와 크기를 가져옵니다.
+     */
+    const rect = canvas.getBoundingClientRect();
+
+    /*
+     * 첫 서명을 시작한 순간의 Canvas 크기를
+     * 이후 리사이즈 계산의 기준 크기로 사용합니다.
+     */
+    if (!signatureBaseSizeRef.current) {
+      signatureBaseSizeRef.current = {
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
+    const transform = getSignatureTransform(canvas);
+
+    if (!transform) {
+      return;
+    }
+
+    /*
+     * 현재 화면에서 Pointer가 위치한 좌표입니다.
+     * 실제 Canvas에 즉시 선을 그릴 때 사용합니다.
+     */
+    const point = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+
+    /*
+     * 현재 화면 좌표를 원본 서명 좌표로 되돌립니다.
+     * 이 좌표가 리사이즈와 상관없는 진짜 서명 데이터가 됩니다.
+     */
+    const basePoint = {
+      x: (point.x - transform.offsetX) / transform.scale,
+      y: (point.y - transform.offsetY) / transform.scale,
+    };
+
+    /*
+     * 새 획의 시작점입니다.
+     * 아직 움직이지 않았으므로 strokes에는 넣지 않습니다.
+     */
+    signatureCurrentStrokeRef.current = [basePoint];
+
+    signatureDrawingRef.current = true;
+    signatureLastPointRef.current = point;
+
+    /*
+     * Pointer가 Canvas 밖으로 조금 벗어나도
+     * 계속 같은 서명 동작으로 추적할 수 있게 합니다.
+     */
+    canvas.setPointerCapture(event.pointerId);
+  };
+
+  /*
+   * Pointer가 서명 Canvas 위에서 움직일 때
+   * 직전 위치부터 현재 위치까지 선을 이어 그립니다.
+   */
+  const handleSignaturePointerMove = (event) => {
+    const canvas = signatureCanvasRef.current;
+    const lastPoint = signatureLastPointRef.current;
+    const currentStroke = signatureCurrentStrokeRef.current;
+
+    if (
+      !canvas ||
+      !signatureDrawingRef.current ||
+      !lastPoint ||
+      !currentStroke ||
+      signaturePointerIdRef.current !== event.pointerId
+    ) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+
+    /*
+     * 현재 Pointer 위치를 Canvas 내부 좌표로 변환합니다.
+     */
+    const currentPoint = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+
+    const transform = getSignatureTransform(canvas);
+
+    if (!transform) {
+      return;
+    }
+
+    /*
+     * 현재 화면 좌표를 원본 서명 좌표로 변환해서
+     * 현재 획에 계속 저장합니다.
+     */
+    const basePoint = {
+      x: (currentPoint.x - transform.offsetX) / transform.scale,
+      y: (currentPoint.y - transform.offsetY) / transform.scale,
+    };
+
+    currentStroke.push(basePoint);
+
+    /*
+     * PointerDown의 한 점만 있을 때는 서명으로 인정하지 않고,
+     * 실제 첫 이동이 발생해서 두 번째 점이 생긴 순간에만
+     * 이 획을 전체 서명 데이터에 등록합니다.
+     */
+    if (currentStroke.length === 2) {
+      signatureStrokesRef.current.push(currentStroke);
+    }
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return;
+    }
+
+    /*
+     * 서명선 모양입니다.
+     * - 어두운 선
+     * - 3px 굵기
+     * - 선 끝과 연결부를 둥글게 처리
+     */
+    context.strokeStyle = "#2f2f2f";
+    context.lineWidth = 3;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+
+    context.beginPath();
+    context.moveTo(lastPoint.x, lastPoint.y);
+    context.lineTo(currentPoint.x, currentPoint.y);
+    context.stroke();
+
+    hasSignatureDrawingRef.current = true;
+
+    /*
+     * 실제 이동이 발생해 선을 그렸으므로
+     * 이제 Canvas에는 등록할 서명이 있다고 판단합니다.
+     */
+    setHasSignatureDrawing(true);
+
+    /*
+     * 다음 선의 시작점은 방금 도착한 위치가 됩니다.
+     */
+    signatureLastPointRef.current = currentPoint;
+  };
+
+  /*
+   * 현재 서명에 사용 중인 Pointer를 떼거나
+   * 해당 Pointer 동작이 취소되면 선 그리기를 종료합니다.
+   */
+  const handleSignaturePointerEnd = (event) => {
+    const canvas = signatureCanvasRef.current;
+
+    /*
+     * 현재 서명에 사용 중인 Pointer가 아니라면
+     * 종료 이벤트도 무시합니다.
+     */
+    if (signaturePointerIdRef.current !== event.pointerId) {
+      return;
+    }
+
+    signatureDrawingRef.current = false;
+    signatureLastPointRef.current = null;
+
+    /*
+     * 현재 사용 중이던 Pointer도 해제합니다.
+     */
+    signaturePointerIdRef.current = null;
+
+    if (canvas?.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  /*
+   * Canvas에 그려진 서명을 PNG File 객체로 변환합니다.
+   *
+   * 기존 RECORD-04는 MultipartFile을 받으므로
+   * 브라우저에서도 일반 이미지 파일과 같은 File 형태로 만들어 전달합니다.
+   */
+  const createSignatureFile = () => {
+    const canvas = signatureCanvasRef.current;
+
+    if (!canvas) {
+      return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          resolve(null);
+          return;
+        }
+
+        const file = new File([blob], `signature-${recordId}.png`, {
+          type: "image/png",
+        });
+
+        resolve(file);
+      }, "image/png");
+    });
+  };
+
+  /*
+   * 서명 Canvas를 비우고
+   * 현재 작성 중인 서명 상태도 함께 초기화합니다.
+   */
+  const clearSignatureCanvas = () => {
+    const canvas = signatureCanvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return;
+    }
+
+    /*
+     * 이후 고해상도 화면 대응을 위해 Canvas에 배율이 적용되더라도
+     * 실제 Canvas 전체 픽셀 영역을 확실하게 지웁니다.
+     */
+    context.save();
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.restore();
+
+    signatureDrawingRef.current = false;
+    signaturePointerIdRef.current = null;
+    signatureLastPointRef.current = null;
+
+    signatureCurrentStrokeRef.current = null;
+    signatureStrokesRef.current = [];
+    signatureBaseSizeRef.current = null;
+
+    signatureCurrentStrokeRef.current = null;
+    hasSignatureDrawingRef.current = false;
+    setHasSignatureDrawing(false);
+  };
+
+  /*
+   * 화면에 표시되는 Canvas 크기가 변경되더라도
+   * 기존 서명 비율을 유지하면서 보존하고,
+   * 고해상도 화면에 맞춰 실제 픽셀 크기를 다시 설정합니다.
+   */
+  const initializeSignatureCanvas = () => {
+    const canvas = signatureCanvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+
+    if (rect.width === 0 || rect.height === 0) {
+      return;
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+
+    /*
+     * Canvas의 실제 해상도를 현재 화면 크기에 맞춥니다.
+     */
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return;
+    }
+
+    /*
+     * 이후 좌표는 CSS 픽셀 기준으로 그릴 수 있도록
+     * DPR 배율을 적용합니다.
+     */
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const transform = getSignatureTransform(canvas);
+
+    if (!transform) {
+      return;
+    }
+
+    /*
+     * 저장해둔 원본 좌표를 기준으로
+     * 현재 Canvas 크기에 맞게 서명을 처음부터 다시 그립니다.
+     */
+    signatureStrokesRef.current.forEach((stroke) => {
+      if (stroke.length < 2) {
+        return;
+      }
+
+      context.strokeStyle = "#2f2f2f";
+      context.lineWidth = 3;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+
+      context.beginPath();
+
+      const firstPoint = stroke[0];
+
+      context.moveTo(
+        firstPoint.x * transform.scale + transform.offsetX,
+        firstPoint.y * transform.scale + transform.offsetY,
+      );
+
+      for (let index = 1; index < stroke.length; index += 1) {
+        const point = stroke[index];
+
+        context.lineTo(
+          point.x * transform.scale + transform.offsetX,
+          point.y * transform.scale + transform.offsetY,
+        );
+      }
+
+      context.stroke();
+    });
+  };
+
+  /*
+   * 서명 Canvas가 화면에 나타나면 최초 크기를 설정하고,
+   * 이후 실제 표시 크기가 변경될 때마다 서명을 보존한 채 다시 맞춥니다.
+   */
+  useEffect(() => {
+    /*
+     * 서명판은 MET + 수정 가능한 상태에서만 화면에 존재합니다.
+     */
+    if (form.visitResult !== "MET" || !editable) {
+      return;
+    }
+
+    const canvas = signatureCanvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    /*
+     * Canvas가 처음 나타났을 때
+     * 현재 화면 크기와 DPR에 맞춰 최초 초기화합니다.
+     */
+    initializeSignatureCanvas();
+
+    let resizeTimer = null;
+
+    const resizeObserver = new ResizeObserver(() => {
+      /*
+       * 연속해서 크기가 변경되는 동안에는
+       * 이전 예약을 취소하고 다시 150ms를 기다립니다.
+       */
+      if (resizeTimer) {
+        window.clearTimeout(resizeTimer);
+      }
+
+      resizeTimer = window.setTimeout(() => {
+        /*
+         * 리사이즈 중이던 Pointer 상태를 종료합니다.
+         * 화면 크기가 바뀌는 순간 이전 좌표와 새 좌표가
+         * 잘못 이어지는 것을 방지합니다.
+         */
+        signatureDrawingRef.current = false;
+        signaturePointerIdRef.current = null;
+        signatureLastPointRef.current = null;
+        signatureCurrentStrokeRef.current = null;
+
+        initializeSignatureCanvas();
+      }, 150);
+    });
+
+    resizeObserver.observe(canvas);
+
+    /*
+     * 서명판이 사라지거나 페이지가 변경되면
+     * Observer와 남아 있는 타이머를 정리합니다.
+     */
+    return () => {
+      resizeObserver.disconnect();
+
+      if (resizeTimer) {
+        window.clearTimeout(resizeTimer);
+      }
+    };
+  }, [form.visitResult, editable]);
 
   /*
    * 현재 화면 상태를 RECORD-03 요청 DTO 구조로 변환합니다.
@@ -328,20 +834,25 @@ function ActivityRecord() {
 
   /*
    * RECORD-04 대상자 서명을 업로드합니다.
+   * Canvas에 작성한 대상자 서명을 등록합니다.
    *
-   * 서명 API는 서버에 저장된 visitResult가 MET인 경우에만
-   * 사용할 수 있으므로 먼저 Draft 저장이 필요합니다.
+   * 1. 현재 화면의 Draft를 먼저 저장해 MET 상태를 DB에 반영하고
+   * 2. Canvas를 PNG File로 변환한 뒤
+   * 3. 기존 RECORD-04 서명 업로드 API를 호출합니다.
    */
   const handleSignatureUpload = async () => {
     setMessageTarget("signature");
 
-    if (!signatureFile) {
-      setActionError("업로드할 서명 이미지를 선택해주세요.");
+    /*
+     * 실제 선을 그리지 않은 빈 Canvas는 등록하지 않습니다.
+     */
+    if (!hasSignatureDrawingRef.current) {
+      setActionError("서명을 먼저 작성해주세요.");
       return;
     }
 
-    if (form.visitResult !== "MET" || record?.visitResult !== "MET") {
-      setActionError("대상자를 만남으로 선택한 뒤 먼저 임시저장해주세요.");
+    if (form.visitResult !== "MET") {
+      setActionError("대상자를 만남으로 선택해주세요.");
       return;
     }
 
@@ -350,6 +861,40 @@ function ActivityRecord() {
     setSuccessMessage("");
 
     try {
+      /*
+       * RECORD-04는 DB에 저장된 visitResult가 MET이어야 하므로
+       * 현재 화면 내용을 먼저 RECORD-03으로 저장합니다.
+       */
+      const savedRecord = await userApi.saveActivityRecordDraft(
+        recordId,
+        createDraftRequest(),
+      );
+
+      setRecord(savedRecord);
+
+      /*
+       * Backend에서 공백 특이사항 등을 정리했을 수 있으므로
+       * 저장된 최신 Draft 값을 화면에도 반영합니다.
+       */
+      setForm((current) => ({
+        ...current,
+        visitResult: savedRecord?.visitResult ?? "",
+        completedAt: toInputDateTime(savedRecord?.completedAt),
+        specialNote: savedRecord?.specialNote ?? "",
+      }));
+
+      /*
+       * Canvas에 그려진 서명을 PNG File 객체로 변환합니다.
+       */
+      const signatureFile = await createSignatureFile();
+
+      if (!signatureFile) {
+        throw new Error("SIGNATURE_FILE_CREATION_FAILED");
+      }
+
+      /*
+       * 기존 RECORD-04 API를 그대로 사용합니다.
+       */
       const response = await userApi.uploadActivityRecordSignature(
         recordId,
         signatureFile,
@@ -358,14 +903,26 @@ function ActivityRecord() {
       setRecord((current) => ({
         ...current,
         signatureUploaded: response?.signatureUploaded ?? true,
+        signedAt: response?.signedAt ?? current?.signedAt,
       }));
 
-      setSignatureFile(null);
+      /*
+       * S3 업로드까지 성공한 경우에만
+       * 작성 중이던 Canvas를 초기화합니다.
+       */
+      clearSignatureCanvas();
 
-      setSuccessMessage("서명이 등록되었습니다.");
+      setSuccessMessage(
+        record?.signatureUploaded
+          ? "서명이 교체되었습니다."
+          : "서명이 등록되었습니다.",
+      );
     } catch (error) {
       setActionError(
-        error?.response?.data?.message ?? "서명 업로드에 실패했습니다.",
+        error?.response?.data?.message ??
+          (error?.message === "SIGNATURE_FILE_CREATION_FAILED"
+            ? "서명 이미지를 생성하지 못했습니다."
+            : "서명 등록에 실패했습니다."),
       );
     } finally {
       setUploadingSignature(false);
@@ -380,6 +937,17 @@ function ActivityRecord() {
    * 먼저 현재 화면 내용을 RECORD-03으로 저장한 뒤 제출합니다.
    */
   const handleSubmit = async () => {
+    /*
+     * Canvas에 새로 작성했지만 아직 등록하지 않은 서명이 있으면
+     * 기존 서명으로 잘못 제출되는 것을 막습니다.
+     */
+    if (hasSignatureDrawingRef.current) {
+      setMessageTarget("actions");
+      setActionError("작성한 서명을 먼저 등록해주세요.");
+      setSuccessMessage("");
+      return;
+    }
+
     const confirmed = window.confirm("활동기록을 최종 제출하시겠습니까?");
 
     if (!confirmed) {
@@ -644,7 +1212,7 @@ function ActivityRecord() {
             <div>
               <h2>대상자 서명</h2>
 
-              <p>활동 내용을 확인한 대상자의 서명 이미지를 등록합니다.</p>
+              <p>활동 내용을 확인한 대상자에게 직접 서명을 받아주세요.</p>
             </div>
           </div>
 
@@ -663,25 +1231,36 @@ function ActivityRecord() {
 
           {editable && (
             <div className="activity-record-signature-upload">
-              <input
-                type="file"
-                accept="image/jpeg,image/png"
-                onChange={(event) =>
-                  setSignatureFile(event.target.files?.[0] ?? null)
-                }
+              <canvas
+                ref={signatureCanvasRef}
+                className="activity-record-signature-canvas"
+                onPointerDown={handleSignaturePointerDown}
+                onPointerMove={handleSignaturePointerMove}
+                onPointerUp={handleSignaturePointerEnd}
+                onPointerCancel={handleSignaturePointerEnd}
               />
 
-              <button
-                type="button"
-                disabled={uploadingSignature || !signatureFile}
-                onClick={handleSignatureUpload}
-              >
-                {uploadingSignature
-                  ? "업로드 중..."
-                  : record.signatureUploaded
-                    ? "서명 교체"
-                    : "서명 등록"}
-              </button>
+              <div className="activity-record-signature-buttons">
+                <button
+                  type="button"
+                  disabled={uploadingSignature || !hasSignatureDrawing}
+                  onClick={clearSignatureCanvas}
+                >
+                  다시 쓰기
+                </button>
+
+                <button
+                  type="button"
+                  disabled={uploadingSignature || !hasSignatureDrawing}
+                  onClick={handleSignatureUpload}
+                >
+                  {uploadingSignature
+                    ? "등록 중..."
+                    : record.signatureUploaded
+                      ? "서명 교체"
+                      : "서명 등록"}
+                </button>
+              </div>
 
               {/* 서명 등록/교체 결과는 서명 영역 바로 아래에 표시합니다. */}
               {messageTarget === "signature" && actionError && (
@@ -697,8 +1276,8 @@ function ActivityRecord() {
               )}
 
               <small>
-                JPEG 또는 PNG 이미지를 사용할 수 있습니다. 방문 결과를 먼저
-                임시저장한 뒤 등록해주세요.
+                서명란에 손가락, 마우스 또는 터치펜으로 직접 서명한 뒤 서명 등록
+                버튼을 눌러주세요.
               </small>
             </div>
           )}

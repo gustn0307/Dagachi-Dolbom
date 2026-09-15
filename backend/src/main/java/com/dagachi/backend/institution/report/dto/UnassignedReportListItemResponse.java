@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 public record UnassignedReportListItemResponse(
         Long reportId,
         String contentPreview,
+        String aiSummary,
         String region,
         ReportStatus status,
         BigDecimal distanceKm,
@@ -35,6 +36,7 @@ public record UnassignedReportListItemResponse(
         return new UnassignedReportListItemResponse(
                 report.getId(),
                 createContentPreview(report.getContent()),
+                null, // 정렬/페이징 이후 Service에서 채워 넣는다.
                 AddressUtils.extractRegion(report.getAddress()),
                 report.getStatus(),
                 distanceKm,
@@ -48,7 +50,23 @@ public record UnassignedReportListItemResponse(
      *
      * 상세 원문과 정확한 위치는 기관 배정 이후
      * REPORT-04의 기관 범위 검증을 거쳐 제공하는 방향입니다.
+     * 거리 계산·정렬·페이징이 모두 끝난 뒤,
+     * 최종 페이지에 포함된 항목에만 AI 요약을 채워 넣기 위한 wither.
      */
+    public UnassignedReportListItemResponse withAiSummary(
+            String aiSummary
+    ) {
+        return new UnassignedReportListItemResponse(
+                reportId,
+                contentPreview,
+                aiSummary,
+                region,
+                status,
+                distanceKm,
+                createdAt
+        );
+    }
+
     private static String createContentPreview(
             String content
     ) {
