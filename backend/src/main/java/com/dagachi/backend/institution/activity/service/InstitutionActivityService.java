@@ -14,6 +14,8 @@ import com.dagachi.backend.domain.enums.ActivityReviewStatus;
 import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.CareRecipientStatus;
+import com.dagachi.backend.domain.enums.ConsentStatus;
+import com.dagachi.backend.domain.enums.VisitResult;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
 import com.dagachi.backend.domain.repository.CareRecipientRepository;
@@ -260,6 +262,20 @@ public class InstitutionActivityService {
         if (
                 recipient.getStatus()
                         != CareRecipientStatus.ACTIVE
+        ) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+
+        /*
+         * 서비스 참여에 동의하지 않았거나
+         * 기존 동의를 철회한 대상자에게는
+         * 새로운 활동을 등록할 수 없다.
+         */
+        if (
+                recipient.getConsentStatus()
+                        != ConsentStatus.AGREED
         ) {
             throw new CustomException(
                     ErrorCode.INVALID_INPUT_VALUE
@@ -922,6 +938,21 @@ public class InstitutionActivityService {
         activity.changeStatus(
                 ActivityStatus.COMPLETED
         );
+
+        /*
+         * 봉사자가 대상자를 실제로 만난 기록이
+         * 기관 승인을 받은 경우에만 마지막 안부 확인 시간을 갱신한다.
+         * 기관의 승인 시각이 아니라 실제 활동 완료 시각을 사용한다.
+         */
+        if (
+                record.getVisitResult()
+                        == VisitResult.MET
+        ) {
+            activity.getRecipient()
+                    .updateLastCheckedAt(
+                            record.getCompletedAt()
+                    );
+        }
 
         List<ChecklistResponse> responses =
                 checklistResponseRepository
