@@ -34,6 +34,38 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
             @Param("status") ApplicationStatus status
     );
 
+    /**
+     * ACT-01 목록 배지 표시용. 취소된 신청은 "신청 안 한 것"과 동일하게 취급하므로 제외한다.
+     */
+    @Query("""
+        SELECT aa
+        FROM ActivityApplication aa
+        WHERE aa.user.id = :userId
+          AND aa.activity.id IN :activityIds
+          AND aa.status <> com.dagachi.backend.domain.enums.ApplicationStatus.CANCELED
+        """)
+    List<ActivityApplication> findActiveApplicationsByUserAndActivityIds(
+            @Param("userId") Long userId,
+            @Param("activityIds") List<Long> activityIds
+    );
+
+    /**
+     * ACT-01 목록의 "신청자수" 표시용.
+     * 활동별로 현재 걸려있는 신청(PENDING+APPROVED)만 센다. CANCELED/REJECTED는 제외.
+     */
+    @Query("""
+        SELECT aa
+        FROM ActivityApplication aa
+        WHERE aa.activity.id IN :activityIds
+          AND aa.status IN (
+                com.dagachi.backend.domain.enums.ApplicationStatus.PENDING,
+                com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+              )
+        """)
+    List<ActivityApplication> findActiveApplicationsByActivityIds(
+            @Param("activityIds") List<Long> activityIds
+    );
+
     // 특정 활동에 대해 사용자가 특정 신청 상태인지 확인한다.
     boolean existsByActivityIdAndUserIdAndStatus(
             Long activityId,

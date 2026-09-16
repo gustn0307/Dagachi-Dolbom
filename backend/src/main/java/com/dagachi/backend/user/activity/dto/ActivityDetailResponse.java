@@ -14,10 +14,12 @@ public record ActivityDetailResponse(
         LocalDateTime scheduledAt,
         Integer requiredPeople,
         Long approvedCount,
+        Long applicantCount,
         String status,
         String genderCondition,
         BigDecimal distanceKm,
-        String myApplicationStatus
+        String myApplicationStatus,
+        LocalDateTime lastCheckedAt
 ) {
 
     public static ActivityDetailResponse of(
@@ -32,10 +34,12 @@ public record ActivityDetailResponse(
                 base.scheduledAt(),
                 base.requiredPeople(),
                 base.approvedCount(),
+                base.applicantCount(),
                 base.status(),
                 base.genderCondition(),
                 base.distanceKm(),
-                myApplicationStatus
+                myApplicationStatus,
+                base.lastCheckedAt()
         );
     }
 }

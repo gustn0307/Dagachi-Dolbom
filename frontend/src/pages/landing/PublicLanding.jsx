@@ -8,7 +8,7 @@ function PublicLanding() {
         <Link className="public-brand" to="/">
           <span>♥</span>
           <div>
-            <strong>다함께 돌봄</strong>
+            <strong>다같이 돌봄</strong>
             <small>함께 만드는 따뜻한 우리 동네</small>
           </div>
         </Link>
@@ -101,7 +101,7 @@ function PublicLanding() {
         </div>
       </section>
       <footer className="public-footer">
-        © 2026 다함께 돌봄 · 함께 만드는 따뜻한 우리 동네
+        © 2026 다같이 돌봄 · 함께 만드는 따뜻한 우리 동네
       </footer>
     </main>
   );
