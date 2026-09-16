@@ -12,6 +12,7 @@ import {
 
 import { institutionApi } from "../../api/institutionApi";
 import { DataState } from "../../hooks/useInstitutionData";
+import { usePolling } from "../../hooks/usePolling";
 
 const PERIODS = [
   { key: "DAILY", label: "일" },
@@ -61,6 +62,25 @@ function Dashboard() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+    /*
+   * 현재 선택한 기간의 대시보드 현황을 조용히 갱신합니다.
+   * AI 돌봄 우선순위 분석은 자동으로 다시 실행하지 않습니다.
+   */
+  const pollDashboard = useCallback(async () => {
+    try {
+      const latestData = await institutionApi.getDashboard(period);
+      setData(latestData);
+    } catch {
+      // 폴링 실패 시 기존 화면 데이터를 유지합니다.
+    }
+  }, [period]);
+
+  usePolling(pollDashboard, {
+    interval: 10000,
+    enabled: Boolean(data) && !loading && !error,
+    immediate: false,
+    refreshOnFocus: true,
+  });
 
   const analyzeCarePriority = async () => {
     try {
