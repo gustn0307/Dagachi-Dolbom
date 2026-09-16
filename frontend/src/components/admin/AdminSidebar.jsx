@@ -6,7 +6,7 @@ function AdminSidebar() {
       <div className="admin-logo">
         <span>◆</span>
         <div>
-          <h2>이웃을 잇다</h2>
+          <h2>다같이 돌봄</h2>
           <p>SERVICE ADMIN</p>
         </div>
       </div>

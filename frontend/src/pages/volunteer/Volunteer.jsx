@@ -53,6 +53,15 @@ function formatSchedule(isoString) {
   });
 }
 
+// 안부 오래된순 정렬일 때, 대상자의 마지막 안부 확인이 얼마나 오래됐는지 보여준다.
+function formatLastChecked(isoString) {
+  if (!isoString) return "안부 확인 이력 없음";
+  const date = new Date(isoString);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (diffDays <= 0) return "오늘 확인";
+  return `마지막 안부 확인: ${diffDays}일 전`;
+}
+
 // PENDING은 언제나 취소 가능. APPROVED는 활동이 아직 시작 전(RECRUITING/READY)일 때만 취소 가능.
 function isCancelable(app) {
   if (app.status === "PENDING") return true;
@@ -113,7 +122,7 @@ function Volunteer() {
   const [appliedRegion, setAppliedRegion] = useState("");
   const [selectedAgeGroups, setSelectedAgeGroups] = useState([]);
   const [selectedGender, setSelectedGender] = useState(""); // "" | "MALE" | "FEMALE"
-  const [sortMode, setSortMode] = useState("latest"); // "latest" | "distance"
+  const [sortMode, setSortMode] = useState("latest"); // "latest" | "stale" | "distance"
   const [coords, setCoords] = useState(null); // { latitude, longitude }
   const [geoLoading, setGeoLoading] = useState(false);
 
@@ -171,6 +180,7 @@ function Volunteer() {
       gender: selectedGender || undefined,
       latitude: coords?.latitude,
       longitude: coords?.longitude,
+      sortBy: sortMode === "stale" ? "STALE" : undefined,
     })
       .then((data) => {
         if (ignore) return;
@@ -199,6 +209,7 @@ function Volunteer() {
     selectedAgeGroups,
     selectedGender,
     coords,
+    sortMode,
   ]);
 
   // 내 신청 현황 조회 (APP-03)
@@ -298,6 +309,8 @@ function Volunteer() {
 
   const selectedActivity =
     activities.find((a) => a.activityId === selectedActivityId) ?? null;
+
+  const alreadyApplied = Boolean(selectedActivity?.myApplicationStatus);
 
   const handleSelect = (activityId) => {
     setApplyError(null);
@@ -406,6 +419,7 @@ function Volunteer() {
         gender: selectedGender || undefined,
         latitude: coords?.latitude,
         longitude: coords?.longitude,
+        sortBy: sortMode === "stale" ? "STALE" : undefined,
       });
       setActivities(data.content);
       setTotalPages(data.totalPages);
@@ -561,9 +575,9 @@ function Volunteer() {
   };
 
   const handleChangeSort = (mode) => {
-    if (mode === "latest") {
+    if (mode === "latest" || mode === "stale") {
       resetPageAndSelection();
-      setSortMode("latest");
+      setSortMode(mode);
       setCoords(null);
       return;
     }
@@ -608,7 +622,8 @@ function Volunteer() {
     Boolean(appliedRegion) ||
     selectedAgeGroups.length > 0 ||
     Boolean(selectedGender) ||
-    sortMode === "distance";
+    sortMode === "distance" ||
+    sortMode === "stale";
 
   // ---- 페이지네이션 버튼 스타일 헬퍼 ----
   const pageBtnStyle = (
@@ -1044,7 +1059,7 @@ function Volunteer() {
         <div
           role="group"
           aria-label="정렬 방식 선택"
-          style={{ display: "flex", gap: 8 }}
+          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
         >
           <button
             type="button"
@@ -1061,7 +1076,24 @@ function Volunteer() {
               cursor: "pointer",
             }}
           >
-            최신순
+            활동 날짜 순
+          </button>
+          <button
+            type="button"
+            aria-pressed={sortMode === "stale"}
+            onClick={() => handleChangeSort("stale")}
+            style={{
+              minHeight: 40,
+              padding: "0 16px",
+              borderRadius: 10,
+              border: `1px solid ${sortMode === "stale" ? "#f4771c" : "#ece5dd"}`,
+              background: sortMode === "stale" ? "#f4771c" : "#fff",
+              color: sortMode === "stale" ? "#fff" : "#685d52",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            안부 오래된순
           </button>
           <button
             type="button"
@@ -1253,7 +1285,7 @@ function Volunteer() {
                         handleSelect(activity.activityId);
                       }
                     }}
-                    style={{ cursor: "pointer" }}
+                    style={{ cursor: "pointer", position: "relative" }}
                   >
                     <span className="visit-num">
                       {String(displayIndex).padStart(2, "0")}
@@ -1271,11 +1303,37 @@ function Volunteer() {
                         {activity.region} · {activity.ageGroup} ·{" "}
                         {activity.gender === "FEMALE" ? "여성" : "남성"} 어르신
                         {" · "}모집 {activity.approvedCount}/
-                        {activity.requiredPeople}명
+                        {activity.requiredPeople}명{" · "}신청자{" "}
+                        {activity.applicantCount}명
                         {activity.distanceKm != null &&
                           ` · 약 ${activity.distanceKm}km`}
                       </p>
+                      {sortMode === "stale" && (
+                        <p
+                          style={{
+                            margin: "4px 0 0",
+                            fontSize: 12,
+                            color: "#c0392b",
+                          }}
+                        >
+                          {formatLastChecked(activity.lastCheckedAt)}
+                        </p>
+                      )}
                     </div>
+
+                    {activity.myApplicationStatus && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: 14,
+                          right: 16,
+                          fontSize: 13,
+                          color: "#897e75",
+                        }}
+                      >
+                        신청한 활동입니다
+                      </span>
+                    )}
 
                     <span className="visit-select-indicator" />
                   </div>
@@ -1336,7 +1394,8 @@ function Volunteer() {
                   {autoCandidate.region} · {autoCandidate.ageGroup} ·{" "}
                   {autoCandidate.gender === "FEMALE" ? "여성" : "남성"} 어르신
                   {" · "}모집 {autoCandidate.approvedCount}/
-                  {autoCandidate.requiredPeople}명
+                  {autoCandidate.requiredPeople}명{" · "}신청자{" "}
+                  {autoCandidate.applicantCount}명
                   {autoCandidate.distanceKm != null &&
                     ` · 약 ${autoCandidate.distanceKm}km`}
                 </p>
@@ -1757,10 +1816,14 @@ function Volunteer() {
           <button
             className="submit"
             type="button"
-            disabled={!selectedActivityId || isApplying}
+            disabled={!selectedActivityId || isApplying || alreadyApplied}
             onClick={() => setShowConfirmModal(true)}
           >
-            {isApplying ? "신청 중..." : "이 활동 신청하기"}
+            {alreadyApplied
+              ? "이미 신청한 활동입니다"
+              : isApplying
+                ? "신청 중..."
+                : "이 활동 신청하기"}
           </button>
         </section>
       )}

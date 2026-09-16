@@ -56,7 +56,8 @@ public class ActivityService {
 
     public PageResponse<ActivityResponse> getActivities(
             ActivitySearchCondition condition,
-            Pageable pageable
+            Pageable pageable,
+            Long userId
     ) {
         boolean hasAgeGroups = condition.hasAgeGroups();
         List<Integer> ageBuckets = resolveAgeBuckets(condition.ageGroups());
@@ -64,10 +65,19 @@ public class ActivityService {
         boolean hasGender = condition.hasGender();
         UserGender gender = resolveGender(condition.gender());
 
+        // 좌표 기반 거리순이 안부 오래된순보다 우선한다.
         if (condition.hasCoordinates()) {
             return PageResponse.from(
                     getActivitiesSortedByDistance(
-                            condition, pageable, hasAgeGroups, ageBuckets, currentYear, hasGender, gender
+                            condition, pageable, hasAgeGroups, ageBuckets, currentYear, hasGender, gender, userId
+                    )
+            );
+        }
+
+        if (condition.isStaleSort()) {
+            return PageResponse.from(
+                    getActivitiesSortedByStaleness(
+                            condition, pageable, hasAgeGroups, ageBuckets, currentYear, hasGender, gender, userId
                     )
             );
         }
@@ -81,13 +91,17 @@ public class ActivityService {
         );
 
         Map<Long, Long> approvedCountMap = getApprovedCountMap(activityPage.getContent());
+        Map<Long, Long> applicantCountMap = getApplicantCountMap(activityPage.getContent());
+        Map<Long, String> myStatusMap = getMyApplicationStatusMap(userId, activityPage.getContent());
 
         Page<ActivityResponse> responsePage = activityPage.map(activity ->
                 ActivityResponse.of(
                         activity,
                         approvedCountMap.getOrDefault(activity.getId(), 0L),
+                        applicantCountMap.getOrDefault(activity.getId(), 0L),
                         null,
-                        null
+                        null,
+                        myStatusMap.get(activity.getId())
                 )
         );
 
@@ -101,24 +115,25 @@ public class ActivityService {
             List<Integer> ageBuckets,
             int currentYear,
             boolean hasGender,
-            UserGender gender
+            UserGender gender,
+            Long userId
     ) {
-        String region = normalizeRegion(condition.region());
-        LocalDateTime dateFrom = resolveDateFrom(condition.dateFrom());
-        LocalDateTime dateTo = resolveDateTo(condition.dateTo());
-
-        List<CareActivity> activities = careActivityRepository.findRecruitingActivitiesForDistanceSort(
-                region, dateFrom, dateTo, hasAgeGroups, ageBuckets, currentYear, hasGender, gender
+        List<CareActivity> activities = fetchUnpagedActivities(
+                condition, hasAgeGroups, ageBuckets, currentYear, hasGender, gender
         );
 
         Map<Long, Long> approvedCountMap = getApprovedCountMap(activities);
+        Map<Long, Long> applicantCountMap = getApplicantCountMap(activities);
+        Map<Long, String> myStatusMap = getMyApplicationStatusMap(userId, activities);
 
         List<ActivityResponse> sorted = activities.stream()
                 .map(activity -> ActivityResponse.of(
                         activity,
                         approvedCountMap.getOrDefault(activity.getId(), 0L),
+                        applicantCountMap.getOrDefault(activity.getId(), 0L),
                         condition.latitude(),
-                        condition.longitude()
+                        condition.longitude(),
+                        myStatusMap.get(activity.getId())
                 ))
                 .sorted(
                         Comparator.comparing(
@@ -129,6 +144,75 @@ public class ActivityService {
                 )
                 .collect(Collectors.toList());
 
+        return toPage(sorted, pageable);
+    }
+
+    /**
+     * 대상자의 최근 안부 확인일(lastCheckedAt)이 오래된 순으로 정렬한다.
+     * 한 번도 안부 확인이 안 된 대상자(null)는 가장 오래된 것으로 간주해 최우선 노출한다.
+     * (getAutoMatchCandidate()의 staleRank 로직과 동일한 규칙)
+     */
+    private Page<ActivityResponse> getActivitiesSortedByStaleness(
+            ActivitySearchCondition condition,
+            Pageable pageable,
+            boolean hasAgeGroups,
+            List<Integer> ageBuckets,
+            int currentYear,
+            boolean hasGender,
+            UserGender gender,
+            Long userId
+    ) {
+        List<CareActivity> activities = fetchUnpagedActivities(
+                condition, hasAgeGroups, ageBuckets, currentYear, hasGender, gender
+        );
+
+        Map<Long, Long> approvedCountMap = getApprovedCountMap(activities);
+        Map<Long, Long> applicantCountMap = getApplicantCountMap(activities);
+        Map<Long, String> myStatusMap = getMyApplicationStatusMap(userId, activities);
+
+        List<ActivityResponse> sorted = activities.stream()
+                .sorted(Comparator.comparing((CareActivity activity) -> {
+                    LocalDateTime lastCheckedAt = activity.getRecipient().getLastCheckedAt();
+                    return lastCheckedAt != null ? lastCheckedAt : LocalDateTime.MIN;
+                }).thenComparing(CareActivity::getScheduledAt))
+                .map(activity -> ActivityResponse.of(
+                        activity,
+                        approvedCountMap.getOrDefault(activity.getId(), 0L),
+                        applicantCountMap.getOrDefault(activity.getId(), 0L),
+                        null,
+                        null,
+                        myStatusMap.get(activity.getId())
+                ))
+                .collect(Collectors.toList());
+
+        return toPage(sorted, pageable);
+    }
+
+    /**
+     * 거리순/안부 오래된순처럼 자바 메모리 정렬이 필요한 경우 공통으로 쓰는,
+     * 페이징 없이 필터 조건에 맞는 전체 활동 목록 조회.
+     */
+    private List<CareActivity> fetchUnpagedActivities(
+            ActivitySearchCondition condition,
+            boolean hasAgeGroups,
+            List<Integer> ageBuckets,
+            int currentYear,
+            boolean hasGender,
+            UserGender gender
+    ) {
+        String region = normalizeRegion(condition.region());
+        LocalDateTime dateFrom = resolveDateFrom(condition.dateFrom());
+        LocalDateTime dateTo = resolveDateTo(condition.dateTo());
+
+        return careActivityRepository.findRecruitingActivitiesForDistanceSort(
+                region, dateFrom, dateTo, hasAgeGroups, ageBuckets, currentYear, hasGender, gender
+        );
+    }
+
+    /**
+     * 자바에서 이미 정렬을 마친 전체 리스트를 Pageable 기준으로 잘라 Page로 감싼다.
+     */
+    private Page<ActivityResponse> toPage(List<ActivityResponse> sorted, Pageable pageable) {
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), sorted.size());
 
@@ -188,6 +272,50 @@ public class ActivityService {
         }
     }
 
+    /**
+     * 목록에 나온 활동들에 대한 로그인 유저 본인의 신청 상태를 조회한다.
+     * 취소(CANCELED)된 신청은 "신청 안 한 것"과 동일하게 취급해 제외한다.
+     * 비로그인(userId == null)이거나 활동이 없으면 빈 Map을 반환한다.
+     */
+    private Map<Long, String> getMyApplicationStatusMap(Long userId, List<CareActivity> activities) {
+        if (userId == null || activities.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> activityIds = activities.stream()
+                .map(CareActivity::getId)
+                .collect(Collectors.toList());
+
+        return activityApplicationRepository
+                .findActiveApplicationsByUserAndActivityIds(userId, activityIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        application -> application.getActivity().getId(),
+                        application -> application.getStatus().name()
+                ));
+    }
+
+    /**
+     * 활동별 "신청자수"(대기중 + 승인됨)를 집계한다. 취소/거절은 제외한다.
+     */
+    private Map<Long, Long> getApplicantCountMap(List<CareActivity> activities) {
+        if (activities.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> activityIds = activities.stream()
+                .map(CareActivity::getId)
+                .collect(Collectors.toList());
+
+        return activityApplicationRepository
+                .findActiveApplicationsByActivityIds(activityIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        application -> application.getActivity().getId(),
+                        Collectors.counting()
+                ));
+    }
+
     // ---- ACT-02, ACT-03은 기존 그대로 ----
 
     public ActivityDetailResponse getActivityDetail(Long activityId, Long userId) {
@@ -197,12 +325,18 @@ public class ActivityService {
                 .countApprovedMap(List.of(activityId))
                 .getOrDefault(activityId, 0L);
 
-        ActivityResponse base = ActivityResponse.of(activity, approvedCount, null, null);
+        long applicantCount = activityApplicationRepository
+                .findActiveApplicationsByActivityIds(List.of(activityId))
+                .size();
 
         String myApplicationStatus = activityApplicationRepository
                 .findByActivity_IdAndUser_Id(activityId, userId)
                 .map(application -> application.getStatus().name())
                 .orElse(null);
+
+        ActivityResponse base = ActivityResponse.of(
+                activity, approvedCount, applicantCount, null, null, myApplicationStatus
+        );
 
         return ActivityDetailResponse.of(base, myApplicationStatus);
     }

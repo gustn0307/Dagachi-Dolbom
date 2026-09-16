@@ -19,16 +19,21 @@ public record ActivityResponse(
         LocalDateTime scheduledAt,
         Integer requiredPeople,
         Long approvedCount,
+        Long applicantCount,
         String status,
         String genderCondition,
-        BigDecimal distanceKm
+        BigDecimal distanceKm,
+        String myApplicationStatus,
+        LocalDateTime lastCheckedAt
 ) {
 
     public static ActivityResponse of(
             CareActivity activity,
             long approvedCount,
+            long applicantCount,
             BigDecimal userLatitude,
-            BigDecimal userLongitude
+            BigDecimal userLongitude,
+            String myApplicationStatus
     ) {
         var recipient = activity.getRecipient();
 
@@ -47,9 +52,12 @@ public record ActivityResponse(
                 activity.getScheduledAt(),
                 activity.getRequiredPeople(),
                 approvedCount,
+                applicantCount,
                 activity.getStatus().name(),
                 activity.getGenderCondition().name(),
-                distanceKm
+                distanceKm,
+                myApplicationStatus,
+                recipient.getLastCheckedAt()
         );
     }
 }
