@@ -1,22 +1,20 @@
 package com.dagachi.backend.common.ai.client;
 
-<<<<<<< HEAD
-import com.dagachi.backend.common.ai.dto.AiReportSummaryRequest;
-import com.dagachi.backend.common.ai.dto.AiReportSummaryResponse;
-import com.dagachi.backend.common.ai.dto.AiReportEmbeddingRequest;
-import com.dagachi.backend.common.ai.dto.AiReportEmbeddingResponse;
 import com.dagachi.backend.common.ai.dto.AiCarePriorityRequest;
 import com.dagachi.backend.common.ai.dto.AiCarePriorityResponse;
-=======
-import com.dagachi.backend.common.ai.dto.*;
->>>>>>> dev
+import com.dagachi.backend.common.ai.dto.AiReportEmbeddingRequest;
+import com.dagachi.backend.common.ai.dto.AiReportEmbeddingResponse;
+import com.dagachi.backend.common.ai.dto.AiReportSummaryRequest;
+import com.dagachi.backend.common.ai.dto.AiReportSummaryResponse;
+import com.dagachi.backend.common.ai.dto.AiReportTitleRequest;
+import com.dagachi.backend.common.ai.dto.AiReportTitleResponse;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 

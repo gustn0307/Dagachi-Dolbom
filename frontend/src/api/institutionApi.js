@@ -51,7 +51,6 @@ export const getCareTargets = (params = {}) => getCareRecipients(params);
  * 기관 대시보드 API
  * ===================================================== */
 
-<<<<<<< HEAD
 export const getDashboard = (period = "MONTHLY") =>
   unwrapData(
     api.get("/api/institution/dashboard", {
@@ -61,12 +60,10 @@ export const getDashboard = (period = "MONTHLY") =>
 
 export const getCarePriorities = () =>
   unwrapData(
-    api.get("/api/institution/dashboard/care-priorities"),
+    api.post(
+      "/api/institution/dashboard/care-priorities/analyze",
+    ),
   );
-=======
-export const getDashboard = () =>
-  unwrapData(api.get("/api/institution/dashboard"));
->>>>>>> dev
 
 /* =====================================================
  * 기관 제보 API

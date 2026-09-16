@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
 @RequestMapping("/api/institution/dashboard")
@@ -39,13 +40,15 @@ public class InstitutionDashboardController {
         ));
     }
 
-    @GetMapping("/care-priorities")
-    public ResponseEntity<ApiResponse<CarePriorityResponse>> getCarePriorities(
+    @PostMapping("/care-priorities/analyze")
+    public ResponseEntity<ApiResponse<CarePriorityResponse>> analyzeCarePriorities(
             @AuthenticationPrincipal Long userId
     ) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "AI 돌봄 우선순위를 분석했습니다.",
-                carePriorityService.analyze(userId)
-        ));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "AI 돌봄 우선순위를 분석했습니다.",
+                        carePriorityService.analyze(userId)
+                )
+        );
     }
 }

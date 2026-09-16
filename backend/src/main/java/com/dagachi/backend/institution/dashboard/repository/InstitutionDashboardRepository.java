@@ -141,72 +141,184 @@ public class InstitutionDashboardRepository {
     }
 
     @SuppressWarnings("unchecked")
-    public List<CarePriorityCandidateRow> findCarePriorityCandidates(Long institutionId) {
+    public List<CarePriorityCandidateRow> findCarePriorityCandidates(
+            Long institutionId
+    ) {
         List<Object[]> rows = entityManager.createNativeQuery("""
                         SELECT cr.id,
                                cr.name,
-                               CASE WHEN cr.last_checked_at IS NULL THEN NULL
-                                    ELSE GREATEST(0, CURRENT_DATE - cr.last_checked_at::date) END,
-                               (SELECT COUNT(*)
-                                  FROM care_activities ca
-                                 WHERE ca.recipient_id = cr.id
-                                   AND ca.status = 'COMPLETED'
-                                   AND ca.updated_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'),
-                               (SELECT COUNT(*)
-                                  FROM checklist_responses response
-                                  JOIN checklist_items item ON item.id = response.checklist_item_id
-                                  JOIN activity_records record ON record.id = response.activity_record_id
-                                  JOIN care_activities ca ON ca.id = record.activity_id
-                                 WHERE ca.recipient_id = cr.id
-                                   AND record.review_status = 'APPROVED'
-                                   AND item.code = 'MEAL_STATUS'
-                                   AND UPPER(COALESCE(response.selected_value, '')) IN ('NO', 'BAD', 'POOR')),
-                               (SELECT COUNT(*)
-                                  FROM checklist_responses response
-                                  JOIN checklist_items item ON item.id = response.checklist_item_id
-                                  JOIN activity_records record ON record.id = response.activity_record_id
-                                  JOIN care_activities ca ON ca.id = record.activity_id
-                                 WHERE ca.recipient_id = cr.id
-                                   AND record.review_status = 'APPROVED'
-                                   AND item.code = 'HEALTH_CONDITION'
-                                   AND UPPER(COALESCE(response.selected_value, '')) IN ('NO', 'BAD', 'POOR')),
-                               (SELECT COUNT(*)
-                                  FROM checklist_responses response
-                                  JOIN checklist_items item ON item.id = response.checklist_item_id
-                                  JOIN activity_records record ON record.id = response.activity_record_id
-                                  JOIN care_activities ca ON ca.id = record.activity_id
-                                 WHERE ca.recipient_id = cr.id
-                                   AND record.review_status = 'APPROVED'
-                                   AND item.code = 'SUPPORT_NEEDED'
-                                   AND UPPER(COALESCE(response.selected_value, '')) = 'YES'),
-                               EXISTS(SELECT 1
-                                        FROM care_activities ca
-                                       WHERE ca.recipient_id = cr.id
-                                         AND ca.scheduled_at >= CURRENT_TIMESTAMP
-                                         AND ca.status IN ('RECRUITING', 'READY', 'IN_PROGRESS'))
+                               CASE
+                                   WHEN cr.last_checked_at IS NULL THEN NULL
+                                   ELSE GREATEST(
+                                       0,
+                                       CURRENT_DATE - cr.last_checked_at::date
+                                   )
+                               END,
+                        
+                               /* 최근 30일 동안 승인된 완료 활동 수 */
+                               (
+                                   SELECT COUNT(DISTINCT ca.id)
+                                   FROM care_activities ca
+                                   JOIN activity_records record
+                                     ON record.activity_id = ca.id
+                                   WHERE ca.recipient_id = cr.id
+                                     AND ca.status = 'COMPLETED'
+                                     AND record.review_status = 'APPROVED'
+                                     AND record.reviewed_at
+                                         >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+                               ),
+                        
+                               /* 최근 30일 식사 우려 기록 수 */
+                               (
+                                   SELECT COUNT(*)
+                                   FROM checklist_responses response
+                                   JOIN checklist_items item
+                                     ON item.id = response.checklist_item_id
+                                   JOIN activity_records record
+                                     ON record.id = response.activity_record_id
+                                   JOIN care_activities ca
+                                     ON ca.id = record.activity_id
+                                   WHERE ca.recipient_id = cr.id
+                                     AND record.review_status = 'APPROVED'
+                                     AND record.reviewed_at
+                                         >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+                                     AND item.code = 'MEAL_STATUS'
+                                     AND UPPER(
+                                         COALESCE(response.selected_value, '')
+                                     ) IN ('NO', 'BAD', 'POOR')
+                               ),
+                        
+                               /* 최근 30일 건강 우려 기록 수 */
+                               (
+                                   SELECT COUNT(*)
+                                   FROM checklist_responses response
+                                   JOIN checklist_items item
+                                     ON item.id = response.checklist_item_id
+                                   JOIN activity_records record
+                                     ON record.id = response.activity_record_id
+                                   JOIN care_activities ca
+                                     ON ca.id = record.activity_id
+                                   WHERE ca.recipient_id = cr.id
+                                     AND record.review_status = 'APPROVED'
+                                     AND record.reviewed_at
+                                         >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+                                     AND item.code = 'HEALTH_CONDITION'
+                                     AND UPPER(
+                                         COALESCE(response.selected_value, '')
+                                     ) IN ('NO', 'BAD', 'POOR')
+                               ),
+                        
+                               /* 최근 30일 추가 지원 요청 수 */
+                               (
+                                   SELECT COUNT(*)
+                                   FROM checklist_responses response
+                                   JOIN checklist_items item
+                                     ON item.id = response.checklist_item_id
+                                   JOIN activity_records record
+                                     ON record.id = response.activity_record_id
+                                   JOIN care_activities ca
+                                     ON ca.id = record.activity_id
+                                   WHERE ca.recipient_id = cr.id
+                                     AND record.review_status = 'APPROVED'
+                                     AND record.reviewed_at
+                                         >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+                                     AND item.code = 'SUPPORT_NEEDED'
+                                     AND UPPER(
+                                         COALESCE(response.selected_value, '')
+                                     ) = 'YES'
+                               ),
+                        
+                               /* 예정되거나 진행 중인 활동 존재 여부 */
+                               EXISTS (
+                                   SELECT 1
+                                   FROM care_activities ca
+                                   WHERE ca.recipient_id = cr.id
+                                     AND ca.scheduled_at >= CURRENT_TIMESTAMP
+                                     AND ca.status IN (
+                                         'RECRUITING',
+                                         'READY',
+                                         'IN_PROGRESS'
+                                     )
+                               )
+                        
                         FROM care_recipients cr
                         WHERE cr.institution_id = :institutionId
                           AND cr.is_deleted = false
                           AND cr.status = 'ACTIVE'
                           AND cr.consent_status = 'AGREED'
-                          AND (cr.last_checked_at IS NULL
-                               OR cr.last_checked_at < CURRENT_TIMESTAMP - INTERVAL '7 days')
-                        ORDER BY cr.last_checked_at ASC NULLS FIRST
-                        LIMIT 10
+                          AND (
+                                    /* 한 번도 확인하지 않았거나 7일 이상 확인하지 않은 대상자 */
+                                    cr.last_checked_at IS NULL
+                        
+                                    OR cr.last_checked_at
+                                       < CURRENT_TIMESTAMP - INTERVAL '7 days'
+                        
+                                    /* 최근 30일 체크리스트에서 우려 사항이 발견된 대상자 */
+                                    OR EXISTS (
+                                        SELECT 1
+                                        FROM checklist_responses response
+                                        JOIN checklist_items item
+                                          ON item.id = response.checklist_item_id
+                                        JOIN activity_records record
+                                          ON record.id = response.activity_record_id
+                                        JOIN care_activities activity
+                                          ON activity.id = record.activity_id
+                                        WHERE activity.recipient_id = cr.id
+                                          AND record.review_status = 'APPROVED'
+                                          AND record.reviewed_at
+                                              >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+                                          AND (
+                                              (
+                                                  item.code IN (
+                                                      'MEAL_STATUS',
+                                                      'HEALTH_CONDITION'
+                                                  )
+                                                  AND UPPER(
+                                                      COALESCE(response.selected_value, '')
+                                                  ) IN ('NO', 'BAD', 'POOR')
+                                              )
+                                              OR (
+                                                  item.code = 'SUPPORT_NEEDED'
+                                                  AND UPPER(
+                                                      COALESCE(response.selected_value, '')
+                                                  ) = 'YES'
+                                              )
+                                          )
+                                    )
+                                )
+                                                /*
+                                     * 체크리스트 우려 기록이 있는 대상자를 먼저 배치하고,
+                                     * 우려 정도가 같으면 오래 확인하지 않은 대상자를 우선합니다.
+                                     *
+                                     * SELECT 컬럼 순서:
+                                     * 5 = 식사 우
+                                                    * 6 = 건강 우
+                                                    * 7 = 추가 지
+                                                       */
+                                    ORDER BY 5 DESC,
+                                                                            6 DESC,
+                                                                            7 DESC,
+                                                                            cr.last_checked_at ASC NULLS FIRST
+                                                                   LIMIT 10
+                        
                         """)
                 .setParameter("institutionId", institutionId)
                 .getResultList();
 
-        return rows.stream().map(row -> new CarePriorityCandidateRow(
-                ((Number) row[0]).longValue(),
-                (String) row[1],
-                row[2] == null ? null : ((Number) row[2]).intValue(),
-                ((Number) row[3]).longValue(),
-                ((Number) row[4]).longValue(),
-                ((Number) row[5]).longValue(),
-                ((Number) row[6]).longValue(),
-                (Boolean) row[7]
-        )).toList();
+        return rows.stream()
+                .map(row -> new CarePriorityCandidateRow(
+                        ((Number) row[0]).longValue(),
+                        (String) row[1],
+                        row[2] == null
+                                ? null
+                                : ((Number) row[2]).intValue(),
+                        ((Number) row[3]).longValue(),
+                        ((Number) row[4]).longValue(),
+                        ((Number) row[5]).longValue(),
+                        ((Number) row[6]).longValue(),
+                        (Boolean) row[7]
+                ))
+                .toList();
     }
 
     private long count(String sql, Long institutionId) {
