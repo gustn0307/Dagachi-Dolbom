@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePolling } from "../../hooks/usePolling";
 
 import { institutionApi } from "../../api/institutionApi";
 import { DataState, useInstitutionData } from "../../hooks/useInstitutionData";
@@ -87,7 +88,7 @@ function ReportManagement() {
 
   const [assigningReportId, setAssigningReportId] = useState(null);
 
-  const { data, loading, error, reload } = useInstitutionData(() => {
+  const { data, loading, error, reload, setData } = useInstitutionData(() => {
     const params = {
       page,
       size: 20,
@@ -105,6 +106,38 @@ function ReportManagement() {
 
   const [retrying, setRetrying] = useState(false);
   const [retryMessage, setRetryMessage] = useState("");
+
+  const pollReports = useCallback(async () => {
+    try {
+      const params = {
+        page,
+        size: 20,
+        status: status || undefined,
+        from: from || undefined,
+        to: to || undefined,
+      };
+
+      const latestData =
+        activeTab === "unassigned"
+          ? await institutionApi.getUnassignedReports(params)
+          : await institutionApi.getReports(params);
+
+      setData(latestData);
+    } catch {
+      // 폴링 실패 시 기존 목록을 유지합니다.
+    }
+  }, [activeTab, from, page, setData, status, to]);
+
+  usePolling(pollReports, {
+    interval: 5000,
+    enabled:
+      !loading &&
+      !error &&
+      assigningReportId === null &&
+      !retrying,
+    immediate: false,
+    refreshOnFocus: true,
+  });
 
   const reports = Array.isArray(data?.content) ? data.content : [];
 
