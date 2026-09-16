@@ -26,12 +26,12 @@ function UserHeader() {
 
   return (
     <header className="topbar">
-      <Link to={homePath} className="brand" aria-label="다함께 돌봄 홈">
+      <Link to={homePath} className="brand" aria-label="다같이 돌봄 홈">
         <span className="brand-symbol" aria-hidden="true">
           ♥
         </span>
         <span>
-          <b>다함께 돌봄</b>
+          <b>다같이 돌봄</b>
           <small>함께 만드는 따뜻한 우리 동네</small>
         </span>
       </Link>

@@ -65,8 +65,7 @@ public class ActivityApplicationService {
 
         CareActivity activity = findActivity(activityId);
 
-        if (activity.getStatus() != ActivityStatus.RECRUITING
-                && activity.getStatus() != ActivityStatus.READY) {
+        if (activity.getStatus() != ActivityStatus.RECRUITING) {
             throw new CustomException(ErrorCode.ACTIVITY_NOT_RECRUITING);
         }
 
@@ -144,7 +143,13 @@ public class ActivityApplicationService {
                 .countApprovedMap(List.of(picked.getId()))
                 .getOrDefault(picked.getId(), 0L);
 
-        return ActivityResponse.of(picked, approvedCount, latitude, longitude);
+        long applicantCount = activityApplicationRepository
+                .findActiveApplicationsByActivityIds(List.of(picked.getId()))
+                .size();
+
+        // 자동배정 후보는 findAutoMatchCandidates가 "내가 신청한 적 없는" 활동만
+        // 걸러주므로 myApplicationStatus는 항상 null이다.
+        return ActivityResponse.of(picked, approvedCount, applicantCount, latitude, longitude, null);
     }
 
     // 오름차순 기준 dense rank(동점은 같은 순위, 다음 순위는 건너뛰지 않고 이어짐)를 계산한다.
@@ -175,8 +180,7 @@ public class ActivityApplicationService {
     public ApplicationResponse applyAuto(Long activityId, Long userId) {
         CareActivity activity = findActivity(activityId);
 
-        if (activity.getStatus() != ActivityStatus.RECRUITING
-                && activity.getStatus() != ActivityStatus.READY) {
+        if (activity.getStatus() != ActivityStatus.RECRUITING) {
             throw new CustomException(ErrorCode.ACTIVITY_NOT_RECRUITING);
         }
 
