@@ -568,20 +568,17 @@ public class InstitutionReportService {
 
         /*
          * 신규 대상자 생성 전에 Report row를 잠급니다.
-         *
-         * 동일 Report에 REPORT-06/07 또는 REPORT-07 두 요청이
-         * 동시에 들어와 고아 CareRecipient가 생성되는 것을 방지합니다.
          */
-        Report report = reportRepository.findWithLockById(reportId)
-                .orElseThrow(
-                        () -> new CustomException(
-                                ErrorCode.RESOURCE_NOT_FOUND
-                        )
-                );
+        Report report =
+                reportRepository.findWithLockById(reportId)
+                        .orElseThrow(
+                                () -> new CustomException(
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                )
+                        );
 
         /*
-         * 미배정 제보나 다른 기관의 제보를 기준으로
-         * 신규 대상자를 만들 수 없습니다.
+         * 미배정 제보이거나 다른 기관에 배정된 제보인지 검사합니다.
          */
         if (report.getInstitution() == null
                 || !report.getInstitution()
@@ -593,11 +590,8 @@ public class InstitutionReportService {
         }
 
         /*
-         * 이미 대상자가 연결된 제보라면
-         * 또 다른 신규 대상자를 생성하지 않습니다.
-         *
-         * 이 검증을 CareRecipient 생성보다 먼저 수행해야
-         * 불필요한 대상자 데이터가 생성되지 않습니다.
+         * 이미 돌봄 대상자가 연결된 제보에는
+         * 신규 대상자를 다시 등록할 수 없습니다.
          */
         if (report.getCareRecipient() != null) {
             throw new CustomException(
@@ -606,12 +600,8 @@ public class InstitutionReportService {
         }
 
         /*
-         * 제보 기반 신규 대상자 등록 시점에는
-         * 아직 동의 여부를 확인하지 않은 PENDING 또는
-         * 이미 동의를 확보한 AGREED만 허용합니다.
-         *
-         * WITHDRAWN은 기존 동의를 철회했다는 의미이므로
-         * 신규 등록 초기 상태로는 허용하지 않습니다.
+         * 신규 대상자의 초기 동의 상태로
+         * WITHDRAWN은 사용할 수 없습니다.
          */
         if (request.consentStatus() == ConsentStatus.WITHDRAWN) {
             throw new CustomException(
@@ -620,8 +610,21 @@ public class InstitutionReportService {
         }
 
         /*
-         * CARE-03과 동일한 입력값을 사용해
-         * 로그인 사용자의 기관 소속 대상자를 생성합니다.
+         * 좌표 변환에는 상세 주소를 제외한 기본 주소만 사용합니다.
+         */
+        String address =
+                request.address().trim();
+
+        /*
+         * Kakao Local API로 주소를 위도·경도로 변환합니다.
+         */
+        Coordinate coordinate =
+                kakaoLocalClient.searchCoordinate(
+                        address
+                );
+
+        /*
+         * 주소와 변환된 위도·경도를 함께 저장합니다.
          */
         CareRecipient careRecipient =
                 CareRecipient.create(
@@ -630,10 +633,10 @@ public class InstitutionReportService {
                         request.gender(),
                         request.birthYear(),
                         normalizeNullableText(request.phone()),
-                        request.address().trim(),
+                        address,
                         normalizeNullableText(request.detailAddress()),
-                        request.latitude(),
-                        request.longitude(),
+                        coordinate.latitude(),
+                        coordinate.longitude(),
                         request.consentStatus()
                 );
 
@@ -643,18 +646,15 @@ public class InstitutionReportService {
                 );
 
         /*
-         * 방금 생성한 대상자를 현재 제보와 연결합니다.
-         *
-         * 이 메서드 전체가 @Transactional이므로
-         * 이후 예외가 발생하면 CareRecipient INSERT도 함께 rollback됩니다.
+         * 생성한 돌봄 대상자를 현재 제보에 연결합니다.
          */
         report.linkCareRecipient(
                 savedCareRecipient
         );
 
         /*
-         * 신규 대상자는 현재 이 Report 한 건과 연결되고,
-         * 아직 활동은 없으므로 각각 1, 0으로 반환합니다.
+         * 현재 제보 1건과 연결되고,
+         * 신규 등록 직후 활동은 0건입니다.
          */
         CareRecipientDetailResponse recipientResponse =
                 CareRecipientDetailResponse.of(

@@ -1,13 +1,20 @@
 package com.dagachi.backend.common.ai.client;
 
-import com.dagachi.backend.common.ai.dto.*;
+import com.dagachi.backend.common.ai.dto.AiCarePriorityRequest;
+import com.dagachi.backend.common.ai.dto.AiCarePriorityResponse;
+import com.dagachi.backend.common.ai.dto.AiReportEmbeddingRequest;
+import com.dagachi.backend.common.ai.dto.AiReportEmbeddingResponse;
+import com.dagachi.backend.common.ai.dto.AiReportSummaryRequest;
+import com.dagachi.backend.common.ai.dto.AiReportSummaryResponse;
+import com.dagachi.backend.common.ai.dto.AiReportTitleRequest;
+import com.dagachi.backend.common.ai.dto.AiReportTitleResponse;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -249,6 +256,51 @@ public class AiServiceClient {
             throw new CustomException(
                     ErrorCode.AI_SERVICE_INVALID_RESPONSE
             );
+        }
+
+        return response;
+    }
+
+    public AiCarePriorityResponse analyzeCarePriority(
+            AiCarePriorityRequest request
+    ) {
+        AiCarePriorityResponse response;
+
+        try {
+            response = aiServiceRestClient
+                    .post()
+                    .uri("/internal/ai/care-priority")
+                    .body(request)
+                    .retrieve()
+                    .body(AiCarePriorityResponse.class);
+        } catch (ResourceAccessException exception) {
+            String message = exception.getMessage();
+            if (message != null && message.toLowerCase().contains("timed out")) {
+                throw new CustomException(ErrorCode.AI_SERVICE_TIMEOUT);
+            }
+            throw new CustomException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+        } catch (RestClientResponseException exception) {
+            throw new CustomException(ErrorCode.AI_SERVICE_UNAVAILABLE);
+        } catch (RestClientException exception) {
+            throw new CustomException(ErrorCode.AI_SERVICE_INVALID_RESPONSE);
+        }
+
+        if (response == null
+                || response.recommendations() == null
+                || !StringUtils.hasText(response.model())) {
+            throw new CustomException(ErrorCode.AI_SERVICE_INVALID_RESPONSE);
+        }
+
+        boolean invalid = response.recommendations().stream().anyMatch(item ->
+                !StringUtils.hasText(item.candidateKey())
+                        || !StringUtils.hasText(item.riskLevel())
+                        || item.score() < 0
+                        || item.score() > 100
+                        || item.reasons() == null
+                        || !StringUtils.hasText(item.recommendedAction())
+        );
+        if (invalid) {
+            throw new CustomException(ErrorCode.AI_SERVICE_INVALID_RESPONSE);
         }
 
         return response;

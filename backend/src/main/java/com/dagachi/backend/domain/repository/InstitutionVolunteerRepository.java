@@ -80,17 +80,18 @@ public interface InstitutionVolunteerRepository
                     """,
             countQuery = """
                     SELECT COUNT(DISTINCT volunteer.id)
-                    FROM ActivityApplication application
-                    JOIN application.activity activity
-                    JOIN application.user volunteer
-                    JOIN ActivityRecord record
+                      FROM ActivityApplication application
+                      JOIN application.activity activity
+                      JOIN application.user volunteer
+                      JOIN ActivityRecord record
                         ON record.activity = activity
-                    WHERE activity.institution.id = :institutionId
-                      AND application.status = :applicationStatus
+                     WHERE activity.institution.id = :institutionId
+                       AND application.status = :applicationStatus
                       AND volunteer.deleted = false
                       AND record.reviewStatus = :reviewStatus
                       AND record.completedAt IS NOT NULL
-                      AND (
+                      AND 
+                      (
                           :keyword = ''
                           OR LOWER(volunteer.name)
                               LIKE CONCAT('%', :keyword, '%')
