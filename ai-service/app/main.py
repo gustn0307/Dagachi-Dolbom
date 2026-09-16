@@ -5,6 +5,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.report_summary import router as report_summary_router
 from app.api.routes.report_embedding import router as report_embedding_router
 from app.api.routes.care_priority import router as care_priority_router
+from app.api.routes.report_title import router as report_title_router
 
 # 애플리케이션 공통 설정을 가져옵니다.
 from app.core.config import get_settings
@@ -35,3 +36,5 @@ app.include_router(report_embedding_router)
 
 # 기관 대시보드의 AI 돌봄 우선순위 분석 API를 등록합니다.
 app.include_router(care_priority_router)
+# Spring Boot가 제보의 제목을 만들 API를 요청
+app.include_router(report_title_router)

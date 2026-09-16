@@ -7,6 +7,9 @@ import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
 import com.dagachi.backend.user.application.dto.ApplicationResponse;
 import com.dagachi.backend.user.application.service.ActivityApplicationService;
+import com.dagachi.backend.user.activity.dto.ActivityResponse;
+import com.dagachi.backend.user.application.dto.AutoMatchApplyRequest;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -15,6 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.PageRequest;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 일반 USER의 활동 신청/조회/취소(APP-01, APP-03, APP-04, APP-05) API를 제공한다.
@@ -43,6 +49,45 @@ public class ActivityApplicationController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("활동 신청이 접수되었습니다.", response));
+    }
+
+    /**
+     * APP-02 (1단계) 자동배정 후보 조회.
+     * [팀 합의 - 2단계 방식] 신청을 생성하지 않는다. 응답의 activityId로 다음 단계 호출.
+     *
+     * GET /api/activity-applications/auto-match/candidate
+     */
+    @GetMapping("/api/activity-applications/auto-match/candidate")
+    public ResponseEntity<ApiResponse<ActivityResponse>> getAutoMatchCandidate(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) BigDecimal latitude,
+            @RequestParam(required = false) BigDecimal longitude,
+            @RequestParam(required = false) List<Long> excludeActivityIds
+    ) {
+        ActivityResponse response =
+                activityApplicationService.getAutoMatchCandidate(userId, latitude, longitude, excludeActivityIds);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("추천 활동을 조회했습니다.", response)
+        );
+    }
+
+    /**
+     * APP-02 (2단계) 자동배정 신청 확정.
+     *
+     * POST /api/activity-applications/auto-match
+     */
+    @PostMapping("/api/activity-applications/auto-match")
+    public ResponseEntity<ApiResponse<ApplicationResponse>> applyAutoMatch(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody AutoMatchApplyRequest request
+    ) {
+        ApplicationResponse response =
+                activityApplicationService.applyAuto(request.activityId(), userId);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success("자동배정 신청이 접수되었습니다.", response));
     }
 
     /**

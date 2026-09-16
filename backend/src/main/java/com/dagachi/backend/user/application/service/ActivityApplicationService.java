@@ -15,7 +15,8 @@ import com.dagachi.backend.domain.repository.CareActivityRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
 import com.dagachi.backend.user.application.dto.ApplicationResponse;
 import com.dagachi.backend.domain.entity.ActivityRecord;
-import com.dagachi.backend.domain.repository.ActivityRecordRepository;
+import com.dagachi.backend.common.util.GeoUtils;
+import com.dagachi.backend.user.activity.dto.ActivityResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+import java.util.Comparator;
 
 /**
  * 일반 USER의 활동 신청(APP-01) / 내 신청 목록(APP-03) / 내 활동 목록(APP-04)
@@ -36,6 +43,7 @@ public class ActivityApplicationService {
     private final CareActivityRepository careActivityRepository;
     private final UserRepository userRepository;
     private final ActivityRecordRepository activityRecordRepository;
+    private static final List<Long> NO_EXCLUDE_FILTER = List.of(-1L);
 
     public ActivityApplicationService(
             ActivityApplicationRepository activityApplicationRepository,
@@ -71,6 +79,116 @@ public class ActivityApplicationService {
 
         if (application == null) {
             application = ActivityApplication.createDirect(activity, user);
+        } else if (application.getStatus() == ApplicationStatus.CANCELED) {
+            application.reactivate();
+        } else {
+            throw new CustomException(ErrorCode.APPLICATION_ALREADY_EXISTS);
+        }
+
+        ActivityApplication saved = activityApplicationRepository.save(application);
+        return ApplicationResponse.from(saved);
+    }
+
+    // APP-02 (1단계) 자동배정 후보 조회. 신청을 생성하지 않는다.
+    // [팀 합의 - 2단계 방식] 원래 API_SPEC은 매칭+신청 원샷이었으나,
+    // 팀 합의로 "후보 조회 → 사용자 확인 후 신청"으로 변경했다. SPEC 문서 갱신 필요.
+    @Transactional(readOnly = true)
+    public ActivityResponse getAutoMatchCandidate(
+            Long userId,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            List<Long> excludeActivityIds
+    ) {
+        List<Long> excludeFilter = (excludeActivityIds == null || excludeActivityIds.isEmpty())
+                ? NO_EXCLUDE_FILTER
+                : excludeActivityIds;
+
+        List<CareActivity> candidates = careActivityRepository.findAutoMatchCandidates(userId, excludeFilter);
+
+        if (candidates.isEmpty()) {
+            throw new CustomException(ErrorCode.NO_AUTO_MATCH_CANDIDATE);
+        }
+
+        boolean hasCoordinates = latitude != null && longitude != null;
+
+        // 1순위: 거리 오름차순 랭크. 위치 미동의 시 전원 랭크 0으로 취급해
+        // 사실상 2순위(lastCheckedAt)만으로 결정되게 한다.
+        Map<Long, Integer> distanceRank = hasCoordinates
+                ? competitionRank(candidates, activity -> GeoUtils.calculateDistanceKm(
+                latitude, longitude,
+                activity.getRecipient().getLatitude(),
+                activity.getRecipient().getLongitude()
+        ))
+                : candidates.stream().collect(Collectors.toMap(CareActivity::getId, a -> 0));
+
+        // 2순위: lastCheckedAt 오름차순 랭크(오래될수록 1등). null(안부 확인 이력 없음)은
+        // 가장 오래된 것으로 간주해 최우선 순위를 준다.
+        Map<Long, Integer> staleRank = competitionRank(candidates, activity -> {
+            LocalDateTime lastCheckedAt = activity.getRecipient().getLastCheckedAt();
+            return lastCheckedAt != null ? lastCheckedAt : LocalDateTime.MIN;
+        });
+
+        int bestScore = candidates.stream()
+                .mapToInt(a -> distanceRank.get(a.getId()) + staleRank.get(a.getId()))
+                .min()
+                .orElseThrow();
+
+        List<CareActivity> topTier = candidates.stream()
+                .filter(a -> distanceRank.get(a.getId()) + staleRank.get(a.getId()) == bestScore)
+                .collect(Collectors.toList());
+
+        // 종합 순위가 동일한 후보군 중 랜덤으로 1건 선택
+        CareActivity picked = topTier.get(ThreadLocalRandom.current().nextInt(topTier.size()));
+
+        long approvedCount = activityApplicationRepository
+                .countApprovedMap(List.of(picked.getId()))
+                .getOrDefault(picked.getId(), 0L);
+
+        return ActivityResponse.of(picked, approvedCount, latitude, longitude);
+    }
+
+    // 오름차순 기준 dense rank(동점은 같은 순위, 다음 순위는 건너뛰지 않고 이어짐)를 계산한다.
+    private <T extends Comparable<T>> Map<Long, Integer> competitionRank(
+            List<CareActivity> candidates,
+            Function<CareActivity, T> keyExtractor
+    ) {
+        List<T> sortedDistinctKeys = candidates.stream()
+                .map(keyExtractor)
+                .distinct()
+                .sorted(Comparator.nullsLast(Comparator.naturalOrder()))
+                .collect(Collectors.toList());
+
+        Map<T, Integer> rankByKey = new HashMap<>();
+        for (int i = 0; i < sortedDistinctKeys.size(); i++) {
+            rankByKey.put(sortedDistinctKeys.get(i), i + 1);
+        }
+
+        return candidates.stream()
+                .collect(Collectors.toMap(
+                        CareActivity::getId,
+                        activity -> rankByKey.get(keyExtractor.apply(activity))
+                ));
+    }
+
+    // APP-02 (2단계) 자동배정 신청 확정. 후보 조회에서 받은 activityId로 실제 신청을 생성한다.
+    @Transactional
+    public ApplicationResponse applyAuto(Long activityId, Long userId) {
+        CareActivity activity = findActivity(activityId);
+
+        if (activity.getStatus() != ActivityStatus.RECRUITING
+                && activity.getStatus() != ActivityStatus.READY) {
+            throw new CustomException(ErrorCode.ACTIVITY_NOT_RECRUITING);
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        ActivityApplication application = activityApplicationRepository
+                .findByActivity_IdAndUser_Id(activityId, userId)
+                .orElse(null);
+
+        if (application == null) {
+            application = ActivityApplication.createAuto(activity, user);
         } else if (application.getStatus() == ApplicationStatus.CANCELED) {
             application.reactivate();
         } else {

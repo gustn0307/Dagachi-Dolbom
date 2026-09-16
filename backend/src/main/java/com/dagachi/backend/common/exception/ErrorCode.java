@@ -195,6 +195,12 @@ public enum ErrorCode {
                 "이미 신청한 활동입니다."
     ),
 
+    NO_AUTO_MATCH_CANDIDATE(
+            HttpStatus.NOT_FOUND,
+            "ACT_404_NO_AUTO_MATCH_CANDIDATE",
+            "지금 배정 가능한 활동이 없습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
     APPLICATION_NOT_CANCELABLE(
             HttpStatus.CONFLICT,
             "APPLICATION_409_NOT_CANCELABLE",
