@@ -62,6 +62,10 @@ export const getCarePriorities = () =>
   unwrapData(
     api.post(
       "/api/institution/dashboard/care-priorities/analyze",
+      undefined,
+      {
+        timeout: 35000,
+      },
     ),
   );
 
