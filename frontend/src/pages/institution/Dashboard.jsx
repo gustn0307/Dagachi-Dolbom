@@ -53,7 +53,11 @@ function Dashboard() {
       setError(null);
       setData(await institutionApi.getDashboard(period));
     } catch (requestError) {
-      setError(requestError);
+      setError(
+        requestError?.response?.data?.message ??
+          requestError?.message ??
+          "대시보드 데이터를 불러오지 못했습니다.",
+      );
     } finally {
       setLoading(false);
     }
@@ -62,7 +66,7 @@ function Dashboard() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
-    /*
+  /*
    * 현재 선택한 기간의 대시보드 현황을 조용히 갱신합니다.
    * AI 돌봄 우선순위 분석은 자동으로 다시 실행하지 않습니다.
    */
@@ -391,8 +395,6 @@ function Dashboard() {
           )}
         </section>
       </div>
-
-      
     </div>
   );
 }
