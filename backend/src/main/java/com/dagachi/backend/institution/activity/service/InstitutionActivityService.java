@@ -15,6 +15,8 @@ import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.CareRecipientStatus;
 import com.dagachi.backend.domain.enums.ConsentStatus;
+import com.dagachi.backend.domain.enums.GenderCondition;
+import com.dagachi.backend.domain.enums.UserGender;
 import com.dagachi.backend.domain.enums.VisitResult;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
@@ -628,8 +630,7 @@ public class InstitutionActivityService {
                                     || newStatus == ActivityStatus.CANCELED;
 
                     case IN_PROGRESS ->
-                            newStatus == ActivityStatus.COMPLETED;
-
+                            false;
                     case COMPLETED, CANCELED ->
                             false;
                 };
@@ -737,18 +738,59 @@ public class InstitutionActivityService {
         }
 
         /*
+         * approvedCount에는 이번에 승인할 신청자가
+         * 포함되지 않았으므로 1명을 더한다.
+         */
+        long approvedCountAfterApproval =
+                approvedCount + 1;
+
+        /*
+         * 이번 승인으로 모집 인원이 충족되는 경우,
+         * SAME_GENDER_ONE 조건도 함께 충족되는지 검사한다.
+         */
+        if (
+                approvedCountAfterApproval
+                        >= activity.getRequiredPeople()
+                        && activity.getGenderCondition()
+                        == GenderCondition.SAME_GENDER_ONE
+        ) {
+            UserGender recipientGender =
+                    activity.getRecipient().getGender();
+
+            List<UserGender> approvedGenders =
+                    activityApplicationRepository
+                            .findApprovedUserGenders(
+                                    activityId
+                            );
+
+            boolean currentApplicantMatches =
+                    application.getUser().getGender()
+                            == recipientGender;
+
+            boolean existingApplicantMatches =
+                    approvedGenders.stream()
+                            .anyMatch(
+                                    gender ->
+                                            gender == recipientGender
+                            );
+
+            if (
+                    !currentApplicantMatches
+                            && !existingApplicantMatches
+            ) {
+                throw new CustomException(
+                        ErrorCode.ACTIVITY_GENDER_CONDITION_NOT_MET
+                );
+            }
+        }
+
+        /*
+         * 인원수와 성별 조건 검증을 통과한 뒤
          * 봉사 신청을 승인한다.
          */
         application.approve(
                 user
         );
-
-        /*
-         * approvedCount에는 방금 승인한 사람이
-         * 포함되지 않았으므로 1명을 더한다.
-         */
-        long approvedCountAfterApproval =
-                approvedCount + 1;
 
         /*
          * 필요한 인원을 모두 승인하면

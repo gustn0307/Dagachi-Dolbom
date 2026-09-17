@@ -134,6 +134,18 @@ export const createReportAiSummary = (reportId) =>
 export const getLatestReportAiSummary = (reportId) =>
   unwrapData(api.get(`/api/institution/reports/${reportId}/ai-analyses`));
 
+// 제보 중복·유사 분석 실행
+export const analyzeDuplicateReport = (reportId) =>
+  unwrapData(
+    api.post(
+      `/api/institution/reports/${reportId}/duplicate-analysis`,
+      undefined,
+      {
+        timeout: 35000,
+      },
+    ),
+  );
+
 /* =====================================================
  * 기관 봉사자 API
  * ===================================================== */
@@ -293,11 +305,12 @@ export const institutionApi = {
   getReports,
   getReport,
   updateReportStatus,
-  linkReportCareRecipient,
+  linkReportCareRecipient,  
   createAndLinkReportCareRecipient,
   createReportAiSummary,
   getLatestReportAiSummary,
   retryMissingReportAiTitles,
+  analyzeDuplicateReport,
 
   // 봉사자
   getVolunteers,
