@@ -1,6 +1,7 @@
 package com.dagachi.backend.domain.repository;
 
 import com.dagachi.backend.domain.entity.ActivityRecord;
+import com.dagachi.backend.domain.enums.ActivityReviewStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -23,4 +24,7 @@ public interface ActivityRecordRepository extends JpaRepository<ActivityRecord, 
      * bulk 조회. N+1 방지용.
      */
     List<ActivityRecord> findByActivity_IdIn(List<Long> activityIds);
+
+    // 메인페이지 통계 조회
+    long countByReviewStatus(ActivityReviewStatus reviewStatus);
 }
