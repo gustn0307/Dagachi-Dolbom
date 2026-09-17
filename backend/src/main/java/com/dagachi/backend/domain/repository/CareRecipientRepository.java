@@ -121,4 +121,7 @@ public interface CareRecipientRepository
 
     @Query("SELECT COUNT(a) FROM CareActivity a WHERE a.recipient.id = :recipientId")
     long countActivitiesByRecipientId(@Param("recipientId") Long recipientId);
+
+    // 메인페이지 통계 조회
+    long countByStatusAndDeletedFalse(CareRecipientStatus status);
 }

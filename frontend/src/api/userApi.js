@@ -205,3 +205,7 @@ export const withdrawUser = (password) =>
 // STAT-01 마이페이지 회원 통계 표시
 export const getMyActivityStatistics = () =>
   unwrapData(api.get("/api/users/me/activity-statistics"));
+
+// STAT-03: 서비스 참여 현황 요약 (함께하는 시민 / 누적 활동 / 도움이 필요한 이웃)
+export const getPlatformSummary = () =>
+  unwrapData(api.get("/api/stats/summary"));

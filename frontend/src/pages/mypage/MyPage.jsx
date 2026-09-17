@@ -282,7 +282,7 @@ function MyPage() {
     <>
       <PageHeader
         eyebrow="마이페이지"
-        title="반가워요"
+        title={profile?.nickname ? `${profile.nickname}님 반가워요` : "반가워요"}
         text="당신의 관심을 통해 이웃의 오늘이 더 안전해지고 있어요."
       />
 

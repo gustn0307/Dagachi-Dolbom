@@ -51,6 +51,7 @@ button {
   border: 0;
   color: #443427;
   text-align: left;
+  text-decoration: none;
 }
 .brand-symbol {
   display: grid;
@@ -125,6 +126,57 @@ button {
   color: #fff;
   border-color: #f4771c;
 }
+
+/* 로그인 사용자 뱃지 — 기관 헤더의 사각형 아바타(.user-avatar) 톤과 통일 */
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+}
+.user-chip-avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  color: #f4771c;
+  background: #ffead8;
+  font-size: 13px;
+  font-weight: 800;
+}
+.user-chip-text {
+  display: grid;
+  line-height: 1.3;
+  max-width: 120px;
+}
+.user-chip-name,
+.user-chip-fullname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-chip-name {
+  color: #4b4038;
+  font-size: 13px;
+  font-weight: 700;
+}
+.user-chip-fullname {
+  color: #897e75;
+  font-size: 11px;
+}
+
+/* 좁은 화면에서는 텍스트를 숨기고 아바타만 남김 */
+@media (max-width: 850px) {
+  .user-chip-text {
+    display: none;
+  }
+  .user-chip {
+    padding: 6px 0;
+  }
+}
+
 /* 회원가입 버튼은 히어로의 CTA(.primary-cta), 폼 제출버튼(.submit)과
    같은 강조 주황색을 공유합니다 */
 .header-tools .join,
@@ -220,6 +272,7 @@ button {
   font-size: 18px;
   font-weight: 700;
   box-shadow: 0 6px 12px #dd925850;
+  text-decoration: none;
 }
 .primary-cta b {
   font-size: 25px;
@@ -345,6 +398,7 @@ button {
   color: #45382f;
   box-shadow: 0 6px 14px #795c3712;
   transition: 0.2s;
+  text-decoration: none;
 }
 .service-card:hover {
   transform: translateY(-5px);

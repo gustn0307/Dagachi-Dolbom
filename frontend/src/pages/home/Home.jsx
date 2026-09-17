@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import heroImage from "../../assets/public-hero-care.png";
+import { getPlatformSummary } from "../../api/userApi";
 
 const services = [
   {
@@ -37,6 +39,31 @@ const services = [
 ];
 
 function Home() {
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadSummary = async () => {
+      try {
+        const data = await getPlatformSummary();
+        if (!ignore) {
+          setSummary(data);
+        }
+      } catch {
+        // 실패해도 홈 화면 전체가 깨지지 않도록 조용히 무시하고 "-"로 유지합니다.
+        if (!ignore) {
+          setSummary(null);
+        }
+      }
+    };
+
+    loadSummary();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
   return (
     <>
       <section
@@ -62,7 +89,6 @@ function Home() {
             ✎ 돌봄 사각지대 제보하기 <b>›</b>
           </Link>
         </div>
-
       </section>
 
       <section className="service-grid">
@@ -72,9 +98,7 @@ function Home() {
             to={service.path}
             className={`service-card ${service.tone}`}
           >
-            <span className="service-icon">
-              {service.icon}
-            </span>
+            <span className="service-icon">{service.icon}</span>
 
             <h2>{service.title}</h2>
 
@@ -85,33 +109,31 @@ function Home() {
         ))}
       </section>
 
-      <Impact />
+      <Impact summary={summary} />
     </>
   );
 }
 
-function Impact() {
+function Impact({ summary }) {
   return (
     <section className="impact">
       <p>
-        <span>❧</span>
-        {" "}
-        “우리의 작은 관심이 모여, 더 안전하고 따뜻한 지역사회를
+        <span>❧</span> “우리의 작은 관심이 모여, 더 안전하고 따뜻한 지역사회를
         만듭니다.”
       </p>
 
       <div>
-        <strong>-</strong>
+        <strong>{summary ? summary.totalCitizens : "-"}</strong>
         <small>함께하는 시민</small>
       </div>
 
       <div>
-        <strong>-</strong>
+        <strong>{summary ? summary.totalCompletedActivities : "-"}</strong>
         <small>누적 활동</small>
       </div>
 
       <div>
-        <strong>-</strong>
+        <strong>{summary ? summary.totalCareRecipients : "-"}</strong>
         <small>도움이 필요한 이웃</small>
       </div>
     </section>

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePolling } from "../../hooks/usePolling";
 
 import { institutionApi } from "../../api/institutionApi";
 import { DataState, useInstitutionData } from "../../hooks/useInstitutionData";
@@ -87,7 +88,11 @@ function ReportManagement() {
 
   const [assigningReportId, setAssigningReportId] = useState(null);
 
-  const { data, loading, error, reload } = useInstitutionData(() => {
+  const [analyzingReportId, setAnalyzingReportId] = useState(null);
+
+  const [duplicateAnalysis, setDuplicateAnalysis] = useState(null);
+
+  const { data, loading, error, reload, setData } = useInstitutionData(() => {
     const params = {
       page,
       size: 20,
@@ -105,6 +110,34 @@ function ReportManagement() {
 
   const [retrying, setRetrying] = useState(false);
   const [retryMessage, setRetryMessage] = useState("");
+
+  const pollReports = useCallback(async () => {
+    try {
+      const params = {
+        page,
+        size: 20,
+        status: status || undefined,
+        from: from || undefined,
+        to: to || undefined,
+      };
+
+      const latestData =
+        activeTab === "unassigned"
+          ? await institutionApi.getUnassignedReports(params)
+          : await institutionApi.getReports(params);
+
+      setData(latestData);
+    } catch {
+      // 폴링 실패 시 기존 목록을 유지합니다.
+    }
+  }, [activeTab, from, page, setData, status, to]);
+
+  usePolling(pollReports, {
+    interval: 5000,
+    enabled: !loading && !error && assigningReportId === null && !retrying,
+    immediate: false,
+    refreshOnFocus: true,
+  });
 
   const reports = Array.isArray(data?.content) ? data.content : [];
 
@@ -194,6 +227,24 @@ function ReportManagement() {
 
   const handleOpenDetail = (reportId) => {
     navigate(`/institution/reports/${reportId}`);
+  };
+
+  const handleDuplicateAnalysis = async (reportId) => {
+    try {
+      setAnalyzingReportId(reportId);
+      setDuplicateAnalysis(null);
+
+      const result = await institutionApi.analyzeDuplicateReport(reportId);
+
+      setDuplicateAnalysis({
+        reportId,
+        candidates: Array.isArray(result?.candidates) ? result.candidates : [],
+      });
+    } catch (analysisError) {
+      window.alert(getErrorMessage(analysisError));
+    } finally {
+      setAnalyzingReportId(null);
+    }
   };
 
   const handleRetryMissingTitles = async () => {
@@ -375,13 +426,13 @@ function ReportManagement() {
                   </span>
 
                   <button
-                    type="button"
-                    className="report-assign-button"
-                    disabled={assigningReportId !== null}
-                    onClick={() => handleAssignReport(report.reportId)}
-                  >
-                    {isAssigning ? "처리 중" : "관할 지정"}
-                  </button>
+  type="button"
+  className="report-assign-button"
+  disabled={assigningReportId !== null}
+  onClick={() => handleAssignReport(report.reportId)}
+>
+  {isAssigning ? "처리 중" : "관할 지정"}
+</button>
                 </article>
               );
             })
@@ -405,18 +456,81 @@ function ReportManagement() {
                     <i className="table-status">{statusLabel}</i>
                   </span>
 
-                  <button
-                    type="button"
-                    className="report-detail-button"
-                    onClick={() => handleOpenDetail(report.reportId)}
-                  >
-                    상세 보기
-                  </button>
+                 <div className="report-row-actions">
+  <button
+    type="button"
+    className="report-detail-button"
+    disabled={analyzingReportId !== null}
+    onClick={() =>
+      handleDuplicateAnalysis(report.reportId)
+    }
+  >
+    {analyzingReportId === report.reportId
+      ? "분석 중..."
+      : "유사 제보"}
+  </button>
+
+  <button
+    type="button"
+    className="report-detail-button"
+    onClick={() =>
+      handleOpenDetail(report.reportId)
+    }
+  >
+    상세 보기
+  </button>
+</div>
                 </article>
               );
             })
           )}
         </div>
+
+        {/* 바로 여기에 유사 제보 결과 코드 추가 */}
+        {duplicateAnalysis && (
+          <div className="duplicate-analysis-result">
+            <div className="duplicate-analysis-header">
+              <div>
+                <strong>
+                  제보 #{duplicateAnalysis.reportId} 유사 제보 분석
+                </strong>
+                <p>최근 접수된 제보 중 내용이 비슷한 결과입니다.</p>
+              </div>
+
+              <button type="button" onClick={() => setDuplicateAnalysis(null)}>
+                닫기
+              </button>
+            </div>
+
+            {duplicateAnalysis.candidates.length === 0 ? (
+              <div className="report-empty-state">유사한 제보가 없습니다.</div>
+            ) : (
+              <div className="duplicate-candidate-list">
+                {duplicateAnalysis.candidates.map((candidate) => (
+                  <div
+                    className="duplicate-candidate-item"
+                    key={candidate.reportId}
+                    >
+                    <span>제보 #{candidate.reportId}</span>
+
+                    <strong>
+                      {candidate.contentPreview || "제보 내용이 없습니다."}
+                    </strong>
+
+                    <span>
+                      유사도{" "}
+                      {Math.round(Number(candidate.similarity ?? 0) * 100)}%
+                    </span>
+
+                    <span>{formatDistance(candidate.distanceKm)}</span>
+
+                    <span>{formatDate(candidate.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {totalPages > 0 && (
           <div className="table-footer care-pagination">
