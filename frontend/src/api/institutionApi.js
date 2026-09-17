@@ -257,6 +257,13 @@ export const getStatistics = (period = "6months") =>
     }),
   );
 
+/**
+ * 로그인한 담당자 소속 기관 정보 조회.
+ * BACKEND: GET /api/institution/profile (신규, INSTITUTION 전용)
+ */
+export const getMyInstitution = () =>
+  unwrapData(api.get("/api/institution/profile"));
+
 /* =====================================================
  * 기관 화면 API 모음
  * ===================================================== */
