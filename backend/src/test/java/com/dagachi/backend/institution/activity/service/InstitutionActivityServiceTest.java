@@ -14,6 +14,7 @@ import com.dagachi.backend.domain.enums.CareRecipientStatus;
 import com.dagachi.backend.domain.enums.ConsentStatus;
 import com.dagachi.backend.domain.enums.GenderCondition;
 import com.dagachi.backend.domain.enums.VisitResult;
+import com.dagachi.backend.domain.enums.UserGender;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
 import com.dagachi.backend.domain.repository.CareRecipientRepository;
@@ -21,6 +22,7 @@ import com.dagachi.backend.domain.repository.ChecklistResponseRepository;
 import com.dagachi.backend.domain.repository.InstitutionActivityRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
 import com.dagachi.backend.institution.activity.dto.InstitutionActivityCreateRequest;
+import com.dagachi.backend.institution.activity.dto.InstitutionActivityStatusRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -113,6 +115,213 @@ class InstitutionActivityServiceTest {
 
         assertThat(application.getStatus()).isEqualTo(ApplicationStatus.APPROVED);
         assertThat(activity.getStatus()).isEqualTo(ActivityStatus.READY);
+    }
+
+    @Test
+    @DisplayName("같은 성별 봉사자가 없으면 마지막 승인을 차단한다")
+    void approvingLastVolunteerRejectsUnmetGenderCondition() {
+        CareActivity activity = CareActivity.create(
+                recipient,
+                institution,
+                manager,
+                LocalDateTime.now().plusDays(1),
+                2,
+                GenderCondition.SAME_GENDER_ONE
+        );
+
+        ActivityApplication application =
+                ActivityApplication.createDirect(
+                        activity,
+                        volunteer
+                );
+
+        when(recipient.getGender())
+                .thenReturn(UserGender.FEMALE);
+
+        when(volunteer.getGender())
+                .thenReturn(UserGender.MALE);
+
+        when(
+                institutionActivityRepository
+                        .findDetailActivity(
+                                1L,
+                                30L
+                        )
+        ).thenReturn(Optional.of(activity));
+
+        when(
+                careActivityRepository
+                        .findByIdForUpdate(
+                                30L
+                        )
+        ).thenReturn(Optional.of(activity));
+
+        when(
+                institutionActivityRepository
+                        .findActivityApplication(
+                                1L,
+                                30L,
+                                40L
+                        )
+        ).thenReturn(Optional.of(application));
+
+        when(
+                institutionActivityRepository
+                        .countApplications(
+                                30L,
+                                ApplicationStatus.APPROVED
+                        )
+        ).thenReturn(1L);
+
+        when(
+                activityApplicationRepository
+                        .findApprovedUserGenders(
+                                30L
+                        )
+        ).thenReturn(
+                List.of(UserGender.MALE)
+        );
+
+        assertThatThrownBy(
+                () ->
+                        service.approveActivityApplication(
+                                10L,
+                                30L,
+                                40L
+                        )
+        ).isInstanceOf(CustomException.class);
+
+        assertThat(application.getStatus())
+                .isEqualTo(ApplicationStatus.PENDING);
+
+        assertThat(activity.getStatus())
+                .isEqualTo(ActivityStatus.RECRUITING);
+    }
+
+    @Test
+    @DisplayName("같은 성별 봉사자가 있으면 마지막 승인 후 READY가 된다")
+    void approvingLastVolunteerSucceedsWhenGenderConditionIsMet() {
+        CareActivity activity = CareActivity.create(
+                recipient,
+                institution,
+                manager,
+                LocalDateTime.now().plusDays(1),
+                2,
+                GenderCondition.SAME_GENDER_ONE
+        );
+
+        ActivityApplication application =
+                ActivityApplication.createDirect(
+                        activity,
+                        volunteer
+                );
+
+        when(recipient.getGender())
+                .thenReturn(UserGender.FEMALE);
+
+        /*
+         * 이번에 승인할 봉사자는 남성이지만,
+         * 기존 승인자 중 여성 봉사자가 있는 상황이다.
+         */
+        when(volunteer.getGender())
+                .thenReturn(UserGender.MALE);
+
+        when(
+                institutionActivityRepository
+                        .findDetailActivity(
+                                1L,
+                                30L
+                        )
+        ).thenReturn(Optional.of(activity));
+
+        when(
+                careActivityRepository
+                        .findByIdForUpdate(
+                                30L
+                        )
+        ).thenReturn(Optional.of(activity));
+
+        when(
+                institutionActivityRepository
+                        .findActivityApplication(
+                                1L,
+                                30L,
+                                40L
+                        )
+        ).thenReturn(Optional.of(application));
+
+        when(
+                institutionActivityRepository
+                        .countApplications(
+                                30L,
+                                ApplicationStatus.APPROVED
+                        )
+        ).thenReturn(1L);
+
+        when(
+                activityApplicationRepository
+                        .findApprovedUserGenders(
+                                30L
+                        )
+        ).thenReturn(
+                List.of(UserGender.FEMALE)
+        );
+
+        service.approveActivityApplication(
+                10L,
+                30L,
+                40L
+        );
+
+        assertThat(application.getStatus())
+                .isEqualTo(ApplicationStatus.APPROVED);
+
+        assertThat(activity.getStatus())
+                .isEqualTo(ActivityStatus.READY);
+    }
+
+    @Test
+    @DisplayName("일반 상태 변경으로 진행 중 활동을 완료할 수 없다")
+    void cannotCompleteActivityThroughStatusChange() {
+        CareActivity activity = CareActivity.create(
+                recipient,
+                institution,
+                manager,
+                LocalDateTime.now().minusHours(1),
+                2,
+                GenderCondition.NONE
+        );
+
+        activity.changeStatus(
+                ActivityStatus.IN_PROGRESS
+        );
+
+        when(
+                institutionActivityRepository
+                        .findDetailActivity(
+                                1L,
+                                30L
+                        )
+        ).thenReturn(Optional.of(activity));
+
+        InstitutionActivityStatusRequest request =
+                new InstitutionActivityStatusRequest(
+                        ActivityStatus.COMPLETED
+                );
+
+        assertThatThrownBy(
+                () ->
+                        service.changeInstitutionActivityStatus(
+                                10L,
+                                30L,
+                                request
+                        )
+        )
+                .isInstanceOf(CustomException.class)
+                .hasMessage("입력값이 올바르지 않습니다.");
+
+        assertThat(activity.getStatus())
+                .isEqualTo(ActivityStatus.IN_PROGRESS);
     }
 
     @Test

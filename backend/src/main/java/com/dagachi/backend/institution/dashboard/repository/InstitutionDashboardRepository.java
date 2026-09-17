@@ -46,6 +46,7 @@ public class InstitutionDashboardRepository {
                 FROM activity_applications aa
                 JOIN care_activities ca ON ca.id = aa.activity_id
                 WHERE ca.institution_id = :institutionId
+                  AND ca.status = 'RECRUITING'
                   AND aa.status = 'PENDING'
                 """, institutionId);
     }
