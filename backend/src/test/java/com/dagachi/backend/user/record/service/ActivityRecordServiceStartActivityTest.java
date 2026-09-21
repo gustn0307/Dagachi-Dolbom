@@ -116,7 +116,7 @@ class ActivityRecordServiceStartActivityTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - 존재하지 않는 활동이면 RESOURCE_NOT_FOUND")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - 존재하지 않는 활동이면 RESOURCE_NOT_FOUND")
     void startActivity_존재하지_않는_활동이면_예외를_던진다() {
         given(careActivityRepository.findByIdForUpdate(ACTIVITY_ID)).willReturn(Optional.empty());
 
@@ -127,7 +127,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - READY 상태가 아니면 ACTIVITY_NOT_READY")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - READY 상태가 아니면 ACTIVITY_NOT_READY")
     void startActivity_READY가_아니면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.RECRUITING, 2, GenderCondition.NONE, recipient);
@@ -141,7 +141,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - 본인의 신청 이력이 없으면 FORBIDDEN")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - 본인의 신청 이력이 없으면 FORBIDDEN")
     void startActivity_신청이_없으면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);
@@ -157,7 +157,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - PENDING 신청자는 FORBIDDEN")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - PENDING 신청자는 FORBIDDEN")
     void startActivity_PENDING신청자는_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);
@@ -175,7 +175,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - 이미 ActivityRecord가 있으면 ACTIVITY_ALREADY_STARTED")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - 이미 ActivityRecord가 있으면 ACTIVITY_ALREADY_STARTED")
     void startActivity_이미_시작된_활동이면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);
@@ -195,7 +195,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - 락 이후 재검증한 승인 인원이 정원 미달이면 ACTIVITY_NOT_READY")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - 락 이후 재검증한 승인 인원이 정원 미달이면 ACTIVITY_NOT_READY")
     void startActivity_정원이_미달이면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);
@@ -217,7 +217,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - SAME_GENDER_ONE인데 대상자와 같은 성별 승인자가 없으면 ACTIVITY_GENDER_CONDITION_NOT_MET")
+    @DisplayName("REQ-REC-01, REQ-ACT-05 - RECORD-01 활동 시작 - SAME_GENDER_ONE인데 대상자와 같은 성별 승인자가 없으면 ACTIVITY_GENDER_CONDITION_NOT_MET")
     void startActivity_성별조건을_충족하지_못하면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.SAME_GENDER_ONE, recipient);
@@ -243,7 +243,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - SAME_GENDER_ONE이어도 대상자와 같은 성별이 1명이라도 있으면 통과한다")
+    @DisplayName("REQ-REC-01, REQ-ACT-05 - RECORD-01 활동 시작 - SAME_GENDER_ONE이어도 대상자와 같은 성별이 1명이라도 있으면 통과한다")
     void startActivity_성별조건을_충족하면_정상적으로_시작된다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.SAME_GENDER_ONE, recipient);
@@ -270,7 +270,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - GenderCondition이 NONE이면 성별 검사를 하지 않는다")
+    @DisplayName("REQ-REC-01, REQ-ACT-05 - RECORD-01 활동 시작 - GenderCondition이 NONE이면 성별 검사를 하지 않는다")
     void startActivity_성별조건이_NONE이면_검사를_생략한다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);
@@ -294,7 +294,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - 활성화된 체크리스트 버전이 없으면 RESOURCE_NOT_FOUND")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - 활성화된 체크리스트 버전이 없으면 RESOURCE_NOT_FOUND")
     void startActivity_활성_체크리스트_버전이_없으면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);
@@ -318,7 +318,7 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("RECORD-01 활동 시작 - 정상 시작이면 DRAFT 기록을 만들고 활동을 IN_PROGRESS로 바꾼다")
+    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - 정상 시작이면 DRAFT 기록을 만들고 활동을 IN_PROGRESS로 바꾼다")
     void startActivity_정상시작이면_DRAFT기록을_생성하고_활동상태를_변경한다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
         CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);

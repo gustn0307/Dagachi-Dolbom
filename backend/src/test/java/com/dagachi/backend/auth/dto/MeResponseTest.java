@@ -27,7 +27,7 @@ class MeResponseTest {
     }
 
     @Test
-    @DisplayName("from - 소속 기관이 없으면 institutionId는 null이다")
+    @DisplayName("REQ-AUTH-05 - from - 소속 기관이 없으면 institutionId는 null이다")
     void from_소속기관이_없으면_institutionId는_null이다() {
         User user = buildUser();
 
@@ -38,7 +38,7 @@ class MeResponseTest {
     }
 
     @Test
-    @DisplayName("from - 소속 기관이 있으면 institutionId를 채운다")
+    @DisplayName("REQ-AUTH-05 - from - 소속 기관이 있으면 institutionId를 채운다")
     void from_소속기관이_있으면_institutionId를_채운다() {
         User user = buildUser();
         Institution institution = mock(Institution.class);

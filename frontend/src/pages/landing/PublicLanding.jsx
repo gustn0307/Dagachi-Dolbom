@@ -1,7 +1,36 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import heroImage from "../../assets/public-hero-care.png";
+import { getPlatformSummary } from "../../api/userApi";
 
 function PublicLanding() {
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadSummary = async () => {
+      try {
+        const data = await getPlatformSummary();
+        if (!ignore) {
+          setSummary(data);
+        }
+      } catch {
+        // 비회원 접근이 막혀있거나 요청이 실패해도 랜딩페이지 전체가
+        // 깨지지 않도록 조용히 무시하고 "-"로 유지합니다.
+        if (!ignore) {
+          setSummary(null);
+        }
+      }
+    };
+
+    loadSummary();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   return (
     <main className="public-landing">
       <header className="public-header">
@@ -100,10 +129,40 @@ function PublicLanding() {
           </small>
         </div>
       </section>
+
+      <PublicImpact summary={summary} />
+
       <footer className="public-footer">
         © 2026 다같이 돌봄 · 함께 만드는 따뜻한 우리 동네
       </footer>
     </main>
   );
 }
+
+function PublicImpact({ summary }) {
+  return (
+    <section className="impact">
+      <p>
+        <span>❧</span>{" "}
+        “우리의 작은 관심이 모여, 더 안전하고 따뜻한 지역사회를 만듭니다.”
+      </p>
+
+      <div>
+        <strong>{summary ? summary.totalCitizens : "-"}</strong>
+        <small>함께하는 시민</small>
+      </div>
+
+      <div>
+        <strong>{summary ? summary.totalCompletedActivities : "-"}</strong>
+        <small>누적 활동</small>
+      </div>
+
+      <div>
+        <strong>{summary ? summary.totalCareRecipients : "-"}</strong>
+        <small>도움이 필요한 이웃</small>
+      </div>
+    </section>
+  );
+}
+
 export default PublicLanding;

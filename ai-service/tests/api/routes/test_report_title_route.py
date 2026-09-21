@@ -19,7 +19,7 @@ ENDPOINT = "/internal/ai/report-title"
 PATCH_TARGET = "app.api.routes.report_title.ReportTitleService"
 
 
-def test_report_title_정상요청이면_200과_제목모델을_반환한다():
+def test_req_ai_12_report_title_정상요청이면_200과_제목모델을_반환한다():
     with patch(PATCH_TARGET) as mock_service_class:
         mock_service_class.return_value.create_title.return_value = ReportTitleResponse(
             title="독거노인 안전 확인 요청", model="gpt-4o-mini"
@@ -36,25 +36,25 @@ def test_report_title_정상요청이면_200과_제목모델을_반환한다():
     assert body["model"] == "gpt-4o-mini"
 
 
-def test_report_title_content가_비어있으면_422를_반환한다():
+def test_req_ai_12_report_title_content가_비어있으면_422를_반환한다():
     response = client.post(ENDPOINT, json={"content": ""})
 
     assert response.status_code == 422
 
 
-def test_report_title_content가_5000자를_초과하면_422를_반환한다():
+def test_req_ai_12_report_title_content가_5000자를_초과하면_422를_반환한다():
     response = client.post(ENDPOINT, json={"content": "가" * 5001})
 
     assert response.status_code == 422
 
 
-def test_report_title_content_필드가_없으면_422를_반환한다():
+def test_req_ai_12_report_title_content_필드가_없으면_422를_반환한다():
     response = client.post(ENDPOINT, json={})
 
     assert response.status_code == 422
 
 
-def test_report_title_API_KEY가_설정되지_않았으면_503을_반환한다():
+def test_req_ai_12_report_title_API_KEY가_설정되지_않았으면_503을_반환한다():
     with patch(PATCH_TARGET) as mock_service_class:
         mock_service_class.return_value.create_title.side_effect = RuntimeError(
             "OPENAI_API_KEY가 설정되지 않았습니다."
@@ -66,7 +66,7 @@ def test_report_title_API_KEY가_설정되지_않았으면_503을_반환한다()
     assert "OPENAI_API_KEY" in response.json()["detail"]
 
 
-def test_report_title_그_외_OpenAI_오류는_502를_반환한다():
+def test_req_ai_12_report_title_그_외_OpenAI_오류는_502를_반환한다():
     with patch(PATCH_TARGET) as mock_service_class:
         mock_service_class.return_value.create_title.side_effect = RuntimeError(
             "OpenAI 인증에 실패했습니다."

@@ -89,58 +89,67 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                                // 인증 없이 접근 가능한 인증 API
-                                .requestMatchers(
-                                        "/api/auth/signup",
-                                        "/api/auth/login"
-                                )
-                                .permitAll()
+                        // 인증 없이 접근 가능한 인증 API
+                        .requestMatchers(
+                                "/api/auth/signup",
+                                "/api/auth/login"
+                        )
+                        .permitAll()
 
-                                // 회원/비회원 모두 제보할 수 있으므로 제보 등록 POST만 공개
-                                .requestMatchers(HttpMethod.POST, "/api/reports")
-                                .permitAll()
+                        // 회원/비회원 모두 제보할 수 있으므로 제보 등록 POST만 공개
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/reports")
+                        .permitAll()
 
-                                // 공지 목록/상세 조회는 공개하되,
-                                // 향후 등록·수정·삭제 API까지 열리지 않도록 GET만 허용
-                                .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**")
-                                .permitAll()
+                        // 공지 목록/상세 조회는 공개하되,
+                        // 향후 등록·수정·삭제 API까지 열리지 않도록 GET만 허용
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/notices",
+                                "/api/notices/**")
+                        .permitAll()
 
-                                .requestMatchers(
-                                        HttpMethod.GET,
-                                        "/api/health/ready"
-                                )
-                                .permitAll()
+                        // 홈/랜딩페이지 하단 서비스 참여 현황(STAT-03)은
+                        // 비회원도 볼 수 있어야 하므로 GET만 공개
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/stats/summary")
+                        .permitAll()
 
-                                // 관리자 전용
-                                .requestMatchers("/api/admin/**")
-                                .hasRole("ADMIN")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/health/ready"
+                        )
+                        .permitAll()
 
-                                // 기관 담당자 전용
-                                .requestMatchers("/api/institution/**")
-                                .hasRole("INSTITUTION")
+                        // 관리자 전용
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
 
-                                // 일반 사용자(USER) 전용 API
-                                //
-                                // USER의 마이페이지·활동 탐색·신청·활동기록 API는
-                                // 로그인 여부뿐 아니라 USER Role까지 확인해야 합니다.
-                                //
-                                // 기존에는 이 경로들이 마지막 anyRequest().authenticated()에 걸려
-                                // INSTITUTION/ADMIN도 인증만 되어 있으면 접근할 수 있었습니다.
-                                // SecurityRoleMatrixTest에서 실제로 200 응답을 재현한 뒤
-                                // USER Role 전용 matcher를 추가했습니다.
-                                .requestMatchers(
-                                        "/api/users/me",
-                                        "/api/users/me/**",
-                                        "/api/activities",
-                                        "/api/activities/**",
-                                        "/api/activity-applications/**",
-                                        "/api/activity-records/**"
-                                )
-                                .hasRole("USER")
+                        // 기관 담당자 전용
+                        .requestMatchers("/api/institution/**")
+                        .hasRole("INSTITUTION")
 
-                                // 그 외 현재 API는 로그인 필요
-                                .anyRequest()
-                                .authenticated()
+                        // 일반 사용자(USER) 전용 API
+                        //
+                        // USER의 마이페이지·활동 탐색·신청·활동기록 API는
+                        // 로그인 여부뿐 아니라 USER Role까지 확인해야 합니다.
+                        //
+                        // 기존에는 이 경로들이 마지막 anyRequest().authenticated()에 걸려
+                        // INSTITUTION/ADMIN도 인증만 되어 있으면 접근할 수 있었습니다.
+                        // SecurityRoleMatrixTest에서 실제로 200 응답을 재현한 뒤
+                        // USER Role 전용 matcher를 추가했습니다.
+                        .requestMatchers(
+                                "/api/users/me",
+                                "/api/users/me/**",
+                                "/api/activities",
+                                "/api/activities/**",
+                                "/api/activity-applications/**",
+                                "/api/activity-records/**"
+                        )
+                        .hasRole("USER")
+
+                        // 그 외 현재 API는 로그인 필요
+                        .anyRequest()
+                        .authenticated()
                 )
 
                 .exceptionHandling(exception -> exception

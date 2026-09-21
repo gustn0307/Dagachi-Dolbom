@@ -77,7 +77,7 @@ class ReportServiceTest {
     }
 
     @Test
-    @DisplayName("createReport - 정상 접수 후 커밋되면 저장된 content(trim 적용)로 AI 제목 생성을 트리거한다")
+    @DisplayName("REQ-AI-12 - createReport - 정상 접수 후 커밋되면 저장된 content(trim 적용)로 AI 제목 생성을 트리거한다")
     void createReport_커밋후_AI제목생성을_트리거한다() {
         ReportCreateRequest request = buildGuestRequest("  긴급 확인이 필요한 상황입니다  ");
 
@@ -100,7 +100,7 @@ class ReportServiceTest {
     }
 
     @Test
-    @DisplayName("createReport - 활성화된 트랜잭션 동기화가 없으면 AI 제목 생성 트리거 자체가 등록되지 않는다")
+    @DisplayName("REQ-AI-12 - createReport - 활성화된 트랜잭션 동기화가 없으면 AI 제목 생성 트리거 자체가 등록되지 않는다")
     void createReport_트랜잭션동기화가_없으면_제목생성을_등록하지_않는다() {
         // 이 테스트만 setUp에서 켜둔 동기화를 일부러 끈다(활성 트랜잭션이 없는 상황 재현).
         TransactionSynchronizationManager.clearSynchronization();
