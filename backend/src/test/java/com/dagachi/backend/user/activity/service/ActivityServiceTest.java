@@ -105,7 +105,7 @@ class ActivityServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("ACT-01 활동 목록 - 필터가 없으면 기본값(전체 기간/전체 연령/전체 성별)으로 조회한다")
+    @DisplayName("REQ-ACT-06 - ACT-01 활동 목록 - 필터가 없으면 기본값(전체 기간/전체 연령/전체 성별)으로 조회한다")
     void getActivities_기본조건이면_기본값으로_조회한다() {
         Pageable pageable = PageRequest.of(0, 20);
         ActivitySearchCondition condition =
@@ -139,7 +139,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-01 활동 목록 - 좌표가 있으면 거리가 가까운 순으로 정렬한다")
+    @DisplayName("REQ-ACT-09 - ACT-01 활동 목록 - 좌표가 있으면 거리가 가까운 순으로 정렬한다")
     void getActivities_좌표가_있으면_거리순으로_정렬한다() {
         Pageable pageable = PageRequest.of(0, 20);
         BigDecimal userLat = new BigDecimal("37.5665");
@@ -167,7 +167,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-01 활동 목록 - sortBy=STALE이면 안부확인이 오래된 순으로 정렬한다")
+    @DisplayName("REQ-ACT-10 - ACT-01 활동 목록 - sortBy=STALE이면 안부확인이 오래된 순으로 정렬한다")
     void getActivities_STALE정렬이면_안부확인이_오래된순으로_정렬한다() {
         Pageable pageable = PageRequest.of(0, 20);
         ActivitySearchCondition condition =
@@ -193,7 +193,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-01 활동 목록 - 허용되지 않는 연령대 라벨이면 400(INVALID_INPUT_VALUE)")
+    @DisplayName("REQ-ACT-07 - ACT-01 활동 목록 - 허용되지 않는 연령대 라벨이면 400(INVALID_INPUT_VALUE)")
     void getActivities_잘못된_연령대라벨이면_예외를_던진다() {
         ActivitySearchCondition condition = new ActivitySearchCondition(
                 null, null, null, null, null, List.of("100대"), null, null
@@ -206,7 +206,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-01 활동 목록 - 허용되지 않는 성별 값이면 400(INVALID_INPUT_VALUE)")
+    @DisplayName("REQ-ACT-07 - ACT-01 활동 목록 - 허용되지 않는 성별 값이면 400(INVALID_INPUT_VALUE)")
     void getActivities_잘못된_성별값이면_예외를_던진다() {
         ActivitySearchCondition condition = new ActivitySearchCondition(
                 null, null, null, null, null, null, "UNKNOWN", null
@@ -223,7 +223,7 @@ class ActivityServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("ACT-02 활동 상세 - 존재하면 본인 신청 상태를 포함해 반환한다")
+    @DisplayName("REQ-ACT-07 - ACT-02 활동 상세 - 존재하면 본인 신청 상태를 포함해 반환한다")
     void getActivityDetail_정상활동이면_상세를_반환한다() {
         CareRecipient recipient = buildRecipient(null, null, null, 1955);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, recipient);
@@ -245,7 +245,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-02 활동 상세 - 존재하지 않으면 예외를 던진다")
+    @DisplayName("REQ-ACT-07 - ACT-02 활동 상세 - 존재하지 않으면 예외를 던진다")
     void getActivityDetail_존재하지_않으면_예외를_던진다() {
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.empty());
 
@@ -260,7 +260,7 @@ class ActivityServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("ACT-03 수행정보 조회 - 신청 이력이 없으면 FORBIDDEN")
+    @DisplayName("REQ-ACT-11 - ACT-03 수행정보 조회 - 신청 이력이 없으면 FORBIDDEN")
     void getExecutionDetail_신청이_없으면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(null, null, null, 1955);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.READY, recipient);
@@ -276,7 +276,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-03 수행정보 조회 - PENDING 신청자는 FORBIDDEN")
+    @DisplayName("REQ-ACT-11 - ACT-03 수행정보 조회 - PENDING 신청자는 FORBIDDEN")
     void getExecutionDetail_PENDING신청자는_예외를_던진다() {
         CareRecipient recipient = buildRecipient(null, null, null, 1955);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.READY, recipient);
@@ -294,7 +294,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-03 수행정보 조회 - APPROVED이고 아직 시작 전(READY)이면 activityRecordId는 null이다")
+    @DisplayName("REQ-ACT-11 - ACT-03 수행정보 조회 - APPROVED이고 아직 시작 전(READY)이면 activityRecordId는 null이다")
     void getExecutionDetail_APPROVED이고_시작전이면_activityRecordId는_null이다() {
         CareRecipient recipient = buildRecipient(null, null, null, 1955);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.READY, recipient);
@@ -315,7 +315,7 @@ class ActivityServiceTest {
     }
 
     @Test
-    @DisplayName("ACT-03 수행정보 조회 - 이미 다른 참여자가 활동을 시작했다면 기존 activityRecordId를 함께 내려준다")
+    @DisplayName("REQ-ACT-11 - ACT-03 수행정보 조회 - 이미 다른 참여자가 활동을 시작했다면 기존 activityRecordId를 함께 내려준다")
     void getExecutionDetail_이미_시작된_활동이면_기존_activityRecordId를_반환한다() {
         CareRecipient recipient = buildRecipient(null, null, null, 1955);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.IN_PROGRESS, recipient);

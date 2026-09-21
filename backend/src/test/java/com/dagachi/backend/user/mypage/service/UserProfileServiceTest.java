@@ -63,7 +63,7 @@ class UserProfileServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("USER-01 내 프로필 조회 - 활성 계정이면 프로필을 반환한다")
+    @DisplayName("REQ-AUTH-06 - USER-01 내 프로필 조회 - 활성 계정이면 프로필을 반환한다")
     void getMyProfile_활성계정이면_프로필을_반환한다() {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -75,7 +75,7 @@ class UserProfileServiceTest {
     }
 
     @Test
-    @DisplayName("USER-01 내 프로필 조회 - 탈퇴/삭제된 계정이면 USER_NOT_FOUND")
+    @DisplayName("REQ-AUTH-06 - USER-01 내 프로필 조회 - 탈퇴/삭제된 계정이면 USER_NOT_FOUND")
     void getMyProfile_탈퇴계정이면_예외를_던진다() {
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.empty());
 
@@ -90,7 +90,7 @@ class UserProfileServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("USER-02 내 프로필 수정 - 닉네임/전화번호를 변경한다")
+    @DisplayName("REQ-AUTH-07 - USER-02 내 프로필 수정 - 닉네임/전화번호를 변경한다")
     void updateMyProfile_닉네임과_전화번호를_변경한다() {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -104,7 +104,7 @@ class UserProfileServiceTest {
     }
 
     @Test
-    @DisplayName("USER-02 내 프로필 수정 - null로 보낸 필드는 기존 값을 유지한다")
+    @DisplayName("REQ-AUTH-07 - USER-02 내 프로필 수정 - null로 보낸 필드는 기존 값을 유지한다")
     void updateMyProfile_null필드는_기존값을_유지한다() {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -173,7 +173,7 @@ class UserProfileServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("USER-03 회원 탈퇴 - 비밀번호가 틀리면 PASSWORD_MISMATCH")
+    @DisplayName("REQ-AUTH-08 - USER-03 회원 탈퇴 - 비밀번호가 틀리면 PASSWORD_MISMATCH")
     void withdraw_비밀번호가_틀리면_예외를_던진다() {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -186,7 +186,7 @@ class UserProfileServiceTest {
     }
 
     @Test
-    @DisplayName("USER-03 회원 탈퇴 - 진행 중인 신청/활동이 있으면 WITHDRAWAL_BLOCKED")
+    @DisplayName("REQ-AUTH-08 - USER-03 회원 탈퇴 - 진행 중인 신청/활동이 있으면 WITHDRAWAL_BLOCKED")
     void withdraw_진행중인_신청이_있으면_예외를_던진다() {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -204,7 +204,7 @@ class UserProfileServiceTest {
     }
 
     @Test
-    @DisplayName("USER-03 회원 탈퇴 - 진행 중인 신청이 없으면 Soft Delete + WITHDRAWN 처리한다")
+    @DisplayName("REQ-AUTH-08 - USER-03 회원 탈퇴 - 진행 중인 신청이 없으면 Soft Delete + WITHDRAWN 처리한다")
     void withdraw_정상요청이면_탈퇴처리된다() {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
