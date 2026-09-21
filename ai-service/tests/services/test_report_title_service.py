@@ -31,7 +31,7 @@ def _fake_openai_response(output_text: str):
     return response
 
 
-def test_create_title_정상_응답이면_공백을_제거한_제목과_모델명을_반환한다():
+def test_req_ai_12_create_title_정상_응답이면_공백을_제거한_제목과_모델명을_반환한다():
     client = MagicMock()
     client.responses.create.return_value = _fake_openai_response("  독거노인 낙상 의심 제보  ")
 
@@ -43,7 +43,7 @@ def test_create_title_정상_응답이면_공백을_제거한_제목과_모델�
     client.responses.create.assert_called_once()
 
 
-def test_create_title_빈_제목을_반환하면_RuntimeError를_던진다():
+def test_req_ai_12_create_title_빈_제목을_반환하면_RuntimeError를_던진다():
     client = MagicMock()
     client.responses.create.return_value = _fake_openai_response("   ")
 
@@ -53,7 +53,7 @@ def test_create_title_빈_제목을_반환하면_RuntimeError를_던진다():
         service.create_title("내용")
 
 
-def test_create_title_인증에_실패하면_RuntimeError로_변환한다():
+def test_req_ai_12_create_title_인증에_실패하면_RuntimeError로_변환한다():
     client = MagicMock()
     client.responses.create.side_effect = AuthenticationError(
         "invalid api key", response=_fake_response(401), body=None
@@ -65,7 +65,7 @@ def test_create_title_인증에_실패하면_RuntimeError로_변환한다():
         service.create_title("내용")
 
 
-def test_create_title_요청_한도를_초과하면_RuntimeError로_변환한다():
+def test_req_ai_12_create_title_요청_한도를_초과하면_RuntimeError로_변환한다():
     client = MagicMock()
     client.responses.create.side_effect = RateLimitError(
         "rate limited", response=_fake_response(429), body=None
@@ -77,7 +77,7 @@ def test_create_title_요청_한도를_초과하면_RuntimeError로_변환한다
         service.create_title("내용")
 
 
-def test_create_title_연결에_실패하면_RuntimeError로_변환한다():
+def test_req_ai_12_create_title_연결에_실패하면_RuntimeError로_변환한다():
     client = MagicMock()
     client.responses.create.side_effect = APIConnectionError(request=_fake_request())
 
@@ -87,7 +87,7 @@ def test_create_title_연결에_실패하면_RuntimeError로_변환한다():
         service.create_title("내용")
 
 
-def test_create_title_그_외_OpenAI_오류는_RuntimeError로_변환한다():
+def test_req_ai_12_create_title_그_외_OpenAI_오류는_RuntimeError로_변환한다():
     client = MagicMock()
     client.responses.create.side_effect = APIError("unknown error", request=_fake_request(), body=None)
 
@@ -97,7 +97,7 @@ def test_create_title_그_외_OpenAI_오류는_RuntimeError로_변환한다():
         service.create_title("내용")
 
 
-def test_create_title_요청_content를_그대로_input으로_전달한다():
+def test_req_ai_12_create_title_요청_content를_그대로_input으로_전달한다():
     client = MagicMock()
     client.responses.create.return_value = _fake_openai_response("제목")
 

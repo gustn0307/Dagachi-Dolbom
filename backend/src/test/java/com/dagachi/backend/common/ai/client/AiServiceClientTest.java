@@ -62,7 +62,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - 정상 응답이면 title/model을 그대로 반환한다")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - 정상 응답이면 title/model을 그대로 반환한다")
     void generateReportTitle_정상응답이면_그대로_반환한다() {
         AiReportTitleResponse expected = new AiReportTitleResponse("독거노인 안전 확인 요청", "gpt-4o-mini");
         given(responseSpec.body(AiReportTitleResponse.class)).willReturn(expected);
@@ -74,7 +74,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - 응답 Body 자체가 없으면 AI_SERVICE_INVALID_RESPONSE")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - 응답 Body 자체가 없으면 AI_SERVICE_INVALID_RESPONSE")
     void generateReportTitle_응답이_없으면_예외를_던진다() {
         given(responseSpec.body(AiReportTitleResponse.class)).willReturn(null);
 
@@ -85,7 +85,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - title이 빈 값이면 AI_SERVICE_INVALID_RESPONSE")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - title이 빈 값이면 AI_SERVICE_INVALID_RESPONSE")
     void generateReportTitle_title이_비어있으면_예외를_던진다() {
         given(responseSpec.body(AiReportTitleResponse.class))
                 .willReturn(new AiReportTitleResponse("", "gpt-4o-mini"));
@@ -97,7 +97,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - model이 빈 값이면 AI_SERVICE_INVALID_RESPONSE")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - model이 빈 값이면 AI_SERVICE_INVALID_RESPONSE")
     void generateReportTitle_model이_비어있으면_예외를_던진다() {
         given(responseSpec.body(AiReportTitleResponse.class))
                 .willReturn(new AiReportTitleResponse("제목", "  "));
@@ -109,7 +109,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - 연결 타임아웃(메시지에 timed out 포함)이면 AI_SERVICE_TIMEOUT")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - 연결 타임아웃(메시지에 timed out 포함)이면 AI_SERVICE_TIMEOUT")
     void generateReportTitle_타임아웃이면_AI_SERVICE_TIMEOUT을_던진다() {
         given(responseSpec.body(AiReportTitleResponse.class))
                 .willThrow(new ResourceAccessException("Read timed out"));
@@ -121,7 +121,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - 타임아웃이 아닌 연결 실패면 AI_SERVICE_UNAVAILABLE")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - 타임아웃이 아닌 연결 실패면 AI_SERVICE_UNAVAILABLE")
     void generateReportTitle_연결실패면_AI_SERVICE_UNAVAILABLE을_던진다() {
         given(responseSpec.body(AiReportTitleResponse.class))
                 .willThrow(new ResourceAccessException("Connection refused"));
@@ -133,7 +133,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - FastAPI가 4xx/5xx를 반환하면 AI_SERVICE_UNAVAILABLE")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - FastAPI가 4xx/5xx를 반환하면 AI_SERVICE_UNAVAILABLE")
     void generateReportTitle_FastAPI가_에러응답을_반환하면_AI_SERVICE_UNAVAILABLE을_던진다() {
         RestClientResponseException exception = mock(RestClientResponseException.class);
         given(responseSpec.body(AiReportTitleResponse.class)).willThrow(exception);
@@ -145,7 +145,7 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("generateReportTitle - 그 외 RestClientException은 AI_SERVICE_INVALID_RESPONSE")
+    @DisplayName("REQ-AI-01, REQ-AI-12 - generateReportTitle - 그 외 RestClientException은 AI_SERVICE_INVALID_RESPONSE")
     void generateReportTitle_그외_RestClientException은_AI_SERVICE_INVALID_RESPONSE를_던진다() {
         given(responseSpec.body(AiReportTitleResponse.class))
                 .willThrow(new RestClientException("역직렬화 실패"));
