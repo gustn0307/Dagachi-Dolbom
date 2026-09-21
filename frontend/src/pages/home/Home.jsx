@@ -76,7 +76,7 @@ function Home() {
           <h1>
             누군가의 오늘을
             <br />
-            <em>지킵니다</em>
+            <em>지켜냅니다</em>
           </h1>
 
           <span>
