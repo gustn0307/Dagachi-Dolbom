@@ -28,7 +28,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 /**
- * SecurityConfig의 USER Role 접근 제어를 실제 HTTP 흐름으로 검증합니다.
+ * REQ-AUTH-06 / REQ-AUTH-09 / REQ-AUTH-10
+ *
+ *  SecurityConfig의 USER Role 접근 제어를 실제 HTTP 흐름으로 검증합니다.
  *
  * 검증 대상:
  * - 익명 사용자는 USER 전용 API 접근 불가 → 401
@@ -101,7 +103,7 @@ class SecurityRoleMatrixTest {
 
 
     @Test
-    @DisplayName("익명 사용자는 USER 전용 API에 접근할 수 없다")
+    @DisplayName("REQ-AUTH-06 - 익명 사용자는 USER 회원정보 API에 접근할 수 없다")
     void anonymous_cannot_access_user_api() throws Exception {
 
         /*
@@ -119,7 +121,7 @@ class SecurityRoleMatrixTest {
 
 
     @Test
-    @DisplayName("USER는 USER 전용 API에 접근할 수 있다")
+    @DisplayName("REQ-AUTH-06 - USER는 자신의 회원정보 API에 접근할 수 있다")
     void user_can_access_user_api() throws Exception {
 
         /*
@@ -151,7 +153,7 @@ class SecurityRoleMatrixTest {
 
 
     @Test
-    @DisplayName("INSTITUTION은 USER 전용 API에 접근할 수 없다")
+    @DisplayName("REQ-AUTH-06, REQ-AUTH-09 - INSTITUTION은 USER 회원정보 API에 접근할 수 없다")
     void institution_cannot_access_user_api() throws Exception {
 
         /*
@@ -180,7 +182,7 @@ class SecurityRoleMatrixTest {
 
 
     @Test
-    @DisplayName("ADMIN은 USER 전용 API에 접근할 수 없다")
+    @DisplayName("REQ-AUTH-06, REQ-AUTH-10 - ADMIN은 USER 회원정보 API에 접근할 수 없다")
     void admin_cannot_access_user_api() throws Exception {
 
         /*

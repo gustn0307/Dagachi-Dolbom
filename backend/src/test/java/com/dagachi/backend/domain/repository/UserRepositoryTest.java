@@ -4,6 +4,7 @@ import com.dagachi.backend.domain.entity.User;
 import com.dagachi.backend.domain.enums.UserGender;
 import com.dagachi.backend.testsupport.PostgresContainerTestBase;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -100,5 +101,52 @@ class UserRepositoryTest
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-01, REQ-AUTH-02 - Soft Delete된 계정 이메일도 전체 중복 검사에서는 존재한다")
+    void existsByEmail_탈퇴한사용자이메일도_중복으로_조회된다() {
+
+        // given
+        User user = User.create(
+                "withdrawn-duplicate@example.com",
+                "encoded-password",
+                "탈퇴 중복 테스트",
+                "탈퇴중복",
+                "01011112222",
+                UserGender.MALE
+        );
+
+        /*
+         * 실제 회원탈퇴와 동일하게
+         * status=WITHDRAWN, deleted=true, deletedAt 설정
+         */
+        user.withdraw();
+
+        userRepository.saveAndFlush(user);
+
+        // when
+        boolean existsIncludingDeleted =
+                userRepository.existsByEmail(
+                        "withdrawn-duplicate@example.com"
+                );
+
+        boolean existsOnlyActive =
+                userRepository.existsByEmailAndDeletedFalse(
+                        "withdrawn-duplicate@example.com"
+                );
+
+        // then
+        /*
+         * 회원가입 중복 검사:
+         * Soft Delete 여부와 관계없이 기존 email이면 true
+         */
+        assertThat(existsIncludingDeleted).isTrue();
+
+        /*
+         * 로그인/현재 활성 사용자 조회 관점:
+         * Soft Delete된 사용자는 제외되므로 false
+         */
+        assertThat(existsOnlyActive).isFalse();
     }
 }

@@ -3,7 +3,6 @@ package com.dagachi.backend.user.mypage.service;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.domain.entity.User;
-import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.UserGender;
 import com.dagachi.backend.domain.enums.UserStatus;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
@@ -21,13 +20,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -191,9 +188,10 @@ class UserProfileServiceTest {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
         given(passwordEncoder.matches("correct-pw", "encoded-pw")).willReturn(true);
-        given(activityApplicationRepository.existsByUser_IdAndStatusIn(
-                eq(USER_ID), eq(List.of(ApplicationStatus.PENDING, ApplicationStatus.APPROVED))
-        )).willReturn(true);
+        given(
+                activityApplicationRepository
+                        .existsBlockingWithdrawalParticipation(USER_ID)
+        ).willReturn(true);
 
         assertThatThrownBy(() -> userProfileService.withdraw(USER_ID, new WithdrawRequest("correct-pw")))
                 .isInstanceOf(CustomException.class)
@@ -209,9 +207,10 @@ class UserProfileServiceTest {
         User user = buildUser("encoded-pw");
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
         given(passwordEncoder.matches("correct-pw", "encoded-pw")).willReturn(true);
-        given(activityApplicationRepository.existsByUser_IdAndStatusIn(
-                eq(USER_ID), eq(List.of(ApplicationStatus.PENDING, ApplicationStatus.APPROVED))
-        )).willReturn(false);
+        given(
+                activityApplicationRepository
+                        .existsBlockingWithdrawalParticipation(USER_ID)
+        ).willReturn(false);
 
         userProfileService.withdraw(USER_ID, new WithdrawRequest("correct-pw"));
 

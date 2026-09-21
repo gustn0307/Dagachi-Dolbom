@@ -19,17 +19,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 /**
- * 회원탈퇴 이후 기존 JWT를 계속 사용할 수 있는지 검증하는 통합 테스트입니다.
+ * REQ-AUTH-03:
+ *  탈퇴 계정은 인증 상태를 계속 유지할 수 없어야 하며,
+ *  탈퇴 전에 발급된 JWT도 현재 DB 계정 상태를 기준으로 거부되어야 합니다.
  *
+ * <p>
  * 이 테스트는 Mockito로 인증 객체를 임의로 만들어 넣지 않고,
  * 실제 JwtTokenProvider가 발급한 JWT를 Authorization 헤더에 넣어
  * JwtAuthenticationFilter -> SecurityFilterChain -> Controller 흐름을 통과시킵니다.
- *
+ * <p>
  * PostgreSQL Testcontainers를 사용하는 이유:
  * - JWT 발급 후 DB의 사용자 상태만 변경하는 실제 상황을 재현하기 위해서입니다.
  * - "JWT에 들어 있는 과거 인증 정보"와 "DB의 현재 계정 상태"가 다를 때
- *   서버가 현재 계정 상태를 다시 확인하는지를 검증합니다.
- *
+ * 서버가 현재 계정 상태를 다시 확인하는지를 검증합니다.
+ * <p>
  * 현재 MVP에서 실제로 구현된 계정 상태 변경은 회원탈퇴이므로
  * SUSPENDED가 아니라 WITHDRAWN + Soft Delete 상태를 기준으로 검증합니다.
  */
@@ -51,7 +54,7 @@ class AccountLifecycleSecurityIntegrationTest extends PostgresContainerTestBase 
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("탈퇴한 사용자는 탈퇴 전에 발급받은 JWT로 USER API에 접근할 수 없다")
+    @DisplayName("REQ-AUTH-03 - 탈퇴한 사용자는 탈퇴 전에 발급받은 JWT로 USER API에 접근할 수 없다")
     void withdrawn_user_cannot_use_previously_issued_token() throws Exception {
 
         /*
@@ -113,12 +116,12 @@ class AccountLifecycleSecurityIntegrationTest extends PostgresContainerTestBase 
          */
         int updatedRows = jdbcTemplate.update(
                 """
-                UPDATE users
-                   SET status = 'WITHDRAWN',
-                       is_deleted = true,
-                       deleted_at = CURRENT_TIMESTAMP
-                 WHERE id = ?
-                """,
+                        UPDATE users
+                           SET status = 'WITHDRAWN',
+                               is_deleted = true,
+                               deleted_at = CURRENT_TIMESTAMP
+                         WHERE id = ?
+                        """,
                 savedUser.getId()
         );
 
@@ -132,11 +135,12 @@ class AccountLifecycleSecurityIntegrationTest extends PostgresContainerTestBase 
          * 5. 탈퇴 전에 발급받았던 "동일한 JWT"를 다시 사용합니다.
          *
          * 기대 동작:
-         * 서버가 JWT claim만 신뢰하지 않고 DB의 현재 계정 상태를 다시 확인하여
-         * 탈퇴한 사용자의 기존 JWT 요청을 인증 단계에서 거부해야 합니다.
+         * JwtAuthenticationFilter가 JWT claim만 신뢰하지 않고
+         * DB의 현재 사용자 상태를 다시 조회합니다.
          *
-         * 현재 구현에서는 JwtAuthenticationFilter가 DB의 사용자 상태를 조회하지 않으므로,
-         * 이 테스트는 실제 보안 취약점을 재현하는 실패 테스트가 될 가능성이 높습니다.
+         * 따라서 현재 사용자가 WITHDRAWN 또는 deleted 상태라면
+         * 기존 JWT가 서명/만료 기준으로 유효하더라도 인증을 거부하고
+         * 401 Unauthorized를 반환해야 합니다.
          */
         mockMvc.perform(
                         get("/api/users/me")
