@@ -105,6 +105,22 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**")
                         .permitAll()
 
+                        // 공지 목록/상세 조회는 공개하되,
+                        // 향후 등록·수정·삭제 API까지 열리지 않도록 GET만 허용
+                        .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**")
+                        .permitAll()
+
+                        // 홈/랜딩페이지 하단 서비스 참여 현황(STAT-03)은
+                        // 비회원도 볼 수 있어야 하므로 GET만 공개
+                        .requestMatchers(HttpMethod.GET, "/api/stats/summary")
+                        .permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/health/ready"
+                        )
+                        .permitAll()
+
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/health/ready"
