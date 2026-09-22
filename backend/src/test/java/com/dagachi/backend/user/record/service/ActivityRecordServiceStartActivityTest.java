@@ -127,14 +127,40 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
+
     @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - READY 상태가 아니면 ACTIVITY_NOT_READY")
     void startActivity_READY가_아니면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(UserGender.FEMALE);
-        CareActivity activity = buildActivity(ActivityStatus.RECRUITING, 2, GenderCondition.NONE, recipient);
+        CareActivity activity = buildActivity(
+                ActivityStatus.RECRUITING,
+                2,
+                GenderCondition.NONE,
+                recipient
+        );
 
-        given(careActivityRepository.findByIdForUpdate(ACTIVITY_ID)).willReturn(Optional.of(activity));
+        User user = buildUser(USER_ID);
+        ActivityApplication application =
+                buildApplication(
+                        activity,
+                        user,
+                        ApplicationStatus.APPROVED
+                );
 
-        assertThatThrownBy(() -> activityRecordService.startActivity(ACTIVITY_ID, USER_ID))
+        given(careActivityRepository.findByIdForUpdate(ACTIVITY_ID))
+                .willReturn(Optional.of(activity));
+
+        given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
+                .willReturn(Optional.of(application));
+
+        given(activityRecordRepository.findByActivity_Id(ACTIVITY_ID))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(
+                () -> activityRecordService.startActivity(
+                        ACTIVITY_ID,
+                        USER_ID
+                )
+        )
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.ACTIVITY_NOT_READY);
@@ -175,23 +201,54 @@ class ActivityRecordServiceStartActivityTest {
     }
 
     @Test
-    @DisplayName("REQ-REC-01 - RECORD-01 활동 시작 - 이미 ActivityRecord가 있으면 ACTIVITY_ALREADY_STARTED")
-    void startActivity_이미_시작된_활동이면_예외를_던진다() {
-        CareRecipient recipient = buildRecipient(UserGender.FEMALE);
-        CareActivity activity = buildActivity(ActivityStatus.READY, 2, GenderCondition.NONE, recipient);
-        User user = buildUser(USER_ID);
-        ActivityApplication application = buildApplication(activity, user, ApplicationStatus.APPROVED);
+    @DisplayName("REQ-REC-01, REQ-REC-02 - RECORD-01 활동 시작 - 기존 공동 ActivityRecord가 있으면 재사용하고 IN_PROGRESS로 전환한다")
+    void startActivity_기존_공동기록이_있으면_재사용한다() {
 
-        given(careActivityRepository.findByIdForUpdate(ACTIVITY_ID)).willReturn(Optional.of(activity));
+        CareRecipient recipient = buildRecipient(UserGender.FEMALE);
+        CareActivity activity = buildActivity(
+                ActivityStatus.READY,
+                2,
+                GenderCondition.NONE,
+                recipient
+        );
+
+        User user = buildUser(USER_ID);
+        ActivityApplication application =
+                buildApplication(
+                        activity,
+                        user,
+                        ApplicationStatus.APPROVED
+                );
+
+        ActivityRecord existingRecord =
+                ActivityRecord.createDraft(
+                        activity,
+                        1,
+                        LocalDateTime.now()
+                );
+
+        given(careActivityRepository.findByIdForUpdate(ACTIVITY_ID))
+                .willReturn(Optional.of(activity));
+
         given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
                 .willReturn(Optional.of(application));
-        given(activityRecordRepository.findByActivity_Id(ACTIVITY_ID))
-                .willReturn(Optional.of(ActivityRecord.createDraft(activity, 1, LocalDateTime.now())));
 
-        assertThatThrownBy(() -> activityRecordService.startActivity(ACTIVITY_ID, USER_ID))
-                .isInstanceOf(CustomException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.ACTIVITY_ALREADY_STARTED);
+        given(activityRecordRepository.findByActivity_Id(ACTIVITY_ID))
+                .willReturn(Optional.of(existingRecord));
+
+        ActivityRecordResponse response =
+                activityRecordService.startActivity(
+                        ACTIVITY_ID,
+                        USER_ID
+                );
+
+        assertThat(response).isNotNull();
+
+        assertThat(activity.getStatus())
+                .isEqualTo(ActivityStatus.IN_PROGRESS);
+
+        verify(activityRecordRepository, never())
+                .save(any(ActivityRecord.class));
     }
 
     @Test

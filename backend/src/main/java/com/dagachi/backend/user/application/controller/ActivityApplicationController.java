@@ -6,6 +6,7 @@ import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
 import com.dagachi.backend.user.application.dto.ApplicationResponse;
+import com.dagachi.backend.user.application.dto.AutoMatchCandidateResponse;
 import com.dagachi.backend.user.application.service.ActivityApplicationService;
 import com.dagachi.backend.user.activity.dto.ActivityResponse;
 import com.dagachi.backend.user.application.dto.AutoMatchApplyRequest;
@@ -69,6 +70,38 @@ public class ActivityApplicationController {
 
         return ResponseEntity.ok(
                 ApiResponse.success("추천 활동을 조회했습니다.", response)
+        );
+    }
+
+    /**
+     * APP-02 AI 기반 자동배정 후보 배치 조회.
+     *
+     * 기존 단건 후보 조회 API는 유지하고,
+     * AI 추천 후보를 최대 10건까지 반환합니다.
+     *
+     * GET /api/activity-applications/auto-match/candidates
+     */
+    @GetMapping("/api/activity-applications/auto-match/candidates")
+    public ResponseEntity<ApiResponse<List<AutoMatchCandidateResponse>>>
+    getAiAutoMatchCandidates(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) BigDecimal latitude,
+            @RequestParam(required = false) BigDecimal longitude,
+            @RequestParam(required = false) List<Long> excludeActivityIds
+    ) {
+        List<AutoMatchCandidateResponse> response =
+                activityApplicationService.getAiAutoMatchCandidates(
+                        userId,
+                        latitude,
+                        longitude,
+                        excludeActivityIds
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "추천 활동 목록을 조회했습니다.",
+                        response
+                )
         );
     }
 
