@@ -10,6 +10,7 @@ import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
 import com.dagachi.backend.domain.enums.GenderCondition;
+import com.dagachi.backend.domain.enums.UserStatus;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.ActivityRecordRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
@@ -82,6 +83,9 @@ public class ActivityApplicationService {
 
     /**
      * APP-01 직접 신청.
+     *
+     * [동시성 보완] User 조회에 PESSIMISTIC_WRITE 락을 사용해 회원 탈퇴(withdraw)와
+     * 동시에 진행되는 경우를 방지하고, 락 획득 직후 status를 재검증한다.
      */
     @Transactional
     public ApplicationResponse applyDirect(Long activityId, Long userId) {
@@ -92,8 +96,16 @@ public class ActivityApplicationService {
             throw new CustomException(ErrorCode.ACTIVITY_NOT_RECRUITING);
         }
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndDeletedFalseForUpdate(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // JWT 인증 통과 시점과 락 획득 시점 사이에 탈퇴/정지가 발생했을 수 있으므로 재검증한다.
+        if (user.getStatus() == UserStatus.WITHDRAWN) {
+            throw new CustomException(ErrorCode.ACCOUNT_WITHDRAWN);
+        }
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new CustomException(ErrorCode.ACCOUNT_SUSPENDED);
+        }
 
         ActivityApplication application = activityApplicationRepository
                 .findByActivity_IdAndUser_Id(activityId, userId)
@@ -943,7 +955,12 @@ public class ActivityApplicationService {
         return responses;
     }
 
-    // APP-02 (2단계) 자동배정 신청 확정. 후보 조회에서 받은 activityId로 실제 신청을 생성한다.
+    /**
+     * APP-02 (2단계) 자동배정 신청 확정. 후보 조회에서 받은 activityId로 실제 신청을 생성한다.
+     *
+     * [동시성 보완] User 조회에 PESSIMISTIC_WRITE 락을 사용해 회원 탈퇴(withdraw)와
+     * 동시에 진행되는 경우를 방지하고, 락 획득 직후 status를 재검증한다.
+     */
     @Transactional
     public ApplicationResponse applyAuto(Long activityId, Long userId) {
         CareActivity activity = findActivity(activityId);
@@ -952,8 +969,15 @@ public class ActivityApplicationService {
             throw new CustomException(ErrorCode.ACTIVITY_NOT_RECRUITING);
         }
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndDeletedFalseForUpdate(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getStatus() == UserStatus.WITHDRAWN) {
+            throw new CustomException(ErrorCode.ACCOUNT_WITHDRAWN);
+        }
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new CustomException(ErrorCode.ACCOUNT_SUSPENDED);
+        }
 
         ActivityApplication application = activityApplicationRepository
                 .findByActivity_IdAndUser_Id(activityId, userId)
@@ -1035,6 +1059,10 @@ public class ActivityApplicationService {
      * APPROVED: 활동이 시작 전(RECRUITING/READY)인 경우만 허용.
      *           취소 후 승인 인원이 정원 미달이 되면 READY -> RECRUITING으로 되돌린다.
      * 그 외(REJECTED/CANCELED, 또는 활동이 이미 시작/종료됨): 취소 불가.
+     *
+     * [수정] 정지(SUSPENDED)·탈퇴(WITHDRAWN) 계정도 자기 신청을 계속 취소할 수
+     * 있던 문제를 막기 위해 계정 상태 검증을 추가했다. application.getUser()로
+     * 이미 로드된 User 엔티티를 그대로 사용하므로 추가 조회는 필요 없다.
      */
     @Transactional
     public ApplicationResponse cancelApplication(Long applicationId, Long userId) {
@@ -1042,8 +1070,18 @@ public class ActivityApplicationService {
         ActivityApplication application = activityApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
-        if (!application.getUser().getId().equals(userId)) {
+        User applicant = application.getUser();
+
+        if (!applicant.getId().equals(userId)) {
             throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        // [수정] 정지·탈퇴된 계정은 본인 신청이라도 취소할 수 없다.
+        if (applicant.getStatus() == UserStatus.SUSPENDED) {
+            throw new CustomException(ErrorCode.ACCOUNT_SUSPENDED);
+        }
+        if (applicant.getStatus() == UserStatus.WITHDRAWN) {
+            throw new CustomException(ErrorCode.ACCOUNT_WITHDRAWN);
         }
 
         if (application.getStatus() == ApplicationStatus.PENDING) {

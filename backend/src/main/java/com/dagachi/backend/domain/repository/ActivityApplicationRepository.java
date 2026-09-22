@@ -131,6 +131,48 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
     }
 
     /**
+     * REQ-AUTH-08 회원 탈퇴 차단 여부 확인.
+     *
+     * 탈퇴를 차단하는 경우:
+     * 1. PENDING 신청이 존재하는 경우
+     * 2. APPROVED 신청이면서 연결된 활동이 아직 종료되지 않은 경우
+     *    - RECRUITING
+     *    - READY
+     *    - IN_PROGRESS
+     *
+     * 탈퇴를 차단하지 않는 경우:
+     * - APPROVED + COMPLETED
+     * - APPROVED + CANCELED
+     * - REJECTED
+     * - CANCELED
+     *
+     * 완료·취소된 과거 활동의 APPROVED 신청 이력은 보존하되,
+     * 현재 진행 중인 참여로 간주하지 않습니다.
+     */
+    @Query("""
+        SELECT CASE
+                   WHEN COUNT(aa) > 0 THEN true
+                   ELSE false
+               END
+        FROM ActivityApplication aa
+        WHERE aa.user.id = :userId
+          AND (
+                aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.PENDING
+                OR (
+                    aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+                    AND aa.activity.status IN (
+                        com.dagachi.backend.domain.enums.ActivityStatus.RECRUITING,
+                        com.dagachi.backend.domain.enums.ActivityStatus.READY,
+                        com.dagachi.backend.domain.enums.ActivityStatus.IN_PROGRESS
+                    )
+                )
+              )
+        """)
+    boolean existsBlockingWithdrawalParticipation(
+            @Param("userId") Long userId
+    );
+
+    /**
      * APP-03 내 신청 목록 조회.
      */
     @Query("""
