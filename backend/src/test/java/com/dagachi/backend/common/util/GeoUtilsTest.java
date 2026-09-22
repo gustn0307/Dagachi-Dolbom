@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GeoUtilsTest {
 
     @Test
-    @DisplayName("calculateDistanceKm - 좌표 중 하나라도 null이면 null을 반환한다")
+    @DisplayName("REQ-ACT-09 - calculateDistanceKm - 좌표 중 하나라도 null이면 null을 반환한다")
     void calculateDistanceKm_좌표가_하나라도_없으면_null을_반환한다() {
         BigDecimal lat = new BigDecimal("37.5665");
         BigDecimal lng = new BigDecimal("126.9780");
@@ -25,7 +25,7 @@ class GeoUtilsTest {
     }
 
     @Test
-    @DisplayName("calculateDistanceKm - 동일한 좌표면 거리는 0.0km다")
+    @DisplayName("REQ-ACT-09 - calculateDistanceKm - 동일한 좌표면 거리는 0.0km다")
     void calculateDistanceKm_같은_좌표면_0을_반환한다() {
         BigDecimal lat = new BigDecimal("37.5665");
         BigDecimal lng = new BigDecimal("126.9780");
@@ -36,7 +36,7 @@ class GeoUtilsTest {
     }
 
     @Test
-    @DisplayName("calculateDistanceKm - 적도 위 경도 1도 차이는 약 111.2km다 (소수 첫째자리 반올림)")
+    @DisplayName("REQ-ACT-09 - calculateDistanceKm - 적도 위 경도 1도 차이는 약 111.2km다 (소수 첫째자리 반올림)")
     void calculateDistanceKm_적도위_경도1도차이는_약111_2km다() {
         BigDecimal distance = GeoUtils.calculateDistanceKm(
                 BigDecimal.ZERO, BigDecimal.ZERO,
@@ -48,7 +48,7 @@ class GeoUtilsTest {
     }
 
     @Test
-    @DisplayName("calculateDistanceKm - 거리 계산은 대칭적이다 (A→B == B→A)")
+    @DisplayName("REQ-ACT-09 - calculateDistanceKm - 거리 계산은 대칭적이다 (A→B == B→A)")
     void calculateDistanceKm_거리는_대칭적이다() {
         BigDecimal seoulLat = new BigDecimal("37.5665");
         BigDecimal seoulLng = new BigDecimal("126.9780");

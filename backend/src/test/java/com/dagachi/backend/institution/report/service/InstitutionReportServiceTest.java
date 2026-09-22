@@ -102,7 +102,7 @@ class InstitutionReportServiceTest {
     }
 
     @Test
-    @DisplayName("getInstitutionReports - REPORT_TITLE 분석 결과를 조회해서 aiSummary로 노출한다 (REPORT_SUMMARY 아님)")
+    @DisplayName("REQ-RPT-08, REQ-AI-12 - getInstitutionReports - REPORT_TITLE 분석 결과를 조회해서 aiSummary로 노출한다 (REPORT_SUMMARY 아님)")
     void getInstitutionReports_REPORT_TITLE을_조회해서_aiSummary로_노출한다() {
         Pageable pageable = PageRequest.of(0, 20);
         User user = buildInstitutionUser();
@@ -129,7 +129,7 @@ class InstitutionReportServiceTest {
     }
 
     @Test
-    @DisplayName("getInstitutionReports - 저장된 AI 제목이 없으면 aiSummary는 null이다")
+    @DisplayName("REQ-RPT-08, REQ-AI-14 - getInstitutionReports - 저장된 AI 제목이 없으면 aiSummary는 null이다")
     void getInstitutionReports_AI제목이_없으면_aiSummary는_null이다() {
         Pageable pageable = PageRequest.of(0, 20);
         User user = buildInstitutionUser();
@@ -149,7 +149,7 @@ class InstitutionReportServiceTest {
     }
 
     @Test
-    @DisplayName("getInstitutionReports - 소속 기관이 없는 사용자는 FORBIDDEN")
+    @DisplayName("REQ-RPT-08, REQ-AUTH-09 - getInstitutionReports - 소속 기관이 없는 사용자는 FORBIDDEN")
     void getInstitutionReports_소속기관이_없으면_예외를_던진다() {
         User user = User.create(
                 "no-institution@test.com", "pw", "이름", "닉네임", "010-0000-0000", UserGender.MALE

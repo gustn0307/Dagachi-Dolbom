@@ -40,7 +40,7 @@ class InstitutionDashboardServiceTest {
     }
 
     @Test
-    @DisplayName("로그인 담당자의 기관 데이터로 대시보드를 집계한다")
+    @DisplayName("REQ-DASH-01, REQ-DASH-02 로그인 담당자의 기관 데이터로 대시보드를 집계한다")
     void returnsDashboardForAuthenticatedInstitution() {
         when(userRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(manager));
         when(manager.getInstitution()).thenReturn(institution);
@@ -73,7 +73,7 @@ class InstitutionDashboardServiceTest {
     }
 
     @Test
-    @DisplayName("기관 소속이 없는 사용자는 대시보드를 조회할 수 없다")
+    @DisplayName("REQ-AUTH-09 기관 소속이 없는 사용자는 대시보드를 조회할 수 없다")
     void rejectsUserWithoutInstitution() {
         when(userRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(manager));
         when(manager.getInstitution()).thenReturn(null);

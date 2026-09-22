@@ -119,7 +119,7 @@ class ActivityApplicationServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName( "[REQ-ACT-12] 모집 중 활동을 직접 신청하면 DIRECT/PENDING으로 생성한다")
+    @DisplayName("REQ-ACT-12 - APP-01 직접 신청 - 신규 신청이면 DIRECT/PENDING으로 생성한다")
     void applyDirect_신규신청이면_PENDING상태로_생성한다() {
         // given
         CareRecipient recipient = buildRecipient(null, null, null);
@@ -144,7 +144,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[REQ-ACT-12] RECRUITING 상태가 아닌 활동은 직접 신청할 수 없다")
+    @DisplayName("REQ-ACT-12 - APP-01 직접 신청 - 모집 중(RECRUITING)이 아니면 예외를 던진다")
     void applyDirect_모집중이_아니면_예외를_던진다() {
         // given
         CareRecipient recipient = buildRecipient(null, null, null);
@@ -161,7 +161,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-01 직접 신청 - 존재하지 않는 활동이면 RESOURCE_NOT_FOUND")
+    @DisplayName("REQ-ACT-12 - APP-01 직접 신청 - 존재하지 않는 활동이면 RESOURCE_NOT_FOUND")
     void applyDirect_활동이_없으면_예외를_던진다() {
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.empty());
 
@@ -172,7 +172,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-01 직접 신청 - 존재하지 않는 사용자면 USER_NOT_FOUND")
+    @DisplayName("REQ-ACT-12 - APP-01 직접 신청 - 존재하지 않는 사용자면 USER_NOT_FOUND")
     void applyDirect_사용자가_없으면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -186,7 +186,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-01 직접 신청 - 이미 PENDING/APPROVED 신청이 있으면 APPLICATION_ALREADY_EXISTS")
+    @DisplayName("REQ-ACT-13 - APP-01 직접 신청 - 이미 PENDING/APPROVED 신청이 있으면 APPLICATION_ALREADY_EXISTS")
     void applyDirect_이미_신청이_있으면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -207,7 +207,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName( "[REQ-ACT-15] CANCELED 신청을 다시 신청하면 새 행 없이 기존 행을 PENDING으로 재사용한다")
+    @DisplayName("REQ-ACT-15 - APP-01 직접 신청 - CANCELED 신청은 새 행을 만들지 않고 기존 행을 PENDING으로 되돌린다")
     void applyDirect_CANCELED_신청은_기존_행을_재사용한다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -230,7 +230,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[현재 동작 기록] AUTO로 취소했던 신청을 직접 신청(APP-01)으로 재신청해도 applicationType은 AUTO로 유지된다")
+    @DisplayName("REQ-ACT-15 - [현재 동작 기록] AUTO로 취소했던 신청을 직접 신청(APP-01)으로 재신청해도 applicationType은 AUTO로 유지된다")
     void applyDirect_CANCELED된_AUTO신청_재사용시_타입은_그대로_AUTO다() {
         // reactivate()는 status/approvedBy/approvedAt/rejectedReason만 초기화하고
         // applicationType은 변경하지 않는다. DB_ENTITY_GUIDE의 "재신청 방식에 따라
@@ -261,7 +261,7 @@ class ActivityApplicationServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("APP-02 자동배정 후보 조회 - 후보가 없으면 NO_AUTO_MATCH_CANDIDATE")
+    @DisplayName("REQ-ACT-17 - APP-02 자동배정 후보 조회 - 후보가 없으면 NO_AUTO_MATCH_CANDIDATE")
     void getAutoMatchCandidate_후보가_없으면_예외를_던진다() {
         given(careActivityRepository.findAutoMatchCandidates(eq(USER_ID), anyList()))
                 .willReturn(List.of());
@@ -273,7 +273,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-02 자동배정 후보 조회 - excludeActivityIds가 없으면 sentinel(List.of(-1L))로 조회한다")
+    @DisplayName("REQ-ACT-17 - APP-02 자동배정 후보 조회 - excludeActivityIds가 없으면 sentinel(List.of(-1L))로 조회한다")
     void getAutoMatchCandidate_제외목록이_없으면_기본값으로_조회한다() {
         given(careActivityRepository.findAutoMatchCandidates(eq(USER_ID), eq(List.of(-1L))))
                 .willReturn(List.of());
@@ -285,7 +285,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[REQ-ACT-16][REQ-ACT-17] 좌표가 있으면 거리와 last_checked_at을 고려해 자동배정 후보를 선택한다")
+    @DisplayName("REQ-ACT-16, REQ-ACT-17 - APP-02 자동배정 후보 조회 - 좌표가 있으면 거리와 안부확인 경과를 함께 고려해 최적 후보를 고른다")
     void getAutoMatchCandidate_좌표가_있으면_거리와_안부경과를_모두_고려한다() {
         BigDecimal userLat = new BigDecimal("37.5665");
         BigDecimal userLng = new BigDecimal("126.9780");
@@ -402,7 +402,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[REQ-ACT-16][REQ-ACT-17] 좌표가 없으면 last_checked_at을 기준으로 자동배정 후보를 선택한다")
+    @DisplayName("REQ-ACT-16, REQ-ACT-17 - APP-02 자동배정 후보 조회 - 좌표가 없으면 안부확인이 오래된 순으로 후보를 고른다")
     void getAutoMatchCandidate_좌표가_없으면_안부경과만으로_후보를_고른다() {
 
         CareRecipient recipientOld =
@@ -504,7 +504,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[REQ-ACT-18] 자동배정 후보를 확정하면 AUTO/PENDING 신청을 생성한다")
+    @DisplayName("REQ-ACT-18 - APP-02 자동배정 신청 확정 - 정상 신청이면 AUTO/PENDING으로 생성한다")
     void applyAuto_신규신청이면_AUTO_PENDING으로_생성한다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -524,7 +524,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-02 자동배정 신청 확정 - 모집 중이 아니면 예외를 던진다")
+    @DisplayName("REQ-ACT-18 - APP-02 자동배정 신청 확정 - 모집 중이 아니면 예외를 던진다")
     void applyAuto_모집중이_아니면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.IN_PROGRESS, 2, recipient);
@@ -537,7 +537,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-02 자동배정 신청 확정 - 이미 신청이 있으면 예외를 던진다")
+    @DisplayName("REQ-ACT-18, REQ-ACT-13 - APP-02 자동배정 신청 확정 - 이미 신청이 있으면 예외를 던진다")
     void applyAuto_이미_신청이_있으면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -562,9 +562,7 @@ class ActivityApplicationServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName(
-            "[REQ-ACT-23] 내 신청 목록에서 PENDING, APPROVED, REJECTED, CANCELED 신청을 모두 조회할 수 있다"
-    )
+    @DisplayName("REQ-ACT-23 - APP-03 내 신청 목록 - PENDING, APPROVED, REJECTED, CANCELED 신청을 모두 조회할 수 있다")
     void getMyApplications_전체조회시_모든신청상태를_반환한다() {
 
         Pageable pageable = PageRequest.of(0, 20);
@@ -673,7 +671,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-03 내 신청 목록 - status만 지정하면 hasStatus=true/hasType=false로 조회한다")
+    @DisplayName("REQ-ACT-23 - APP-03 내 신청 목록 - status만 지정하면 hasStatus=true/hasType=false로 조회한다")
     void getMyApplications_status만_지정하면_해당_플래그로_조회한다() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<ActivityApplication> emptyPage = new PageImpl<>(List.of(), pageable, 0);
@@ -692,7 +690,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-03 내 신청 목록 - 필터가 없으면 hasStatus/hasType 모두 false로 조회한다")
+    @DisplayName("REQ-ACT-23 - APP-03 내 신청 목록 - 필터가 없으면 hasStatus/hasType 모두 false로 조회한다")
     void getMyApplications_필터가_없으면_전체_조회_플래그로_요청한다() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<ActivityApplication> emptyPage = new PageImpl<>(List.of(), pageable, 0);
@@ -709,9 +707,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName(
-            "[REQ-ACT-25] 내 활동 목록에서 APPROVED된 예정 및 진행 활동을 조회할 수 있다"
-    )
+    @DisplayName("REQ-ACT-25 - APP-04 내 활동 목록 - APPROVED된 예정 및 진행 활동을 조회할 수 있다")
     void getMyActivities_APPROVED된_예정_진행활동을_반환한다() {
 
         Pageable pageable = PageRequest.of(0, 20);
@@ -804,7 +800,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-04 내 활동 목록 - 페이지에 나온 활동들의 activityRecordId를 한 번의 IN 조회로 채운다")
+    @DisplayName("REQ-ACT-25 - APP-04 내 활동 목록 - 페이지에 나온 활동들의 activityRecordId를 한 번의 IN 조회로 채운다")
     void getMyActivities_activityRecordId를_bulk조회로_채운다() {
         Pageable pageable = PageRequest.of(0, 20);
 
@@ -845,7 +841,7 @@ class ActivityApplicationServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("APP-05 신청 취소 - 존재하지 않는 신청이면 RESOURCE_NOT_FOUND")
+    @DisplayName("REQ-ACT-14 - APP-05 신청 취소 - 존재하지 않는 신청이면 RESOURCE_NOT_FOUND")
     void cancelApplication_신청이_없으면_예외를_던진다() {
         given(activityApplicationRepository.findById(1L)).willReturn(Optional.empty());
 
@@ -856,7 +852,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-05 신청 취소 - 본인 신청이 아니면 FORBIDDEN")
+    @DisplayName("REQ-ACT-14 - APP-05 신청 취소 - 본인 신청이 아니면 FORBIDDEN")
     void cancelApplication_본인_신청이_아니면_예외를_던진다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -875,7 +871,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[REQ-ACT-14] PENDING 신청은 승인 전에 CANCELED로 변경할 수 있다")
+    @DisplayName("REQ-ACT-14 - APP-05 신청 취소 - PENDING 신청은 CareActivity 조회 없이 바로 취소된다")
     void cancelApplication_PENDING이면_바로_취소된다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -893,7 +889,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[REQ-ACT-14] APPROVED 신청을 READY 상태에서 취소해 정원이 미달되면 RECRUITING으로 복귀한다")
+    @DisplayName("REQ-ACT-14 - APP-05 신청 취소 - APPROVED이고 활동이 READY면 취소 후 정원 미달 시 RECRUITING으로 되돌린다")
     void cancelApplication_APPROVED_READY에서_취소하면_정원미달시_RECRUITING으로_돌아간다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.READY, 2, recipient);
@@ -915,7 +911,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName( "[REQ-ACT-14] APPROVED 신청은 IN_PROGRESS 전 RECRUITING 상태에서 취소할 수 있다")
+    @DisplayName("REQ-ACT-14 - APP-05 신청 취소 - APPROVED이고 활동이 RECRUITING이면 상태 재계산 없이 취소만 된다")
     void cancelApplication_APPROVED_RECRUITING에서_취소하면_상태변경없이_취소만_된다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
@@ -936,7 +932,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("[REQ-ACT-14] APPROVED 신청은 활동이 IN_PROGRESS가 된 이후에는 취소할 수 없다")
+    @DisplayName("REQ-ACT-14 - APP-05 신청 취소 - APPROVED이지만 활동이 이미 IN_PROGRESS면 취소할 수 없다")
     void cancelApplication_활동이_시작된_이후에는_APPROVED를_취소할_수_없다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.IN_PROGRESS, 2, recipient);
@@ -958,7 +954,7 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("APP-05 신청 취소 - REJECTED 신청은 취소할 수 없다")
+    @DisplayName("REQ-ACT-14, REQ-ACT-15 - APP-05 신청 취소 - REJECTED/CANCELED 신청은 취소할 수 없다")
     void cancelApplication_REJECTED된_신청은_취소할_수_없다() {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);

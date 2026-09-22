@@ -38,7 +38,7 @@ class PlatformStatsServiceTest {
     private PlatformStatsService platformStatsService;
 
     @Test
-    @DisplayName("getPlatformSummary - 세 Repository의 집계값을 각각 올바른 조건으로 조회해 그대로 반환한다")
+    @DisplayName("REQ-DASH-05 - getPlatformSummary - 세 Repository의 집계값을 각각 올바른 조건으로 조회해 그대로 반환한다")
     void getPlatformSummary_각_집계값을_그대로_반환한다() {
         given(userRepository.countByRoleAndStatusAndDeletedFalse(UserRole.USER, UserStatus.ACTIVE))
                 .willReturn(120L);
@@ -55,7 +55,7 @@ class PlatformStatsServiceTest {
     }
 
     @Test
-    @DisplayName("getPlatformSummary - 데이터가 하나도 없으면 모두 0을 반환한다")
+    @DisplayName("REQ-DASH-05 - getPlatformSummary - 데이터가 하나도 없으면 모두 0을 반환한다")
     void getPlatformSummary_데이터가_없으면_0을_반환한다() {
         given(userRepository.countByRoleAndStatusAndDeletedFalse(UserRole.USER, UserStatus.ACTIVE))
                 .willReturn(0L);

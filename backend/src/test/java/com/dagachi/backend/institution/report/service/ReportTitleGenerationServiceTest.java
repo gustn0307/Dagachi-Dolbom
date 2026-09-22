@@ -86,7 +86,7 @@ class ReportTitleGenerationServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("generateAndSaveTitleAsync - 대상 제보가 없으면 AI를 호출하지 않고 조용히 끝난다")
+    @DisplayName("REQ-AI-12 - generateAndSaveTitleAsync - 대상 제보가 없으면 AI를 호출하지 않고 조용히 끝난다")
     void generateAndSaveTitleAsync_제보가_없으면_아무일도_하지_않는다() {
         given(reportRepository.existsById(10L)).willReturn(false);
 
@@ -98,7 +98,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("generateAndSaveTitleAsync - 정상 생성되면 REPORT_TITLE 타입의 AIAnalysis를 저장한다")
+    @DisplayName("REQ-AI-12 - generateAndSaveTitleAsync - 정상 생성되면 REPORT_TITLE 타입의 AIAnalysis를 저장한다")
     void generateAndSaveTitleAsync_성공하면_AIAnalysis를_저장한다() {
         given(reportRepository.existsById(10L)).willReturn(true);
         given(aiServiceClient.generateReportTitle("어르신이 며칠째 안 보인다는 제보"))
@@ -118,7 +118,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("generateAndSaveTitleAsync - AI 호출이 실패해도 예외를 밖으로 던지지 않는다")
+    @DisplayName("REQ-AI-12 - generateAndSaveTitleAsync - AI 호출이 실패해도 예외를 밖으로 던지지 않는다")
     void generateAndSaveTitleAsync_AI호출_실패해도_예외를_던지지_않는다() {
         given(reportRepository.existsById(10L)).willReturn(true);
         given(aiServiceClient.generateReportTitle(any()))
@@ -135,7 +135,7 @@ class ReportTitleGenerationServiceTest {
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("retryMissingTitles - MY_INSTITUTION scope에서 사용자가 없으면 USER_NOT_FOUND")
+    @DisplayName("REQ-AI-12 - retryMissingTitles - MY_INSTITUTION scope에서 사용자가 없으면 USER_NOT_FOUND")
     void retryMissingTitles_MY_INSTITUTION_사용자가_없으면_예외를_던진다() {
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.empty());
 
@@ -148,7 +148,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("retryMissingTitles - MY_INSTITUTION scope에서 소속 기관이 없으면 FORBIDDEN")
+    @DisplayName("REQ-AI-12 - retryMissingTitles - MY_INSTITUTION scope에서 소속 기관이 없으면 FORBIDDEN")
     void retryMissingTitles_MY_INSTITUTION_소속기관이_없으면_예외를_던진다() {
         User user = buildUser(USER_ID); // institution 미설정 -> null
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -162,7 +162,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("retryMissingTitles - MY_INSTITUTION scope는 소속 기관 ID 기준으로 대상을 조회한다")
+    @DisplayName("REQ-AI-12 - retryMissingTitles - MY_INSTITUTION scope는 소속 기관 ID 기준으로 대상을 조회한다")
     void retryMissingTitles_MY_INSTITUTION_소속기관_기준으로_조회한다() {
         User user = buildUser(USER_ID);
         Institution institution = mock(Institution.class);
@@ -182,7 +182,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("retryMissingTitles - UNASSIGNED scope에서 사용자가 없으면 USER_NOT_FOUND")
+    @DisplayName("REQ-AI-12 - retryMissingTitles - UNASSIGNED scope에서 사용자가 없으면 USER_NOT_FOUND")
     void retryMissingTitles_UNASSIGNED_사용자가_없으면_예외를_던진다() {
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.empty());
 
@@ -195,7 +195,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("retryMissingTitles - 대상이 없으면 0건 결과를 반환한다")
+    @DisplayName("REQ-AI-12 - retryMissingTitles - 대상이 없으면 0건 결과를 반환한다")
     void retryMissingTitles_대상이_없으면_0건을_반환한다() {
         User user = buildUser(USER_ID);
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -213,7 +213,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("[현재 동작 기록] retryMissingTitles - 조회 이후 삭제된 제보는 targetCount엔 포함되지만 성공/실패 어디에도 잡히지 않는다")
+    @DisplayName("REQ-AI-12 - [현재 동작 기록] retryMissingTitles - 조회 이후 삭제된 제보는 targetCount엔 포함되지만 성공/실패 어디에도 잡히지 않는다")
     void retryMissingTitles_성공과_실패와_유실이_섞이면_개수를_정확히_센다() {
         User user = buildUser(USER_ID);
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
@@ -250,7 +250,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("retryMissingTitles - 대상이 100건을 초과하면 100건만 처리하고 hasMore=true를 반환한다")
+    @DisplayName("REQ-AI-12 - retryMissingTitles - 대상이 100건을 초과하면 100건만 처리하고 hasMore=true를 반환한다")
     void retryMissingTitles_101건_이상이면_100건만_처리한다() {
         User user = buildUser(USER_ID);
         given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
