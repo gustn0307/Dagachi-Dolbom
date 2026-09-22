@@ -63,12 +63,12 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
      * ACT-01 목록 배지 표시용. 취소된 신청은 "신청 안 한 것"과 동일하게 취급하므로 제외한다.
      */
     @Query("""
-        SELECT aa
-        FROM ActivityApplication aa
-        WHERE aa.user.id = :userId
-          AND aa.activity.id IN :activityIds
-          AND aa.status <> com.dagachi.backend.domain.enums.ApplicationStatus.CANCELED
-        """)
+            SELECT aa
+            FROM ActivityApplication aa
+            WHERE aa.user.id = :userId
+              AND aa.activity.id IN :activityIds
+              AND aa.status <> com.dagachi.backend.domain.enums.ApplicationStatus.CANCELED
+            """)
     List<ActivityApplication> findActiveApplicationsByUserAndActivityIds(
             @Param("userId") Long userId,
             @Param("activityIds") List<Long> activityIds
@@ -79,14 +79,14 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
      * 활동별로 현재 걸려있는 신청(PENDING+APPROVED)만 센다. CANCELED/REJECTED는 제외.
      */
     @Query("""
-        SELECT aa
-        FROM ActivityApplication aa
-        WHERE aa.activity.id IN :activityIds
-          AND aa.status IN (
-                com.dagachi.backend.domain.enums.ApplicationStatus.PENDING,
-                com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
-              )
-        """)
+            SELECT aa
+            FROM ActivityApplication aa
+            WHERE aa.activity.id IN :activityIds
+              AND aa.status IN (
+                    com.dagachi.backend.domain.enums.ApplicationStatus.PENDING,
+                    com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+                  )
+            """)
     List<ActivityApplication> findActiveApplicationsByActivityIds(
             @Param("activityIds") List<Long> activityIds
     );
@@ -100,6 +100,7 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
 
     interface ActivityApplicationCountProjection {
         Long getActivityId();
+
         Long getCount();
     }
 
@@ -218,12 +219,12 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
      * RECORD-01 활동 시작 시 SAME_GENDER_ONE 조건 검증용.
      */
     @Query("""
-        SELECT u.gender
-        FROM ActivityApplication aa
-        JOIN aa.user u
-        WHERE aa.activity.id = :activityId
-          AND aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
-        """)
+            SELECT u.gender
+            FROM ActivityApplication aa
+            JOIN aa.user u
+            WHERE aa.activity.id = :activityId
+              AND aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+            """)
     List<UserGender> findApprovedUserGenders(@Param("activityId") Long activityId);
 
     /**
@@ -233,12 +234,60 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
     boolean existsByUser_IdAndStatusIn(Long userId, List<ApplicationStatus> statuses);
 
     /**
+     * REQ-AUTH-08 회원 탈퇴 차단 여부 확인.
+     * <p>
+     * 탈퇴를 차단하는 경우:
+     * <p>
+     * 1. PENDING 신청이 존재하는 경우
+     * 2. APPROVED 신청이면서 연결된 활동이 아직 종료되지 않은 경우
+     * - RECRUITING
+     * - READY
+     * - IN_PROGRESS
+     * <p>
+     * 탈퇴를 차단하지 않는 경우:
+     * <p>
+     * - APPROVED + COMPLETED
+     * - APPROVED + CANCELED
+     * - REJECTED
+     * - CANCELED
+     * <p>
+     * 완료·취소된 과거 활동의 APPROVED 신청 이력은 보존하되,
+     * 현재 진행 중인 참여로 간주하지 않습니다.
+     */
+    @Query("""
+            SELECT CASE
+                       WHEN COUNT(aa) > 0 THEN true
+                       ELSE false
+                   END
+            FROM ActivityApplication aa
+            WHERE aa.user.id = :userId
+              AND (
+                    aa.status =
+                        com.dagachi.backend.domain.enums.ApplicationStatus.PENDING
+            
+                    OR (
+                        aa.status =
+                            com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+            
+                        AND aa.activity.status IN (
+                            com.dagachi.backend.domain.enums.ActivityStatus.RECRUITING,
+                            com.dagachi.backend.domain.enums.ActivityStatus.READY,
+                            com.dagachi.backend.domain.enums.ActivityStatus.IN_PROGRESS
+                        )
+                    )
+                  )
+            """)
+    boolean existsBlockingWithdrawalParticipation(
+            @Param("userId") Long userId
+    );
+
+    /**
      * STAT-01 내 활동 통계 - 완료한 안부 확인 횟수.
-     *
+     * <p>
      * 로그인 사용자가 APPROVED 참여자로 참여한 CareActivity 중,
      * 공동 ActivityRecord가 기관에 의해 APPROVED되었고
      * visitResult가 MET인 활동 수를 센다.
-     *
+     * <p>
      * CareActivity : ActivityRecord = 1 : 0..1 이므로
      * activity.id 기준 distinct count가 record 기준 count와 동일하다.
      */
@@ -262,7 +311,7 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
 
     /**
      * STAT-01 내 활동 통계 - 함께한 이웃(고유 대상자) 수.
-     *
+     * <p>
      * 위와 동일한 조건에서 서로 다른 CareRecipient가 몇 명인지 센다.
      * 같은 어르신을 여러 번 방문해도 1명으로만 계산한다.
      */

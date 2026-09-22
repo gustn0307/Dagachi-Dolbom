@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext";
 import PageHeader from "../../components/common/PageHeader";
 import {
   getMyReports,
@@ -37,6 +38,7 @@ const overlayStyle = {
 
 function MyPage() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   // ---- 최근 제보 ----
   const [reports, setReports] = useState([]);
@@ -89,7 +91,7 @@ function MyPage() {
       } catch (requestError) {
         setError(
           requestError?.response?.data?.message ??
-            "제보 내역을 불러오지 못했습니다.",
+          "제보 내역을 불러오지 못했습니다.",
         );
       } finally {
         setLoading(false);
@@ -106,7 +108,7 @@ function MyPage() {
       } catch (requestError) {
         setProfileError(
           requestError?.response?.data?.message ??
-            "내 정보를 불러오지 못했습니다.",
+          "내 정보를 불러오지 못했습니다.",
         );
       } finally {
         setProfileLoading(false);
@@ -123,7 +125,7 @@ function MyPage() {
       } catch (requestError) {
         setStatsError(
           requestError?.response?.data?.message ??
-            "활동 통계를 불러오지 못했습니다.",
+          "활동 통계를 불러오지 못했습니다.",
         );
       }
     };
@@ -222,7 +224,7 @@ function MyPage() {
       } else {
         setPasswordError(
           requestError?.response?.data?.message ??
-            "비밀번호 변경에 실패했습니다.",
+          "비밀번호 변경에 실패했습니다.",
         );
       }
     } finally {
@@ -253,9 +255,18 @@ function MyPage() {
 
       await withdrawUser(withdrawPassword);
 
-      // 탈퇴 완료 후 로그인 화면으로 이동합니다.
-      // 실제 로그아웃(토큰 제거)은 프로젝트의 AuthContext.logout()과
-      // 연결해 주세요.
+      /*
+       * 회원 탈퇴가 성공하면 서버의 계정은 더 이상 유효한 로그인 계정이 아닙니다.
+       *
+       * 기존 Access Token을 브라우저에 남겨 두면 Axios interceptor가
+       * 로그인/공지/비회원 제보 같은 공개 API에도 탈퇴 전 JWT를 계속 첨부할 수 있습니다.
+       *
+       * AuthContext.logout()을 호출하여
+       * 1. sessionStorage의 Access Token을 제거하고
+       * 2. React의 user 상태도 null로 변경한 뒤
+       * 로그인 화면으로 이동합니다.
+       */
+      logout();
       navigate("/login", { replace: true });
     } catch (requestError) {
       const code = requestError?.response?.data?.code;
@@ -263,14 +274,14 @@ function MyPage() {
       if (code === "USER_409_WITHDRAWAL_BLOCKED") {
         setWithdrawError(
           "대기중이거나 승인된 신청/활동이 있어 탈퇴할 수 없어요. " +
-            "봉사 참여 > 내 신청 현황에서 먼저 취소해 주세요.",
+          "봉사 참여 > 내 신청 현황에서 먼저 취소해 주세요.",
         );
       } else if (code === "USER_400_PASSWORD_MISMATCH") {
         setWithdrawError("비밀번호가 일치하지 않습니다.");
       } else {
         setWithdrawError(
           requestError?.response?.data?.message ??
-            "탈퇴 처리 중 오류가 발생했습니다.",
+          "탈퇴 처리 중 오류가 발생했습니다.",
         );
       }
     } finally {
@@ -451,7 +462,7 @@ function MyPage() {
               />
               {passwordForm.newPasswordConfirm &&
                 passwordForm.newPassword !==
-                  passwordForm.newPasswordConfirm && (
+                passwordForm.newPasswordConfirm && (
                   <span className="auth-error">
                     비밀번호가 일치하지 않습니다.
                   </span>
@@ -502,9 +513,8 @@ function MyPage() {
           }}
         >
           <strong
-            aria-label={`완료한 안부 확인 ${
-              stats?.completedCareCheckCount ?? "-"
-            }회`}
+            aria-label={`완료한 안부 확인 ${stats?.completedCareCheckCount ?? "-"
+              }회`}
           >
             {statsError ? "-" : (stats?.completedCareCheckCount ?? "-")}
             <span>회</span>
