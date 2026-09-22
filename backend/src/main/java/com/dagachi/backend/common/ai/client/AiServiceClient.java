@@ -8,6 +8,8 @@ import com.dagachi.backend.common.ai.dto.AiReportSummaryRequest;
 import com.dagachi.backend.common.ai.dto.AiReportSummaryResponse;
 import com.dagachi.backend.common.ai.dto.AiReportTitleRequest;
 import com.dagachi.backend.common.ai.dto.AiReportTitleResponse;
+import com.dagachi.backend.common.ai.dto.AiActivityMatchingRequest;
+import com.dagachi.backend.common.ai.dto.AiActivityMatchingResponse;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -301,6 +303,83 @@ public class AiServiceClient {
         );
         if (invalid) {
             throw new CustomException(ErrorCode.AI_SERVICE_INVALID_RESPONSE);
+        }
+
+        return response;
+    }
+
+    /**
+     * FastAPI의 활동 AI 매칭 API를 호출합니다.
+     *
+     * Spring에서 미리 선별한 후보와 사용자의 활동 경험을 전달하고,
+     * AI가 정한 후보 순위와 추천 이유를 반환받습니다.
+     */
+    public AiActivityMatchingResponse matchActivities(
+            AiActivityMatchingRequest request
+    ) {
+        AiActivityMatchingResponse response;
+
+        try {
+            response = aiServiceRestClient
+                    .post()
+                    .uri("/internal/ai/activity-matching")
+                    .body(request)
+                    .retrieve()
+                    .body(AiActivityMatchingResponse.class);
+
+        } catch (ResourceAccessException exception) {
+            String message = exception.getMessage();
+
+            if (message != null
+                    && message.toLowerCase().contains("timed out")) {
+                throw new CustomException(
+                        ErrorCode.AI_SERVICE_TIMEOUT
+                );
+            }
+
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_UNAVAILABLE
+            );
+
+        } catch (RestClientResponseException exception) {
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_UNAVAILABLE
+            );
+
+        } catch (RestClientException exception) {
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_INVALID_RESPONSE
+            );
+        }
+
+        // HTTP 호출은 성공했지만 응답 Body가 없는 경우입니다.
+        if (response == null) {
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_INVALID_RESPONSE
+            );
+        }
+
+        // 후보가 없거나 사용한 모델 정보가 없으면 정상 결과로 사용하지 않습니다.
+        if (response.recommendations() == null
+                || response.recommendations().isEmpty()
+                || !StringUtils.hasText(response.model())) {
+            throw new CustomException(
+                    ErrorCode.AI_SERVICE_INVALID_RESPONSE
+            );
+        }
+
+        // 각 추천 결과에 필요한 값이 들어있는지 확인합니다.
+        for (AiActivityMatchingResponse.Recommendation recommendation
+                : response.recommendations()) {
+
+            if (recommendation.activityId() == null
+                    || recommendation.rank() < 1
+                    || !StringUtils.hasText(recommendation.reason())) {
+
+                throw new CustomException(
+                        ErrorCode.AI_SERVICE_INVALID_RESPONSE
+                );
+            }
         }
 
         return response;

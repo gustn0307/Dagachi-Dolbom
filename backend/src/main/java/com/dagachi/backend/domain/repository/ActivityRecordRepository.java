@@ -17,6 +17,7 @@ public interface ActivityRecordRepository extends JpaRepository<ActivityRecord, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select ar from ActivityRecord ar where ar.id = :id")
     Optional<ActivityRecord> findByIdForUpdate(@Param("id") Long id);
+
     Optional<ActivityRecord> findByActivity_Id(Long activityId);
 
     /**
@@ -27,4 +28,45 @@ public interface ActivityRecordRepository extends JpaRepository<ActivityRecord, 
 
     // 메인페이지 통계 조회
     long countByReviewStatus(ActivityReviewStatus reviewStatus);
+
+    /**
+     * AI 매칭 사용자 경험 프로필 조회.
+     *
+     * 승인된 활동 신청 + 기관 승인 활동기록 + 실제 만남(MET) 기록만 조회합니다.
+     */
+    @Query("""
+            SELECT DISTINCT ar
+            FROM ActivityRecord ar
+            JOIN FETCH ar.activity ca
+            JOIN FETCH ca.recipient cr
+            JOIN ActivityApplication aa
+                ON aa.activity = ca
+            WHERE aa.user.id = :userId
+              AND aa.status =
+                  com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+              AND ar.reviewStatus =
+                  com.dagachi.backend.domain.enums.ActivityReviewStatus.APPROVED
+              AND ar.visitResult =
+                  com.dagachi.backend.domain.enums.VisitResult.MET
+            """)
+    List<ActivityRecord> findApprovedMetRecordsByUserId(
+            @Param("userId") Long userId
+    );
+
+    /**
+     * AI 매칭 후보 대상자의 최근 기관 승인 활동기록 조회.
+     */
+    @Query("""
+            SELECT ar
+            FROM ActivityRecord ar
+            JOIN FETCH ar.activity ca
+            JOIN FETCH ca.recipient cr
+            WHERE cr.id IN :recipientIds
+              AND ar.reviewStatus =
+                  com.dagachi.backend.domain.enums.ActivityReviewStatus.APPROVED
+            ORDER BY cr.id ASC, ar.completedAt DESC
+            """)
+    List<ActivityRecord> findApprovedRecordsByRecipientIds(
+            @Param("recipientIds") List<Long> recipientIds
+    );
 }

@@ -51,7 +51,7 @@ import static org.mockito.Mockito.verify;
  * ActivityApplicationService(APP-01~05) 비즈니스 규칙 단위 테스트.
  *
  * DB나 Spring Context 없이 Repository를 모두 Mock 처리한다.
- * REQ-ID는 컨트롤러/서비스 Javadoc에 표기된 API_SPEC ID(APP-xx)를 기준으로 표기한다.
+ * 요구사항 정의서의 REQ-ID와 직접 대응하는 테스트는 @DisplayName에 REQ-ID를 표기한다.
  */
 @ExtendWith(MockitoExtension.class)
 class ActivityApplicationServiceTest {
@@ -285,53 +285,222 @@ class ActivityApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("REQ-ACT-17 - APP-02 자동배정 후보 조회 - 좌표가 있으면 거리와 안부확인 경과를 함께 고려해 최적 후보를 고른다")
+    @DisplayName("REQ-ACT-16, REQ-ACT-17 - APP-02 자동배정 후보 조회 - 좌표가 있으면 거리와 안부확인 경과를 함께 고려해 최적 후보를 고른다")
     void getAutoMatchCandidate_좌표가_있으면_거리와_안부경과를_모두_고려한다() {
         BigDecimal userLat = new BigDecimal("37.5665");
         BigDecimal userLng = new BigDecimal("126.9780");
 
         // A: 사용자와 매우 가깝고, 안부확인도 오래됨 -> 두 지표 모두 우세
-        CareRecipient recipientA = buildRecipient(userLat, userLng, LocalDateTime.now().minusDays(30));
-        CareActivity activityA = buildActivity(1L, ActivityStatus.RECRUITING, 2, recipientA);
+        CareRecipient recipientA =
+                buildRecipient(
+                        userLat,
+                        userLng,
+                        LocalDateTime.now().minusDays(30)
+                );
+
+        CareActivity activityA =
+                buildActivity(
+                        1L,
+                        ActivityStatus.RECRUITING,
+                        2,
+                        recipientA
+                );
 
         // B: 멀리 떨어져 있고, 최근에 안부확인함 -> 두 지표 모두 열세
-        CareRecipient recipientB = buildRecipient(new BigDecimal("35.1796"), new BigDecimal("129.0756"), LocalDateTime.now().minusDays(1));
-        CareActivity activityB = buildActivity(2L, ActivityStatus.RECRUITING, 2, recipientB);
+        CareRecipient recipientB =
+                buildRecipient(
+                        new BigDecimal("35.1796"),
+                        new BigDecimal("129.0756"),
+                        LocalDateTime.now().minusDays(1)
+                );
 
-        given(careActivityRepository.findAutoMatchCandidates(eq(USER_ID), anyList()))
-                .willReturn(List.of(activityA, activityB));
-        given(activityApplicationRepository.countApprovedMap(eq(List.of(1L))))
-                .willReturn(Map.of(1L, 1L));
-        given(activityApplicationRepository.findActiveApplicationsByActivityIds(eq(List.of(1L))))
-                .willReturn(List.of());
+        CareActivity activityB =
+                buildActivity(
+                        2L,
+                        ActivityStatus.RECRUITING,
+                        2,
+                        recipientB
+                );
 
-        var response = service.getAutoMatchCandidate(USER_ID, userLat, userLng, null);
+        // REQ-ACT-17 유효 후보 필터에서 로그인 사용자의 성별을 확인한다.
+        User user =
+                buildUser(
+                        USER_ID,
+                        UserGender.MALE
+                );
 
-        assertThat(response.activityId()).isEqualTo(1L);
-        assertThat(response.myApplicationStatus()).isNull();
-        assertThat(response.approvedCount()).isEqualTo(1L);
-        assertThat(response.applicantCount()).isEqualTo(0L);
+        given(
+                careActivityRepository.findAutoMatchCandidates(
+                        eq(USER_ID),
+                        anyList()
+                )
+        ).willReturn(
+                List.of(activityA, activityB)
+        );
+
+        given(
+                userRepository.findById(USER_ID)
+        ).willReturn(
+                Optional.of(user)
+        );
+
+        // 유효 후보 필터에서 후보 전체의 현재 승인 인원을 배치 조회한다.
+        given(
+                activityApplicationRepository.countApprovedMap(
+                        eq(List.of(1L, 2L))
+                )
+        ).willReturn(
+                Map.of()
+        );
+
+        // 현재 두 활동은 GenderCondition.NONE이지만,
+        // 공통 필터의 배치 조회 흐름을 그대로 준비한다.
+        given(
+                activityApplicationRepository.countApprovedSameGenderMap(
+                        eq(List.of(1L, 2L))
+                )
+        ).willReturn(
+                Map.of()
+        );
+
+        // 최종 선택된 활동의 응답용 승인 인원 조회
+        given(
+                activityApplicationRepository.countApprovedMap(
+                        eq(List.of(1L))
+                )
+        ).willReturn(
+                Map.of(1L, 1L)
+        );
+
+        given(
+                activityApplicationRepository.findActiveApplicationsByActivityIds(
+                        eq(List.of(1L))
+                )
+        ).willReturn(
+                List.of()
+        );
+
+        var response =
+                service.getAutoMatchCandidate(
+                        USER_ID,
+                        userLat,
+                        userLng,
+                        null
+                );
+
+        assertThat(response.activityId())
+                .isEqualTo(1L);
+
+        assertThat(response.myApplicationStatus())
+                .isNull();
+
+        assertThat(response.approvedCount())
+                .isEqualTo(1L);
+
+        assertThat(response.applicantCount())
+                .isEqualTo(0L);
     }
 
     @Test
-    @DisplayName("REQ-ACT-17 - APP-02 자동배정 후보 조회 - 좌표가 없으면 안부확인이 오래된 순으로만 후보를 고른다")
+    @DisplayName("REQ-ACT-16, REQ-ACT-17 - APP-02 자동배정 후보 조회 - 좌표가 없으면 안부확인이 오래된 순으로 후보를 고른다")
     void getAutoMatchCandidate_좌표가_없으면_안부경과만으로_후보를_고른다() {
-        CareRecipient recipientOld = buildRecipient(null, null, LocalDateTime.now().minusDays(60));
-        CareActivity activityOld = buildActivity(1L, ActivityStatus.RECRUITING, 2, recipientOld);
 
-        CareRecipient recipientRecent = buildRecipient(null, null, LocalDateTime.now().minusDays(1));
-        CareActivity activityRecent = buildActivity(2L, ActivityStatus.RECRUITING, 2, recipientRecent);
+        CareRecipient recipientOld =
+                buildRecipient(
+                        null,
+                        null,
+                        LocalDateTime.now().minusDays(60)
+                );
 
-        given(careActivityRepository.findAutoMatchCandidates(eq(USER_ID), anyList()))
-                .willReturn(List.of(activityOld, activityRecent));
-        given(activityApplicationRepository.countApprovedMap(eq(List.of(1L))))
-                .willReturn(Map.of());
-        given(activityApplicationRepository.findActiveApplicationsByActivityIds(eq(List.of(1L))))
-                .willReturn(List.of());
+        CareActivity activityOld =
+                buildActivity(
+                        1L,
+                        ActivityStatus.RECRUITING,
+                        2,
+                        recipientOld
+                );
 
-        var response = service.getAutoMatchCandidate(USER_ID, null, null, null);
+        CareRecipient recipientRecent =
+                buildRecipient(
+                        null,
+                        null,
+                        LocalDateTime.now().minusDays(1)
+                );
 
-        assertThat(response.activityId()).isEqualTo(1L);
+        CareActivity activityRecent =
+                buildActivity(
+                        2L,
+                        ActivityStatus.RECRUITING,
+                        2,
+                        recipientRecent
+                );
+
+        // REQ-ACT-17 유효 후보 필터에서 로그인 사용자의 성별을 확인한다.
+        User user =
+                buildUser(
+                        USER_ID,
+                        UserGender.MALE
+                );
+
+        given(
+                careActivityRepository.findAutoMatchCandidates(
+                        eq(USER_ID),
+                        anyList()
+                )
+        ).willReturn(
+                List.of(activityOld, activityRecent)
+        );
+
+        given(
+                userRepository.findById(USER_ID)
+        ).willReturn(
+                Optional.of(user)
+        );
+
+        // 유효 후보 필터에서 후보 전체 승인 인원을 한 번에 확인한다.
+        given(
+                activityApplicationRepository.countApprovedMap(
+                        eq(List.of(1L, 2L))
+                )
+        ).willReturn(
+                Map.of()
+        );
+
+        given(
+                activityApplicationRepository.countApprovedSameGenderMap(
+                        eq(List.of(1L, 2L))
+                )
+        ).willReturn(
+                Map.of()
+        );
+
+        // 최종 선택된 활동의 응답용 승인 인원
+        given(
+                activityApplicationRepository.countApprovedMap(
+                        eq(List.of(1L))
+                )
+        ).willReturn(
+                Map.of()
+        );
+
+        given(
+                activityApplicationRepository.findActiveApplicationsByActivityIds(
+                        eq(List.of(1L))
+                )
+        ).willReturn(
+                List.of()
+        );
+
+        var response =
+                service.getAutoMatchCandidate(
+                        USER_ID,
+                        null,
+                        null,
+                        null
+                );
+
+        assertThat(response.activityId())
+                .isEqualTo(1L);
     }
 
     @Test
@@ -393,6 +562,115 @@ class ActivityApplicationServiceTest {
     // ---------------------------------------------------------------
 
     @Test
+    @DisplayName("REQ-ACT-23 - APP-03 내 신청 목록 - PENDING, APPROVED, REJECTED, CANCELED 신청을 모두 조회할 수 있다")
+    void getMyApplications_전체조회시_모든신청상태를_반환한다() {
+
+        Pageable pageable = PageRequest.of(0, 20);
+
+        CareRecipient recipient =
+                buildRecipient(null, null, null);
+
+        User user =
+                buildUser(USER_ID, UserGender.MALE);
+
+        ActivityApplication pending =
+                buildExistingApplication(
+                        1L,
+                        buildActivity(
+                                21L,
+                                ActivityStatus.RECRUITING,
+                                2,
+                                recipient
+                        ),
+                        user,
+                        ApplicationType.DIRECT,
+                        ApplicationStatus.PENDING
+                );
+
+        ActivityApplication approved =
+                buildExistingApplication(
+                        2L,
+                        buildActivity(
+                                22L,
+                                ActivityStatus.READY,
+                                2,
+                                recipient
+                        ),
+                        user,
+                        ApplicationType.DIRECT,
+                        ApplicationStatus.APPROVED
+                );
+
+        ActivityApplication rejected =
+                buildExistingApplication(
+                        3L,
+                        buildActivity(
+                                23L,
+                                ActivityStatus.RECRUITING,
+                                2,
+                                recipient
+                        ),
+                        user,
+                        ApplicationType.DIRECT,
+                        ApplicationStatus.REJECTED
+                );
+
+        ActivityApplication canceled =
+                buildExistingApplication(
+                        4L,
+                        buildActivity(
+                                24L,
+                                ActivityStatus.RECRUITING,
+                                2,
+                                recipient
+                        ),
+                        user,
+                        ApplicationType.DIRECT,
+                        ApplicationStatus.CANCELED
+                );
+
+        Page<ActivityApplication> page =
+                new PageImpl<>(
+                        List.of(
+                                pending,
+                                approved,
+                                rejected,
+                                canceled
+                        ),
+                        pageable,
+                        4
+                );
+
+        given(
+                activityApplicationRepository.findMyApplications(
+                        eq(USER_ID),
+                        eq(false),
+                        isNull(),
+                        eq(false),
+                        isNull(),
+                        eq(pageable)
+                )
+        ).willReturn(page);
+
+        PageResponse<ApplicationResponse> response =
+                service.getMyApplications(
+                        USER_ID,
+                        null,
+                        null,
+                        pageable
+                );
+
+        assertThat(response.content())
+                .extracting(ApplicationResponse::status)
+                .containsExactly(
+                        ApplicationStatus.PENDING,
+                        ApplicationStatus.APPROVED,
+                        ApplicationStatus.REJECTED,
+                        ApplicationStatus.CANCELED
+                );
+    }
+
+    @Test
     @DisplayName("REQ-ACT-23 - APP-03 내 신청 목록 - status만 지정하면 hasStatus=true/hasType=false로 조회한다")
     void getMyApplications_status만_지정하면_해당_플래그로_조회한다() {
         Pageable pageable = PageRequest.of(0, 20);
@@ -426,6 +704,99 @@ class ActivityApplicationServiceTest {
         verify(activityApplicationRepository).findMyApplications(
                 eq(USER_ID), eq(false), isNull(), eq(false), isNull(), eq(pageable)
         );
+    }
+
+    @Test
+    @DisplayName("REQ-ACT-25 - APP-04 내 활동 목록 - APPROVED된 예정 및 진행 활동을 조회할 수 있다")
+    void getMyActivities_APPROVED된_예정_진행활동을_반환한다() {
+
+        Pageable pageable = PageRequest.of(0, 20);
+
+        CareRecipient recipient =
+                buildRecipient(null, null, null);
+
+        User user =
+                buildUser(USER_ID, UserGender.MALE);
+
+        CareActivity readyActivity =
+                buildActivity(
+                        31L,
+                        ActivityStatus.READY,
+                        2,
+                        recipient
+                );
+
+        CareActivity inProgressActivity =
+                buildActivity(
+                        32L,
+                        ActivityStatus.IN_PROGRESS,
+                        2,
+                        recipient
+                );
+
+        ActivityApplication readyApplication =
+                buildExistingApplication(
+                        1L,
+                        readyActivity,
+                        user,
+                        ApplicationType.DIRECT,
+                        ApplicationStatus.APPROVED
+                );
+
+        ActivityApplication inProgressApplication =
+                buildExistingApplication(
+                        2L,
+                        inProgressActivity,
+                        user,
+                        ApplicationType.AUTO,
+                        ApplicationStatus.APPROVED
+                );
+
+        Page<ActivityApplication> page =
+                new PageImpl<>(
+                        List.of(
+                                readyApplication,
+                                inProgressApplication
+                        ),
+                        pageable,
+                        2
+                );
+
+        given(
+                activityApplicationRepository.findMyActivities(
+                        eq(USER_ID),
+                        eq(false),
+                        isNull(),
+                        eq(pageable)
+                )
+        ).willReturn(page);
+
+        given(
+                activityRecordRepository.findByActivity_IdIn(
+                        eq(List.of(31L, 32L))
+                )
+        ).willReturn(List.of());
+
+        PageResponse<ApplicationResponse> response =
+                service.getMyActivities(
+                        USER_ID,
+                        null,
+                        pageable
+                );
+
+        assertThat(response.content())
+                .hasSize(2);
+
+        assertThat(response.content())
+                .extracting(ApplicationResponse::status)
+                .containsOnly(ApplicationStatus.APPROVED);
+
+        assertThat(response.content())
+                .extracting(ApplicationResponse::activityStatus)
+                .containsExactly(
+                        ActivityStatus.READY,
+                        ActivityStatus.IN_PROGRESS
+                );
     }
 
     @Test

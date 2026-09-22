@@ -10,7 +10,7 @@ import {
   fetchMyActivities,
   cancelApplication,
   startActivity,
-  fetchAutoMatchCandidate,
+  fetchAutoMatchCandidates,
   applyAutoMatch,
 } from "../../api/userApi";
 
@@ -22,6 +22,19 @@ const GENDER_OPTIONS = [
   { value: "MALE", label: "남성" },
   { value: "FEMALE", label: "여성" },
 ];
+
+const AUTO_MATCH_CANDIDATES_KEY = "autoMatchCandidates";
+const AUTO_MATCH_INDEX_KEY = "autoMatchCandidateIndex";
+const AUTO_MATCH_SEEN_IDS_KEY = "autoMatchSeenActivityIds";
+
+function readSessionArray(key) {
+  try {
+    const saved = sessionStorage.getItem(key);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
 
 const STATUS_LABEL = {
   RECRUITING: "모집중",
@@ -136,12 +149,44 @@ function Volunteer() {
   const [myTotalElements, setMyTotalElements] = useState(0);
 
   // ---- 배정 받기 탭 state (APP-02) ----
-  const [autoCandidate, setAutoCandidate] = useState(null);
+
   const [autoLoading, setAutoLoading] = useState(false);
   const [autoError, setAutoError] = useState(null);
   const [autoApplying, setAutoApplying] = useState(false);
   const [autoApplyError, setAutoApplyError] = useState(null);
-  const [seenActivityIds, setSeenActivityIds] = useState([]);
+  const [autoCandidates, setAutoCandidates] = useState(() =>
+    readSessionArray(AUTO_MATCH_CANDIDATES_KEY),
+  );
+
+  const [autoCandidateIndex, setAutoCandidateIndex] = useState(() => {
+    const saved = sessionStorage.getItem(AUTO_MATCH_INDEX_KEY);
+    const parsed = Number(saved);
+
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+  });
+
+  const [seenActivityIds, setSeenActivityIds] = useState(() =>
+    readSessionArray(AUTO_MATCH_SEEN_IDS_KEY),
+  );
+  const autoCandidate = autoCandidates[autoCandidateIndex] ?? null;
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      AUTO_MATCH_CANDIDATES_KEY,
+      JSON.stringify(autoCandidates),
+    );
+  }, [autoCandidates]);
+
+  useEffect(() => {
+    sessionStorage.setItem(AUTO_MATCH_INDEX_KEY, String(autoCandidateIndex));
+  }, [autoCandidateIndex]);
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      AUTO_MATCH_SEEN_IDS_KEY,
+      JSON.stringify(seenActivityIds),
+    );
+  }, [seenActivityIds]);
 
   // ---- 내 활동 탭 state (APP-04) ----
   const [myActivities, setMyActivities] = useState([]);
@@ -327,24 +372,50 @@ function Volunteer() {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // 배정 받기 탭에서 후보를 새로 요청한다. 위치 권한이 없어도 진행한다.
-  const loadAutoMatchCandidate = (excludeIds = seenActivityIds) => {
+  // ---- AI 자동배정 후보 조회/이동/신청 (APP-02) ----
+
+  // 사용자가 실제로 확인한 활동 ID를 중복 없이 기록합니다.
+  // 다음 AI batch 요청에서 이미 본 활동을 제외할 때 사용합니다.
+  const addSeenActivityId = (activityId) => {
+    setSeenActivityIds((prev) =>
+      prev.includes(activityId) ? prev : [...prev, activityId],
+    );
+  };
+
+  // AI가 정렬한 자동배정 후보를 한 번에 최대 10개 받아옵니다.
+  // 위치 정보를 사용할 수 없더라도 자동배정은 계속 진행합니다.
+  const loadAutoMatchCandidates = (excludeIds = seenActivityIds) => {
     setAutoLoading(true);
     setAutoError(null);
     setAutoApplyError(null);
-    setAutoCandidate(null);
 
     const fetchWithCoords = (coords) =>
-      fetchAutoMatchCandidate({
+      fetchAutoMatchCandidates({
         ...(coords ?? {}),
         excludeActivityIds: excludeIds,
       })
         .then((data) => {
-          setAutoCandidate(data);
-          setSeenActivityIds((prev) => [...prev, data.activityId]);
+          if (!Array.isArray(data) || data.length === 0) {
+            setAutoCandidates([]);
+            setAutoCandidateIndex(0);
+            setAutoError(
+              excludeIds.length > 0
+                ? "더 이상 추천할 활동이 없습니다. 처음부터 다시 볼까요?"
+                : "지금 배정 가능한 활동이 없습니다. 잠시 후 다시 시도해주세요.",
+            );
+            return;
+          }
+
+          // 새 AI batch를 저장하고 첫 번째 후보부터 보여줍니다.
+          setAutoCandidates(data);
+          setAutoCandidateIndex(0);
+
+          // 첫 번째 후보는 실제 화면에 표시되므로 본 활동으로 기록합니다.
+          addSeenActivityId(data[0].activityId);
         })
         .catch((err) => {
           const code = err?.response?.data?.code;
+
           setAutoError(
             code === "ACT_404_NO_AUTO_MATCH_CANDIDATE"
               ? excludeIds.length > 0
@@ -372,15 +443,47 @@ function Volunteer() {
     );
   };
 
-  // 탭 진입 시 "본 목록" 초기화하고 새로 시작
+  // 현재 batch에 다음 후보가 있으면 서버를 다시 호출하지 않고
+  // 저장된 후보 중 다음 활동을 보여줍니다.
+  // 현재 batch를 모두 본 경우에만 새로운 AI batch를 요청합니다.
+  const handleNextAutoCandidate = () => {
+    const nextIndex = autoCandidateIndex + 1;
+
+    if (nextIndex < autoCandidates.length) {
+      const nextCandidate = autoCandidates[nextIndex];
+
+      setAutoCandidateIndex(nextIndex);
+      setAutoApplyError(null);
+      addSeenActivityId(nextCandidate.activityId);
+      return;
+    }
+
+    // 현재 batch를 모두 확인했으므로 이전 후보는 더 이상 복원하지 않습니다.
+    setAutoCandidates([]);
+    setAutoCandidateIndex(0);
+
+    loadAutoMatchCandidates(seenActivityIds);
+  };
+
+  // 배정 받기 탭에 들어왔을 때 이전에 보던 AI batch가 sessionStorage에
+  // 남아 있으면 그대로 이어서 봅니다.
+  // 저장된 batch가 없거나 모두 본 경우에만 새로운 batch를 요청합니다.
   useEffect(() => {
     if (activeTab !== "auto") return;
-    setSeenActivityIds([]);
-    loadAutoMatchCandidate([]);
+
+    if (
+      autoCandidates.length > 0 &&
+      autoCandidateIndex < autoCandidates.length
+    ) {
+      return;
+    }
+
+    loadAutoMatchCandidates(seenActivityIds);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // 배정받은 후보에 실제 신청
+  // 현재 화면에 표시된 AI 추천 활동에 실제 신청합니다.
   const handleApplyAutoMatch = async () => {
     if (!autoCandidate) return;
 
@@ -389,8 +492,16 @@ function Volunteer() {
 
     try {
       await applyAutoMatch(autoCandidate.activityId);
+
       setToastMessage("신청이 완료되었습니다. 기관 승인을 기다려주세요.");
-      setAutoCandidate(null);
+
+      // 자동배정 신청이 끝났으므로 이번 추천 세션을 초기화합니다.
+      setAutoCandidates([]);
+      setAutoCandidateIndex(0);
+      setSeenActivityIds([]);
+
+      // 신청 결과를 바로 확인할 수 있도록 내 신청 현황 탭으로 이동합니다.
+      setActiveTab("my");
     } catch (err) {
       const message =
         err?.response?.data?.message ?? "신청 중 오류가 발생했습니다.";
@@ -1367,7 +1478,9 @@ function Volunteer() {
                 className="secondary-action"
                 onClick={() => {
                   setSeenActivityIds([]);
-                  loadAutoMatchCandidate([]);
+                  setAutoCandidates([]);
+                  setAutoCandidateIndex(0);
+                  loadAutoMatchCandidates([]);
                 }}
               >
                 처음부터 다시 보기
@@ -1400,6 +1513,22 @@ function Volunteer() {
                     ` · 약 ${autoCandidate.distanceKm}km`}
                 </p>
 
+                {autoCandidate.reason && (
+                  <p
+                    style={{
+                      margin: "8px 0 0",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      background: "#fff7f0",
+                      color: "#685d52",
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    추천 이유: {autoCandidate.reason}
+                  </p>
+                )}
+
                 {autoApplyError && (
                   <p style={{ color: "#c0392b", fontSize: 13, marginTop: 8 }}>
                     {autoApplyError}
@@ -1418,7 +1547,7 @@ function Volunteer() {
                 <button
                   type="button"
                   disabled={autoApplying}
-                  onClick={() => loadAutoMatchCandidate()}
+                  onClick={handleNextAutoCandidate}
                   style={{
                     minHeight: 44,
                     padding: "0 16px",

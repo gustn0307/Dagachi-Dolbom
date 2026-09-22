@@ -35,6 +35,31 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
     );
 
     /**
+     * REQ-ACT-17 자동배정 SAME_GENDER_ONE 유효 후보 검증용.
+     *
+     * 후보 활동 전체를 대상으로,
+     * 현재 APPROVED 참여자 중 돌봄 대상자와 성별이 같은 인원 수를
+     * 활동별로 한 번에 조회한다.
+     *
+     * 후보마다 개별 조회하지 않고 배치 조회하여
+     * 자동배정 후보 수가 늘어나도 N+1 조회가 발생하지 않도록 한다.
+     */
+    @Query("""
+        SELECT aa.activity.id AS activityId, COUNT(aa) AS count
+        FROM ActivityApplication aa
+        JOIN aa.activity ca
+        JOIN ca.recipient cr
+        JOIN aa.user u
+        WHERE aa.activity.id IN :activityIds
+          AND aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+          AND u.gender = cr.gender
+        GROUP BY aa.activity.id
+        """)
+    List<ActivityApplicationCountProjection> countApprovedSameGenderByActivityIds(
+            @Param("activityIds") List<Long> activityIds
+    );
+
+    /**
      * ACT-01 목록 배지 표시용. 취소된 신청은 "신청 안 한 것"과 동일하게 취급하므로 제외한다.
      */
     @Query("""
@@ -81,6 +106,24 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
 
     default Map<Long, Long> countApprovedMap(List<Long> activityIds) {
         return countApprovedByActivityIds(activityIds, ApplicationStatus.APPROVED)
+                .stream()
+                .collect(Collectors.toMap(
+                        ActivityApplicationCountProjection::getActivityId,
+                        ActivityApplicationCountProjection::getCount
+                ));
+    }
+
+    /**
+     * REQ-ACT-17 자동배정 후보 검증에서 사용할
+     * 활동별 '대상자와 같은 성별의 APPROVED 참여자 수' Map을 만든다.
+     *
+     * 조회 결과가 없는 활동은 Map에 포함되지 않으며,
+     * Service에서 기본값 0으로 처리한다.
+     */
+    default Map<Long, Long> countApprovedSameGenderMap(
+            List<Long> activityIds
+    ) {
+        return countApprovedSameGenderByActivityIds(activityIds)
                 .stream()
                 .collect(Collectors.toMap(
                         ActivityApplicationCountProjection::getActivityId,
