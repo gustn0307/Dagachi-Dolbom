@@ -10,6 +10,7 @@ import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.GenderCondition;
 import com.dagachi.backend.domain.enums.UserGender;
+import com.dagachi.backend.domain.enums.UserStatus;
 import com.dagachi.backend.domain.repository.*;
 import com.dagachi.backend.user.record.dto.ActivityRecordResponse;
 
@@ -42,6 +43,12 @@ import java.util.List;
 
 /**
  * 일반 USER의 활동 시작(RECORD-01)을 담당한다.
+ *
+ * [수정 - 유지훈 담당 범위(RECORD-01)만] startActivity()에 정지(SUSPENDED)·
+ * 탈퇴(WITHDRAWN) 계정 검증을 추가했다. 공용 UserAccessValidator는 아직
+ * 존재하지 않아(강현수 담당, 별도 PR 필요) 여기서는 UserRepository를 직접
+ * 사용하는 로컬 검증으로 처리한다. RECORD-02~05(saveDraft/uploadSignature/
+ * submit/getActivityRecord, 맹동영 담당)는 원본 그대로 되돌렸다.
  */
 @Slf4j
 @Service
@@ -58,7 +65,7 @@ public class ActivityRecordService {
     // RECORD-04 서명 파일 업로드/삭제에 사용합니다.
     private final S3StorageService s3StorageService;
 
-    // RECORD-05 제출자를 조회하는 데 사용합니다.
+    // RECORD-01 계정 상태 검증, RECORD-05 제출자 조회에 사용합니다.
     private final UserRepository userRepository;
 
     public ActivityRecordService(
@@ -79,11 +86,35 @@ public class ActivityRecordService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * [신규 - RECORD-01 전용] 삭제되지 않고, 정지·탈퇴되지 않은 사용자를 조회합니다.
+     *
+     * startActivity()에서만 사용합니다. RECORD-02~05는 맹동영 담당 영역이라
+     * 이 검증을 임의로 추가하지 않았습니다. (공용 UserAccessValidator가
+     * 만들어지면 그때 이 메서드는 제거하고 그쪽으로 교체 예정)
+     */
+    private User findActiveUser(Long userId) {
+        User user = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new CustomException(ErrorCode.ACCOUNT_SUSPENDED);
+        }
+
+        if (user.getStatus() == UserStatus.WITHDRAWN) {
+            throw new CustomException(ErrorCode.ACCOUNT_WITHDRAWN);
+        }
+
+        return user;
+    }
+
     @Transactional
     public ActivityRecordResponse startActivity(
             Long activityId,
             Long userId
     ) {
+        // [수정] 활동 시작 전에 계정 상태(정지/탈퇴)를 먼저 검증합니다.
+        findActiveUser(userId);
 
         // REQ-REC-01
         // 활동 시작과 공동 ActivityRecord 생성을 한 트랜잭션에서 처리하기 위해

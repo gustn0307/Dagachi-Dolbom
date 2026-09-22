@@ -132,6 +132,48 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
     }
 
     /**
+     * REQ-AUTH-08 회원 탈퇴 차단 여부 확인.
+     *
+     * 탈퇴를 차단하는 경우:
+     * 1. PENDING 신청이 존재하는 경우
+     * 2. APPROVED 신청이면서 연결된 활동이 아직 종료되지 않은 경우
+     *    - RECRUITING
+     *    - READY
+     *    - IN_PROGRESS
+     *
+     * 탈퇴를 차단하지 않는 경우:
+     * - APPROVED + COMPLETED
+     * - APPROVED + CANCELED
+     * - REJECTED
+     * - CANCELED
+     *
+     * 완료·취소된 과거 활동의 APPROVED 신청 이력은 보존하되,
+     * 현재 진행 중인 참여로 간주하지 않습니다.
+     */
+    @Query("""
+        SELECT CASE
+                   WHEN COUNT(aa) > 0 THEN true
+                   ELSE false
+               END
+        FROM ActivityApplication aa
+        WHERE aa.user.id = :userId
+          AND (
+                aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.PENDING
+                OR (
+                    aa.status = com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
+                    AND aa.activity.status IN (
+                        com.dagachi.backend.domain.enums.ActivityStatus.RECRUITING,
+                        com.dagachi.backend.domain.enums.ActivityStatus.READY,
+                        com.dagachi.backend.domain.enums.ActivityStatus.IN_PROGRESS
+                    )
+                )
+              )
+        """)
+    boolean existsBlockingWithdrawalParticipation(
+            @Param("userId") Long userId
+    );
+
+    /**
      * APP-03 내 신청 목록 조회.
      */
     @Query("""
@@ -188,64 +230,20 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
     /**
      * USER-03 탈퇴 시 진행 중인 신청/활동 여부 확인.
      * [팀 미확정 정책 임시 적용] PENDING 또는 APPROVED가 하나라도 있으면 탈퇴를 막는다.
+     *
+     * [참고] 이 메서드는 CareActivity 상태를 보지 않아 REQ-AUTH-08 정확한 정책과
+     * 다르다. 현재는 existsBlockingWithdrawalParticipation()이 실제로 사용되며,
+     * 이 메서드는 더 이상 호출되지 않는다. 다른 곳에서 참조가 없으면 정리 대상이다.
      */
     boolean existsByUser_IdAndStatusIn(Long userId, List<ApplicationStatus> statuses);
 
     /**
-     * REQ-AUTH-08 회원 탈퇴 차단 여부 확인.
-     * <p>
-     * 탈퇴를 차단하는 경우:
-     * <p>
-     * 1. PENDING 신청이 존재하는 경우
-     * 2. APPROVED 신청이면서 연결된 활동이 아직 종료되지 않은 경우
-     * - RECRUITING
-     * - READY
-     * - IN_PROGRESS
-     * <p>
-     * 탈퇴를 차단하지 않는 경우:
-     * <p>
-     * - APPROVED + COMPLETED
-     * - APPROVED + CANCELED
-     * - REJECTED
-     * - CANCELED
-     * <p>
-     * 완료·취소된 과거 활동의 APPROVED 신청 이력은 보존하되,
-     * 현재 진행 중인 참여로 간주하지 않습니다.
-     */
-    @Query("""
-            SELECT CASE
-                       WHEN COUNT(aa) > 0 THEN true
-                       ELSE false
-                   END
-            FROM ActivityApplication aa
-            WHERE aa.user.id = :userId
-              AND (
-                    aa.status =
-                        com.dagachi.backend.domain.enums.ApplicationStatus.PENDING
-            
-                    OR (
-                        aa.status =
-                            com.dagachi.backend.domain.enums.ApplicationStatus.APPROVED
-            
-                        AND aa.activity.status IN (
-                            com.dagachi.backend.domain.enums.ActivityStatus.RECRUITING,
-                            com.dagachi.backend.domain.enums.ActivityStatus.READY,
-                            com.dagachi.backend.domain.enums.ActivityStatus.IN_PROGRESS
-                        )
-                    )
-                  )
-            """)
-    boolean existsBlockingWithdrawalParticipation(
-            @Param("userId") Long userId
-    );
-
-    /**
      * STAT-01 내 활동 통계 - 완료한 안부 확인 횟수.
-     * <p>
+     *
      * 로그인 사용자가 APPROVED 참여자로 참여한 CareActivity 중,
      * 공동 ActivityRecord가 기관에 의해 APPROVED되었고
      * visitResult가 MET인 활동 수를 센다.
-     * <p>
+     *
      * CareActivity : ActivityRecord = 1 : 0..1 이므로
      * activity.id 기준 distinct count가 record 기준 count와 동일하다.
      */
@@ -269,7 +267,7 @@ public interface ActivityApplicationRepository extends JpaRepository<ActivityApp
 
     /**
      * STAT-01 내 활동 통계 - 함께한 이웃(고유 대상자) 수.
-     * <p>
+     *
      * 위와 동일한 조건에서 서로 다른 CareRecipient가 몇 명인지 센다.
      * 같은 어르신을 여러 번 방문해도 1명으로만 계산한다.
      */
