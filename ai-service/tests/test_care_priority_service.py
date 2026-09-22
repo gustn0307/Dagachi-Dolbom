@@ -40,7 +40,7 @@ def request_fixture() -> CarePriorityRequest:
 
 
 class CarePriorityServiceTest(unittest.TestCase):
-    def test_analyze_returns_valid_recommendation(self):
+    def test_req_ai_09_req_ai_10_analyze_returns_valid_recommendation(self):
         output = json.dumps(
             {
                 "recommendations": [
@@ -62,7 +62,7 @@ class CarePriorityServiceTest(unittest.TestCase):
         self.assertEqual(result.recommendations[0].riskLevel, "HIGH")
         self.assertEqual(result.recommendations[0].score, 88)
 
-    def test_analyze_rejects_unknown_candidate(self):
+    def test_req_ai_09_req_ai_10_analyze_rejects_unknown_candidate(self):
         output = json.dumps(
             {
                 "recommendations": [

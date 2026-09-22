@@ -44,7 +44,7 @@ class InstitutionCarePriorityServiceTest {
     }
 
     @Test
-    @DisplayName("개인정보를 제외한 지표만 AI에 보내고 결과에 대상자 정보를 다시 연결한다")
+    @DisplayName("REQ-AI-09, REQ-AI-10 개인정보를 제외한 지표로 우선 확인 대상을 분석한다")
     void analyzesPseudonymousCandidateAndMapsRecipient() {
         when(userRepository.findByIdAndDeletedFalse(10L)).thenReturn(Optional.of(manager));
         when(manager.getInstitution()).thenReturn(institution);

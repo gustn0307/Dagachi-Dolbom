@@ -2,6 +2,7 @@ package com.dagachi.backend.institution.dashboard.repository;
 
 import com.dagachi.backend.testsupport.PostgresContainerTestBase;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -29,6 +30,7 @@ class InstitutionDashboardRepositoryTest
     private EntityManager entityManager;
 
     @Test
+    @DisplayName("REQ-AI-10 기관 범위의 우려 대상자와 장기 미확인 대상자를 조회한다")
     void 우려대상자와_장기미확인대상자만_기관범위에서_조회한다() {
         Long institutionId = insertInstitution("테스트 기관");
         Long otherInstitutionId = insertInstitution("다른 기관");

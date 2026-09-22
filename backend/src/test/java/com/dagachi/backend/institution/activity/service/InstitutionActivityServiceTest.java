@@ -72,7 +72,7 @@ class InstitutionActivityServiceTest {
     }
 
     @Test
-    @DisplayName("동의하지 않은 대상자는 활동을 등록할 수 없다")
+    @DisplayName("REQ-ACT-01 동의하지 않은 대상자는 활동을 등록할 수 없다")
     void createActivityRejectsRecipientWithoutConsent() {
         when(careRecipientRepository.findByIdAndInstitution_IdAndDeletedFalse(20L, 1L))
                 .thenReturn(Optional.of(recipient));
@@ -92,7 +92,7 @@ class InstitutionActivityServiceTest {
     }
 
     @Test
-    @DisplayName("마지막 봉사자를 승인하면 활동이 자동으로 READY가 된다")
+    @DisplayName("REQ-ACT-03 마지막 봉사자를 승인하면 활동이 자동으로 READY가 된다")
     void approvingLastRequiredVolunteerChangesActivityToReady() {
         CareActivity activity = CareActivity.create(
                 recipient,
@@ -118,7 +118,7 @@ class InstitutionActivityServiceTest {
     }
 
     @Test
-    @DisplayName("같은 성별 봉사자가 없으면 마지막 승인을 차단한다")
+    @DisplayName("REQ-ACT-05 같은 성별 봉사자가 없으면 마지막 승인을 차단한다")
     void approvingLastVolunteerRejectsUnmetGenderCondition() {
         CareActivity activity = CareActivity.create(
                 recipient,
@@ -199,7 +199,7 @@ class InstitutionActivityServiceTest {
     }
 
     @Test
-    @DisplayName("같은 성별 봉사자가 있으면 마지막 승인 후 READY가 된다")
+    @DisplayName("REQ-ACT-05 같은 성별 봉사자가 있으면 마지막 승인 후 READY가 된다")
     void approvingLastVolunteerSucceedsWhenGenderConditionIsMet() {
         CareActivity activity = CareActivity.create(
                 recipient,
@@ -281,7 +281,7 @@ class InstitutionActivityServiceTest {
     }
 
     @Test
-    @DisplayName("일반 상태 변경으로 진행 중 활동을 완료할 수 없다")
+    @DisplayName("REQ-ACT-03 일반 상태 변경으로 진행 중 활동을 완료할 수 없다")
     void cannotCompleteActivityThroughStatusChange() {
         CareActivity activity = CareActivity.create(
                 recipient,
@@ -325,7 +325,7 @@ class InstitutionActivityServiceTest {
     }
 
     @Test
-    @DisplayName("만남 기록을 승인하면 활동을 완료하고 마지막 안부 확인 시간을 갱신한다")
+    @DisplayName("REQ-ACT-03, REQ-CARE-07 만남 기록 승인 시 활동을 완료하고 마지막 안부 확인 시간을 갱신한다")
     void approvingMetRecordCompletesActivityAndUpdatesLastCheckedAt() {
         LocalDateTime completedAt = LocalDateTime.of(2026, 9, 15, 11, 30);
         CareActivity activity = CareActivity.create(
