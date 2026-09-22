@@ -53,6 +53,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+/**
+ * [수정 - 유지훈] P0-3: startActivity() 맨 앞에 정지/탈퇴 계정을 차단하는
+ * findActiveUser(userId) 검증(userRepository.findByIdAndDeletedFalse 호출)이
+ * 추가되면서, 아래 두 startActivity 관련 테스트에 userRepository stub을
+ * 추가했다. ("startActivity_기존공동기록이있으면...", "startActivity_최초시작이면...")
+ * 그 외 saveDraft/submit/uploadSignature/getActivityRecord 테스트들은
+ * startActivity()를 거치지 않으므로 변경하지 않았다.
+ */
 @ExtendWith(MockitoExtension.class)
 class ActivityRecordServiceTest {
 
@@ -414,6 +422,16 @@ class ActivityRecordServiceTest {
                         ActivityRecord.class
                 );
 
+        // [수정 - 유지훈] P0-3: startActivity() 맨 앞의 findActiveUser(userId)용 stub.
+        // 이게 없으면 Optional.empty() 기본값 때문에 USER_NOT_FOUND로 먼저 실패한다.
+        when(
+                userRepository.findByIdAndDeletedFalse(
+                        userId
+                )
+        ).thenReturn(
+                Optional.of(buildRealUser())
+        );
+
         when(
                 careActivityRepository.findByIdForUpdate(
                         activityId
@@ -521,6 +539,15 @@ class ActivityRecordServiceTest {
                 org.mockito.Mockito.mock(
                         ActivityApplication.class
                 );
+
+        // [수정 - 유지훈] P0-3: startActivity() 맨 앞의 findActiveUser(userId)용 stub.
+        when(
+                userRepository.findByIdAndDeletedFalse(
+                        userId
+                )
+        ).thenReturn(
+                Optional.of(buildRealUser())
+        );
 
         when(
                 careActivityRepository.findByIdForUpdate(
