@@ -814,6 +814,13 @@ function ActivityRecord() {
               };
             })
         : [];
+
+    return {
+      visitResult: form.visitResult || null,
+      completedAt: toApiDateTime(form.completedAt),
+      specialNote: form.specialNote,
+      responses,
+    };
   };
 
   /*
