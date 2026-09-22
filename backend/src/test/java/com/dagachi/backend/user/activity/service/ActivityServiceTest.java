@@ -255,6 +255,35 @@ class ActivityServiceTest {
                 .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
+    // [신규] ACT-01/ACT-02 myApplicationStatus 불일치 버그 회귀 테스트.
+    //
+    // ACT-01 목록 조회(getMyApplicationStatusMap)는 CANCELED 신청을
+    // "신청 안 한 것"과 동일하게 취급해 null로 반환하는데,
+    // ACT-02 상세 조회는 수정 전에는 findByActivity_IdAndUser_Id()의
+    // 결과를 그대로 반환해 CANCELED가 그대로 노출됐다.
+    //
+    // 같은 활동을 목록에서 볼 때와 상세에서 볼 때 값이 달라지는 걸 막기 위해
+    // getActivityDetail()에도 CANCELED 필터링을 추가했고, 이 테스트로 고정한다.
+    @Test
+    @DisplayName("REQ-ACT-07 - ACT-02 활동 상세 - CANCELED 신청은 ACT-01과 동일하게 null로 반환한다")
+    void getActivityDetail_CANCELED신청은_null로_반환한다() {
+        CareRecipient recipient = buildRecipient(null, null, null, 1955);
+        CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, recipient);
+        User user = buildUser(USER_ID);
+        ActivityApplication canceledApplication = buildApplication(activity, user, ApplicationStatus.CANCELED);
+
+        given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
+        given(activityApplicationRepository.countApprovedMap(eq(List.of(ACTIVITY_ID)))).willReturn(Map.of());
+        given(activityApplicationRepository.findActiveApplicationsByActivityIds(eq(List.of(ACTIVITY_ID))))
+                .willReturn(List.of());
+        given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
+                .willReturn(Optional.of(canceledApplication));
+
+        ActivityDetailResponse response = activityService.getActivityDetail(ACTIVITY_ID, USER_ID);
+
+        assertThat(response.myApplicationStatus()).isNull();
+    }
+
     // ---------------------------------------------------------------
     // ACT-03 수행정보 조회
     // ---------------------------------------------------------------
