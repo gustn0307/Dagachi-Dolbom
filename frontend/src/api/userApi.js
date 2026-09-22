@@ -143,6 +143,32 @@ export const fetchAutoMatchCandidate = async ({ latitude, longitude, excludeActi
   return response.data.data;
 };
 
+// APP-02 AI 자동배정 후보 배치 조회
+// Spring이 최대 10개 후보를 AI 재정렬 후 반환합니다.
+export const fetchAutoMatchCandidates = async ({
+  latitude,
+  longitude,
+  excludeActivityIds,
+} = {}) => {
+  const params = {};
+
+  if (latitude != null && longitude != null) {
+    params.latitude = latitude;
+    params.longitude = longitude;
+  }
+
+  if (excludeActivityIds && excludeActivityIds.length > 0) {
+    params.excludeActivityIds = excludeActivityIds;
+  }
+
+  const response = await api.get(
+    "/api/activity-applications/auto-match/candidates",
+    { params },
+  );
+
+  return response.data.data;
+};
+
 // APP-02 (2단계) 자동배정 신청 확정
 export const applyAutoMatch = (activityId) =>
   unwrapData(api.post("/api/activity-applications/auto-match", { activityId }));

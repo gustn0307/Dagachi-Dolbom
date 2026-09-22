@@ -288,6 +288,7 @@ function ActivityRecord() {
         items.map((item) => ({
           ...item,
           selectedValue: null,
+          textValue: null,
         })),
       );
 
@@ -327,6 +328,27 @@ function ActivityRecord() {
           ? {
               ...item,
               selectedValue,
+            }
+          : item,
+      ),
+    );
+  };
+
+  /*
+   * REQ-REC-08
+   * TEXT 체크리스트 문항의 직접 확인 내용을 변경합니다.
+   */
+  const handleChecklistTextChange = (itemId, textValue) => {
+    setActionError("");
+    setSuccessMessage("");
+
+    setChecklistItems((items) =>
+      items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              selectedValue: null,
+              textValue,
             }
           : item,
       ),
@@ -769,25 +791,29 @@ function ActivityRecord() {
     const responses =
       form.visitResult === "MET"
         ? checklistItems
-            .filter(
-              (item) => item.selectedValue != null && item.selectedValue !== "",
-            )
-            .map((item) => ({
-              itemId: item.id,
-              selectedValue: item.selectedValue,
-              textValue: null,
-            }))
+            .filter((item) => {
+              if (item.itemType === "TEXT") {
+                return item.textValue != null && item.textValue.trim() !== "";
+              }
+
+              return item.selectedValue != null && item.selectedValue !== "";
+            })
+            .map((item) => {
+              if (item.itemType === "TEXT") {
+                return {
+                  itemId: item.id,
+                  selectedValue: null,
+                  textValue: item.textValue,
+                };
+              }
+
+              return {
+                itemId: item.id,
+                selectedValue: item.selectedValue,
+                textValue: null,
+              };
+            })
         : [];
-
-    return {
-      visitResult: form.visitResult || null,
-
-      completedAt: toApiDateTime(form.completedAt),
-
-      specialNote: form.specialNote,
-
-      responses,
-    };
   };
 
   /*
@@ -1136,22 +1162,37 @@ function ActivityRecord() {
                   {item.required && <em>필수</em>}
                 </div>
 
-                <div className="activity-record-answer-options">
-                  {(item.options ?? []).map((option) => (
-                    <label key={option}>
-                      <input
-                        type="radio"
-                        name={`checklist-${item.id}`}
-                        value={option}
-                        checked={item.selectedValue === option}
-                        disabled={!editable}
-                        onChange={() => handleChecklistChange(item.id, option)}
-                      />
+                {item.itemType === "TEXT" ? (
+                  <textarea
+                    className="activity-record-checklist-text"
+                    value={item.textValue ?? ""}
+                    disabled={!editable}
+                    rows={4}
+                    placeholder="직접 확인한 사실을 입력해주세요."
+                    onChange={(event) =>
+                      handleChecklistTextChange(item.id, event.target.value)
+                    }
+                  />
+                ) : (
+                  <div className="activity-record-answer-options">
+                    {(item.options ?? []).map((option) => (
+                      <label key={option}>
+                        <input
+                          type="radio"
+                          name={`checklist-${item.id}`}
+                          value={option}
+                          checked={item.selectedValue === option}
+                          disabled={!editable}
+                          onChange={() =>
+                            handleChecklistChange(item.id, option)
+                          }
+                        />
 
-                      <span>{OPTION_LABELS[option] ?? option}</span>
-                    </label>
-                  ))}
-                </div>
+                        <span>{OPTION_LABELS[option] ?? option}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </article>
             ))}
           </div>

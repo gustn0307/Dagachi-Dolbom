@@ -9,6 +9,7 @@ import com.dagachi.backend.domain.entity.User;
 import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.ApplicationType;
+import com.dagachi.backend.domain.enums.GenderCondition;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.ActivityRecordRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
@@ -124,10 +125,30 @@ public class ActivityApplicationService {
                 ? NO_EXCLUDE_FILTER
                 : excludeActivityIds;
 
-        List<CareActivity> candidates = careActivityRepository.findAutoMatchCandidates(userId, excludeFilter);
+        List<CareActivity> candidates =
+                careActivityRepository.findAutoMatchCandidates(
+                        userId,
+                        excludeFilter
+                );
+
+        /*
+         * REQ-ACT-17 유효 후보 필터.
+         *
+         * Repository에서는 모집 상태 / 중복 신청 / 제외 목록을 먼저 거르고,
+         * Service에서는 현재 승인 인원과 SAME_GENDER_ONE 조건까지 확인합니다.
+         *
+         * AI 매칭 여부와 관계없이 자동배정 후보는 모두 같은 하드 필터를 사용합니다.
+         */
+        candidates =
+                filterValidAutoMatchCandidates(
+                        userId,
+                        candidates
+                );
 
         if (candidates.isEmpty()) {
-            throw new CustomException(ErrorCode.NO_AUTO_MATCH_CANDIDATE);
+            throw new CustomException(
+                    ErrorCode.NO_AUTO_MATCH_CANDIDATE
+            );
         }
 
         boolean hasCoordinates = latitude != null && longitude != null;
@@ -203,6 +224,18 @@ public class ActivityApplicationService {
                 careActivityRepository.findAutoMatchCandidates(
                         userId,
                         excludeFilter
+                );
+
+        /*
+         * REQ-ACT-17 유효 후보 필터.
+         *
+         * AI는 Spring이 검증한 유효 후보만 재정렬해야 하므로,
+         * 기존 자동배정과 동일한 정원 / 성별 조건을 먼저 적용합니다.
+         */
+        candidates =
+                filterValidAutoMatchCandidates(
+                        userId,
+                        candidates
                 );
 
         if (candidates.isEmpty()) {
@@ -293,6 +326,129 @@ public class ActivityApplicationService {
                 reasonByActivityId,
                 aiResponse.model()
         );
+    }
+
+    /**
+     * REQ-ACT-17 자동배정 유효 후보를 만든다.
+     *
+     * Repository의 기본 후보 조회 결과에 대해
+     * 현재 승인 인원과 SAME_GENDER_ONE 조건을 추가 검증한다.
+     *
+     * 승인 인원 수와 같은 성별 승인 인원 수는 후보 전체를
+     * 각각 한 번의 배치 조회로 가져와 N+1 조회를 방지한다.
+     */
+    private List<CareActivity> filterValidAutoMatchCandidates(
+            Long userId,
+            List<CareActivity> candidates
+    ) {
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+
+        User user =
+                userRepository.findById(userId)
+                        .orElseThrow(
+                                () -> new CustomException(
+                                        ErrorCode.USER_NOT_FOUND
+                                )
+                        );
+
+        List<Long> activityIds =
+                candidates.stream()
+                        .map(CareActivity::getId)
+                        .collect(Collectors.toList());
+
+        Map<Long, Long> approvedCountMap =
+                activityApplicationRepository
+                        .countApprovedMap(activityIds);
+
+        Map<Long, Long> sameGenderApprovedCountMap =
+                activityApplicationRepository
+                        .countApprovedSameGenderMap(activityIds);
+
+        return candidates.stream()
+                .filter(activity ->
+                        isValidAutoMatchCandidate(
+                                activity,
+                                user,
+                                approvedCountMap,
+                                sameGenderApprovedCountMap
+                        )
+                )
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * REQ-ACT-17 활동 1건이 현재 사용자에게
+     * 자동배정 가능한 유효 후보인지 판단한다.
+     *
+     * SAME_GENDER_ONE은 모든 참여자가 같은 성별이어야 한다는 뜻이 아니다.
+     * 최종 승인 참여자 중 최소 1명만 대상자와 같은 성별이면 된다.
+     *
+     * 따라서 현재 동성 승인자가 없고 사용자도 이성이더라도
+     * 사용자가 들어간 뒤 자리가 남아 있다면 후보로 유지한다.
+     * 반대로 그 사용자가 마지막 자리를 채우게 되면
+     * 이후 성별 조건을 충족할 수 없으므로 후보에서 제외한다.
+     */
+    private boolean isValidAutoMatchCandidate(
+            CareActivity activity,
+            User user,
+            Map<Long, Long> approvedCountMap,
+            Map<Long, Long> sameGenderApprovedCountMap
+    ) {
+        Long activityId = activity.getId();
+
+        long approvedCount =
+                approvedCountMap.getOrDefault(
+                        activityId,
+                        0L
+                );
+
+        int requiredPeople =
+                activity.getRequiredPeople();
+
+        // 이미 정원이 찬 활동은 자동배정 후보가 될 수 없습니다.
+        if (approvedCount >= requiredPeople) {
+            return false;
+        }
+
+        // 성별 조건이 없는 활동은 정원만 남아 있으면 후보입니다.
+        if (activity.getGenderCondition()
+                != GenderCondition.SAME_GENDER_ONE) {
+            return true;
+        }
+
+        long sameGenderApprovedCount =
+                sameGenderApprovedCountMap.getOrDefault(
+                        activityId,
+                        0L
+                );
+
+        // 기존 승인자 중 이미 대상자와 같은 성별이 있으면 조건 충족 상태입니다.
+        if (sameGenderApprovedCount > 0) {
+            return true;
+        }
+
+        // 현재 사용자가 대상자와 같은 성별이면
+        // 이 사용자의 승인으로 SAME_GENDER_ONE을 충족할 수 있습니다.
+        if (user.getGender()
+                == activity.getRecipient().getGender()) {
+            return true;
+        }
+
+        /*
+         * 아직 동성 승인자가 없고 현재 사용자도 대상자와 다른 성별인 경우.
+         *
+         * 사용자가 들어간 뒤에도 자리가 남으면
+         * 이후 다른 승인자가 성별 조건을 충족할 수 있으므로 후보로 유지합니다.
+         *
+         * 반대로 이번 사용자가 마지막 자리를 채우면
+         * SAME_GENDER_ONE을 충족할 방법이 없어지므로 제외합니다.
+         */
+        long remainingPeopleAfterApproval =
+                requiredPeople - (approvedCount + 1);
+
+        return remainingPeopleAfterApproval > 0;
     }
 
     // 오름차순 기준 dense rank(동점은 같은 순위, 다음 순위는 건너뛰지 않고 이어짐)를 계산한다.
