@@ -8,6 +8,7 @@ import com.dagachi.backend.common.kakao.dto.Coordinate;
 import com.dagachi.backend.domain.entity.Report;
 import com.dagachi.backend.domain.entity.ReportImage;
 import com.dagachi.backend.domain.entity.User;
+import com.dagachi.backend.domain.enums.UserRole;
 import com.dagachi.backend.domain.repository.ReportImageRepository;
 import com.dagachi.backend.domain.repository.ReportRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
@@ -75,6 +76,18 @@ public class ReportService {
                             new CustomException(ErrorCode.USER_NOT_FOUND)
                     );
 
+            /*
+             * REQ-RPT-01:
+             * 인증된 회원 제보는 USER Role만 등록할 수 있습니다.
+             *
+             * POST /api/reports는 비회원 제보도 허용해야 하므로
+             * SecurityConfig에서는 permitAll이지만,
+             * 인증 정보가 존재하는 경우 Service에서 USER Role인지 검증합니다.
+             */
+            if (reporter.getRole() != UserRole.USER) {
+                throw new CustomException(ErrorCode.FORBIDDEN);
+            }
+
             if (reporter.getStatus() == UserStatus.SUSPENDED) {
                 throw new CustomException(
                         ErrorCode.ACCOUNT_SUSPENDED
@@ -127,7 +140,7 @@ public class ReportService {
 
     /**
      * 신규 제보 트랜잭션 commit 이후 AI 제목(REPORT_TITLE) 생성을 트리거합니다.
-     *
+     * <p>
      * generateAndSaveTitleAsync가 @Async이므로 이 afterCommit()은 즉시 반환되고,
      * 실제 OpenAI 호출은 별도 스레드풀에서 처리됩니다.
      */

@@ -3,7 +3,6 @@ package com.dagachi.backend.user.mypage.service;
 import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.domain.entity.User;
-import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
 import com.dagachi.backend.user.mypage.dto.ChangePasswordRequest;
@@ -13,8 +12,6 @@ import com.dagachi.backend.user.mypage.dto.WithdrawRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class UserProfileService {
@@ -84,11 +81,43 @@ public class UserProfileService {
             throw new CustomException(ErrorCode.PASSWORD_MISMATCH);
         }
 
-        boolean hasActiveParticipation = activityApplicationRepository
-                .existsByUser_IdAndStatusIn(
-                        userId,
-                        List.of(ApplicationStatus.PENDING, ApplicationStatus.APPROVED)
-                );
+        /*
+         * REQ-AUTH-08
+         *
+         * 실제 진행 중인 신청/활동이 있을 때만 회원 탈퇴를 제한합니다.
+         *
+         * - PENDING 신청: 탈퇴 차단
+         * - APPROVED + RECRUITING/READY/IN_PROGRESS: 탈퇴 차단
+         * - APPROVED + COMPLETED/CANCELED: 과거 참여 이력이므로 탈퇴 허용
+         * PENDING
+            → 차단
+
+            APPROVED + RECRUITING
+            → 차단
+
+            APPROVED + READY
+            → 차단
+
+            APPROVED + IN_PROGRESS
+            → 차단
+
+            APPROVED + COMPLETED
+            → 허용
+
+            APPROVED + CANCELED
+            → 허용
+
+            REJECTED
+            → 허용
+
+            CANCELED
+            → 허용
+         */
+        boolean hasActiveParticipation =
+                activityApplicationRepository
+                        .existsBlockingWithdrawalParticipation(
+                                userId
+                        );
 
         if (hasActiveParticipation) {
             throw new CustomException(ErrorCode.WITHDRAWAL_BLOCKED);
