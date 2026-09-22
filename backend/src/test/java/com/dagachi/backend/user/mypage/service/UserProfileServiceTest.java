@@ -234,7 +234,7 @@ class UserProfileServiceTest {
         given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(passwordEncoder.matches("correct-pw", "encoded-pw")).willReturn(true);
         // [수정] existsBlockingWithdrawalParticipation으로 교체
-        given(activityApplicationRepository.existsBlockingWithdrawalParticipation(eq(USER_ID)))
+        given(activityApplicationRepository.existsBlockingWithdrawalParticipation((USER_ID)))
                 .willReturn(false);
 
         userProfileService.withdraw(USER_ID, new WithdrawRequest("correct-pw"));
