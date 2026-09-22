@@ -21,6 +21,7 @@ import com.dagachi.backend.domain.repository.ChecklistItemRepository;
 import com.dagachi.backend.domain.repository.ChecklistResponseRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
 import com.dagachi.backend.user.record.dto.ActivityRecordResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,13 @@ import static org.mockito.Mockito.verify;
  * {@link ActivityRecordServiceTest}(맹동영님 담당)에서 검증하고 있어
  * 이 파일에서는 다루지 않는다. 같은 대상 클래스를 테스트하지만
  * 담당자가 다른 메서드를 검증하는 것이라 파일을 분리했다.
+ *
+ * [수정 - 유지훈] P0-3: startActivity() 맨 앞에 정지/탈퇴 계정을 차단하는
+ * findActiveUser(userId) 검증(userRepository.findByIdAndDeletedFalse 호출)을
+ * 추가하면서, 모든 테스트가 이 조회를 거치게 되었다. 이 stub이 없으면
+ * Mockito가 기본값(Optional.empty())을 반환해 모든 테스트가 의도한 예외
+ * 대신 USER_NOT_FOUND로 먼저 실패한다. @BeforeEach에서 활성 USER를
+ * 공통으로 stub하여 기존 테스트 로직/assertion은 그대로 유지했다.
  */
 @ExtendWith(MockitoExtension.class)
 class ActivityRecordServiceStartActivityTest {
@@ -109,6 +117,17 @@ class ActivityRecordServiceStartActivityTest {
         ActivityApplication application = ActivityApplication.createDirect(activity, user);
         ReflectionTestUtils.setField(application, "status", status);
         return application;
+    }
+
+    /**
+     * [신규] P0-3: startActivity()가 맨 앞에서 호출하는 findActiveUser(userId)용
+     * 공통 stub. 모든 테스트가 이 조회를 거치므로 @BeforeEach로 한 번만 설정한다.
+     * (기본값: ACTIVE 상태의 USER_ID 사용자)
+     */
+    @BeforeEach
+    void setUpActiveUser() {
+        given(userRepository.findByIdAndDeletedFalse(USER_ID))
+                .willReturn(Optional.of(buildUser(USER_ID)));
     }
 
     // ---------------------------------------------------------------
