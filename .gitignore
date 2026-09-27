@@ -126,3 +126,4 @@ id_ed25519.*
 # Generated test result artifacts
 ai-service/test-results/
 frontend/junit-results/
+test-report-output/
