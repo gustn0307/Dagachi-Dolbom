@@ -122,3 +122,7 @@ id_ed25519.*
 *.bak
 *.swp
 *~
+
+# Generated test result artifacts
+ai-service/test-results/
+frontend/junit-results/
