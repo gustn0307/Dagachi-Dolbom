@@ -35,8 +35,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
@@ -722,5 +721,59 @@ class ReportCreateServiceTest {
 
         verify(s3StorageService)
                 .upload(image, "reports");
+    }
+
+    @Test
+    @DisplayName("REQ-AI-02 - 제보 commit 후 embedding 생성이 실패해도 제보 접수 결과는 유지된다")
+    void createReport_embedding생성실패가_제보접수를_실패시키지_않는다() {
+        // given
+        ReportCreateRequest request =
+                new ReportCreateRequest(
+                        "embedding 실패 허용 테스트",
+                        "경기도 평택시 테스트 주소",
+                        null,
+                        null,
+                        "010-1234-5678"
+                );
+
+        given(reportRepository.save(any(Report.class)))
+                .willAnswer(invocation -> {
+                    Report report = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(report, "id", 80L);
+                    return report;
+                });
+
+        doThrow(new CustomException(ErrorCode.AI_SERVICE_UNAVAILABLE))
+                .when(reportEmbeddingService)
+                .ensureEmbedding(80L);
+
+        // when
+        var response =
+                reportService.createReport(
+                        null,
+                        request,
+                        null
+                );
+
+        /*
+         * 실제 DB commit 이후 afterCommit callback이 실행되는 상황을
+         * Mockito 단위 테스트에서 직접 재현한다.
+         */
+        for (TransactionSynchronization synchronization
+                : TransactionSynchronizationManager.getSynchronizations()) {
+
+            assertThatCode(synchronization::afterCommit)
+                    .doesNotThrowAnyException();
+        }
+
+        // then
+        assertThat(response.reportId())
+                .isEqualTo(80L);
+
+        assertThat(response.status())
+                .isEqualTo(ReportStatus.SUBMITTED);
+
+        verify(reportEmbeddingService)
+                .ensureEmbedding(80L);
     }
 }

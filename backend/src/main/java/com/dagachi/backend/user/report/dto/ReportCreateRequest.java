@@ -15,6 +15,7 @@ public record ReportCreateRequest(
         @Size(max = 500)
         String content,
 
+        @NotBlank(message = "주소는 필수입니다.")
         @Size(max = 255, message = "주소는 255자 이하여야 합니다.")
         String address,
 
