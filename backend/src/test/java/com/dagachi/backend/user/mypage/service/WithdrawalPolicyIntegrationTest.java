@@ -26,6 +26,19 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * [수정] 원본 4개 테스트(완료/진행중/취소된 활동, PENDING 신청)는 그대로 유지했다.
+ *
+ * 감사 문서가 지적한 "RECRUITING·READY·REJECTED/CANCELED 이력 조합의 명시적
+ * 테스트 추가 필요"에 따라 아래 4개를 신규로 추가했다.
+ * - APPROVED + RECRUITING 활동 -> 탈퇴 차단
+ * - APPROVED + READY 활동 -> 탈퇴 차단
+ * - REJECTED 신청 이력만 존재 -> 탈퇴 허용
+ * - CANCELED 신청 이력만 존재(활동 상태 무관) -> 탈퇴 허용
+ *
+ * 신규 테스트는 반복되는 fixture 생성 코드를 private 헬퍼로 뽑아서 작성했다.
+ * 원본 4개 테스트의 내용/스타일은 변경하지 않았다.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -841,5 +854,269 @@ class WithdrawalPolicyIntegrationTest
 
         assertThat(activeUser.getDeletedAt())
                 .isNull();
+    }
+
+    // ---------------------------------------------------------------
+    // [신규] REQ-AUTH-08 추가 이력 조합 테스트
+    //
+    // 반복되는 fixture 생성을 헬퍼로 뽑았다. 위 원본 4개 테스트는
+    // 그대로 유지하고, 아래 신규 테스트만 이 헬퍼를 사용한다.
+    // ---------------------------------------------------------------
+
+    private Institution createAndPersistInstitution(String suffix) {
+        Institution institution =
+                BeanUtils.instantiateClass(Institution.class);
+
+        ReflectionTestUtils.setField(institution, "name", "테스트 주민센터-" + suffix);
+        ReflectionTestUtils.setField(institution, "type", InstitutionType.COMMUNITY_CENTER);
+        ReflectionTestUtils.setField(institution, "address", "경기도 평택시 테스트 주소");
+        ReflectionTestUtils.setField(institution, "phone", "0311234567");
+        ReflectionTestUtils.setField(institution, "status", InstitutionStatus.ACTIVE);
+        ReflectionTestUtils.setField(institution, "deleted", false);
+
+        entityManager.persist(institution);
+        entityManager.flush();
+
+        return institution;
+    }
+
+    private User createAndPersistInstitutionUser(Institution institution, String suffix) {
+        User institutionUser = User.create(
+                "institution-" + suffix + "@test.com",
+                passwordEncoder.encode("institution-password"),
+                "기관 담당자",
+                "기관담당",
+                "0311234567",
+                UserGender.FEMALE
+        );
+
+        ReflectionTestUtils.setField(institutionUser, "role", UserRole.INSTITUTION);
+        ReflectionTestUtils.setField(institutionUser, "institution", institution);
+
+        return userRepository.saveAndFlush(institutionUser);
+    }
+
+    private User createAndPersistWithdrawTargetUser(String suffix, String rawPassword) {
+        User user = User.create(
+                "withdraw-" + suffix + "@test.com",
+                passwordEncoder.encode(rawPassword),
+                "탈퇴 정책 사용자",
+                "탈퇴정책",
+                "01012345678",
+                UserGender.MALE
+        );
+
+        return userRepository.saveAndFlush(user);
+    }
+
+    private CareRecipient createAndPersistRecipient(Institution institution) {
+        CareRecipient recipient = CareRecipient.create(
+                institution,
+                "테스트 대상자",
+                UserGender.FEMALE,
+                1950,
+                "01099998888",
+                "경기도 평택시 테스트 주소",
+                null,
+                null,
+                null,
+                ConsentStatus.AGREED
+        );
+
+        return careRecipientRepository.saveAndFlush(recipient);
+    }
+
+    private CareActivity createAndPersistActivity(
+            CareRecipient recipient,
+            Institution institution,
+            User institutionUser,
+            ActivityStatus status
+    ) {
+        CareActivity activity = CareActivity.create(
+                recipient,
+                institution,
+                institutionUser,
+                LocalDateTime.now().minusDays(1),
+                1,
+                GenderCondition.NONE
+        );
+
+        activity.changeStatus(status);
+
+        return careActivityRepository.saveAndFlush(activity);
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-08 - RECRUITING 활동의 APPROVED 신청이 있으면 회원 탈퇴를 차단한다")
+    void withdraw_RECRUITING활동의_APPROVED신청이있으면_탈퇴를_차단한다() {
+        // given
+        Institution institution = createAndPersistInstitution("recruiting");
+        User institutionUser = createAndPersistInstitutionUser(institution, "recruiting");
+
+        String rawPassword = "test-password";
+        User user = createAndPersistWithdrawTargetUser("recruiting", rawPassword);
+        Long userId = user.getId();
+
+        CareRecipient recipient = createAndPersistRecipient(institution);
+
+        /*
+         * 아직 모집 중인 활동을 재현합니다. CareActivity.create()가 기본적으로
+         * RECRUITING 상태로 생성하므로 changeStatus() 호출 없이 그대로 사용합니다.
+         */
+        CareActivity activity = careActivityRepository.saveAndFlush(
+                CareActivity.create(
+                        recipient, institution, institutionUser,
+                        LocalDateTime.now().plusDays(1), 2, GenderCondition.NONE
+                )
+        );
+
+        ActivityApplication application = ActivityApplication.createDirect(activity, user);
+        application.approve(institutionUser);
+        activityApplicationRepository.saveAndFlush(application);
+
+        entityManager.clear();
+
+        // when & then
+        assertThatThrownBy(() ->
+                userProfileService.withdraw(userId, new WithdrawRequest(rawPassword))
+        )
+                .isInstanceOf(CustomException.class)
+                .satisfies(exception -> {
+                    CustomException customException = (CustomException) exception;
+                    assertThat(customException.getErrorCode())
+                            .isEqualTo(ErrorCode.WITHDRAWAL_BLOCKED);
+                });
+
+        entityManager.clear();
+
+        User activeUser = userRepository.findById(userId).orElseThrow();
+
+        assertThat(activeUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(activeUser.getDeleted()).isFalse();
+        assertThat(activeUser.getDeletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-08 - READY 활동의 APPROVED 신청이 있으면 회원 탈퇴를 차단한다")
+    void withdraw_READY활동의_APPROVED신청이있으면_탈퇴를_차단한다() {
+        // given
+        Institution institution = createAndPersistInstitution("ready");
+        User institutionUser = createAndPersistInstitutionUser(institution, "ready");
+
+        String rawPassword = "test-password";
+        User user = createAndPersistWithdrawTargetUser("ready", rawPassword);
+        Long userId = user.getId();
+
+        CareRecipient recipient = createAndPersistRecipient(institution);
+        CareActivity activity = createAndPersistActivity(
+                recipient, institution, institutionUser, ActivityStatus.READY
+        );
+
+        ActivityApplication application = ActivityApplication.createDirect(activity, user);
+        application.approve(institutionUser);
+        activityApplicationRepository.saveAndFlush(application);
+
+        entityManager.clear();
+
+        // when & then
+        assertThatThrownBy(() ->
+                userProfileService.withdraw(userId, new WithdrawRequest(rawPassword))
+        )
+                .isInstanceOf(CustomException.class)
+                .satisfies(exception -> {
+                    CustomException customException = (CustomException) exception;
+                    assertThat(customException.getErrorCode())
+                            .isEqualTo(ErrorCode.WITHDRAWAL_BLOCKED);
+                });
+
+        entityManager.clear();
+
+        User activeUser = userRepository.findById(userId).orElseThrow();
+
+        assertThat(activeUser.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(activeUser.getDeleted()).isFalse();
+        assertThat(activeUser.getDeletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-08 - REJECTED 신청 이력만 있으면 회원 탈퇴를 차단하지 않는다")
+    void withdraw_REJECTED신청_이력만_있으면_탈퇴를_차단하지않는다() {
+        // given
+        Institution institution = createAndPersistInstitution("rejected");
+        User institutionUser = createAndPersistInstitutionUser(institution, "rejected");
+
+        String rawPassword = "test-password";
+        User user = createAndPersistWithdrawTargetUser("rejected", rawPassword);
+
+        CareRecipient recipient = createAndPersistRecipient(institution);
+        CareActivity activity = createAndPersistActivity(
+                recipient, institution, institutionUser, ActivityStatus.RECRUITING
+        );
+
+        ActivityApplication application = ActivityApplication.createDirect(activity, user);
+
+        /*
+         * 기관이 신청을 거절한 이력을 재현합니다.
+         * REJECTED는 existsBlockingWithdrawalParticipation의 차단 조건(PENDING,
+         * APPROVED+진행중)에 해당하지 않으므로 탈퇴를 막지 않아야 합니다.
+         */
+        application.reject(institutionUser, "정원 초과로 거절합니다");
+        activityApplicationRepository.saveAndFlush(application);
+
+        entityManager.clear();
+
+        // when
+        userProfileService.withdraw(user.getId(), new WithdrawRequest(rawPassword));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        User withdrawnUser = userRepository.findById(user.getId()).orElseThrow();
+
+        assertThat(withdrawnUser.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
+        assertThat(withdrawnUser.getDeleted()).isTrue();
+        assertThat(withdrawnUser.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-08 - CANCELED 신청 이력만 있으면(활동 상태 무관) 회원 탈퇴를 차단하지 않는다")
+    void withdraw_CANCELED신청_이력만_있으면_탈퇴를_차단하지않는다() {
+        // given
+        Institution institution = createAndPersistInstitution("cancel-history");
+        User institutionUser = createAndPersistInstitutionUser(institution, "cancel-history");
+
+        String rawPassword = "test-password";
+        User user = createAndPersistWithdrawTargetUser("cancel-history", rawPassword);
+
+        CareRecipient recipient = createAndPersistRecipient(institution);
+
+        /*
+         * 활동은 여전히 RECRUITING(진행 전) 상태이지만,
+         * 사용자 본인이 신청을 취소해 CANCELED 이력만 남긴 경우를 재현합니다.
+         * activity.status가 아니라 application.status가 CANCELED인 케이스입니다.
+         */
+        CareActivity activity = createAndPersistActivity(
+                recipient, institution, institutionUser, ActivityStatus.RECRUITING
+        );
+
+        ActivityApplication application = ActivityApplication.createDirect(activity, user);
+        application.cancel();
+        activityApplicationRepository.saveAndFlush(application);
+
+        entityManager.clear();
+
+        // when
+        userProfileService.withdraw(user.getId(), new WithdrawRequest(rawPassword));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        User withdrawnUser = userRepository.findById(user.getId()).orElseThrow();
+
+        assertThat(withdrawnUser.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
+        assertThat(withdrawnUser.getDeleted()).isTrue();
+        assertThat(withdrawnUser.getDeletedAt()).isNotNull();
     }
 }

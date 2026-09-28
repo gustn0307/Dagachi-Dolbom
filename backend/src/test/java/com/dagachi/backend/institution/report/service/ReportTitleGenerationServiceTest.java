@@ -98,7 +98,7 @@ class ReportTitleGenerationServiceTest {
     }
 
     @Test
-    @DisplayName("REQ-AI-12 - generateAndSaveTitleAsync - 정상 생성되면 REPORT_TITLE 타입의 AIAnalysis를 저장한다")
+    @DisplayName("REQ-AI-05, REQ-AI-12 - generateAndSaveTitleAsync - 정상 생성되면 REPORT_TITLE 타입의 AIAnalysis를 저장한다")
     void generateAndSaveTitleAsync_성공하면_AIAnalysis를_저장한다() {
         given(reportRepository.existsById(10L)).willReturn(true);
         given(aiServiceClient.generateReportTitle("어르신이 며칠째 안 보인다는 제보"))

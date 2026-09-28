@@ -4,6 +4,7 @@ import com.dagachi.backend.common.exception.CustomException;
 import com.dagachi.backend.common.exception.ErrorCode;
 import com.dagachi.backend.domain.entity.User;
 import com.dagachi.backend.domain.enums.UserGender;
+import com.dagachi.backend.domain.enums.UserRole;
 import com.dagachi.backend.domain.enums.UserStatus;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.UserRepository;
@@ -31,6 +32,11 @@ import static org.mockito.Mockito.verify;
 
 /**
  * UserProfileService(USER-01~03, 비밀번호 변경) 비즈니스 규칙 단위 테스트.
+ *
+ * [수정 - 버그] withdraw()가 REQ-AUTH-08 정책을 정확히 구현한
+ * existsBlockingWithdrawalParticipation()을 쓰도록 교체됨에 따라,
+ * 관련 stub 3곳을 existsByUser_IdAndStatusIn → existsBlockingWithdrawalParticipation으로 갱신했다.
+ * assertion 내용(기대 결과) 자체는 변경하지 않았다.
  */
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
@@ -80,6 +86,19 @@ class UserProfileServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-06 - USER-01 내 프로필 조회 - INSTITUTION 계정이면 FORBIDDEN")
+    void getMyProfile_INSTITUTION계정이면_예외를_던진다() {
+        User user = buildUser("encoded-pw");
+        ReflectionTestUtils.setField(user, "role", UserRole.INSTITUTION);
+        given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userProfileService.getMyProfile(USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     // ---------------------------------------------------------------
@@ -167,13 +186,21 @@ class UserProfileServiceTest {
 
     // ---------------------------------------------------------------
     // USER-03 회원 탈퇴
+    //
+    // [동시성 보완] withdraw()는 findByIdAndDeletedFalse 대신
+    // findByIdAndDeletedFalseForUpdate(PESSIMISTIC_WRITE 락)를 사용한다.
+    //
+    // [수정 - 버그] 진행 중 참여 확인은 existsByUser_IdAndStatusIn이 아니라
+    // REQ-AUTH-08을 정확히 구현한 existsBlockingWithdrawalParticipation을 사용한다.
+    // (기존 메서드는 CareActivity 상태를 보지 않아 COMPLETED/CANCELED된 활동의
+    // APPROVED 이력도 탈퇴를 막는 버그가 있었다.)
     // ---------------------------------------------------------------
 
     @Test
     @DisplayName("REQ-AUTH-08 - USER-03 회원 탈퇴 - 비밀번호가 틀리면 PASSWORD_MISMATCH")
     void withdraw_비밀번호가_틀리면_예외를_던진다() {
         User user = buildUser("encoded-pw");
-        given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(passwordEncoder.matches("wrong-pw", "encoded-pw")).willReturn(false);
 
         assertThatThrownBy(() -> userProfileService.withdraw(USER_ID, new WithdrawRequest("wrong-pw")))
@@ -186,12 +213,11 @@ class UserProfileServiceTest {
     @DisplayName("REQ-AUTH-08 - USER-03 회원 탈퇴 - 진행 중인 신청/활동이 있으면 WITHDRAWAL_BLOCKED")
     void withdraw_진행중인_신청이_있으면_예외를_던진다() {
         User user = buildUser("encoded-pw");
-        given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(passwordEncoder.matches("correct-pw", "encoded-pw")).willReturn(true);
-        given(
-                activityApplicationRepository
-                        .existsBlockingWithdrawalParticipation(USER_ID)
-        ).willReturn(true);
+        // [수정] existsBlockingWithdrawalParticipation으로 교체
+        given(activityApplicationRepository.existsBlockingWithdrawalParticipation(USER_ID))
+                .willReturn(true);
 
         assertThatThrownBy(() -> userProfileService.withdraw(USER_ID, new WithdrawRequest("correct-pw")))
                 .isInstanceOf(CustomException.class)
@@ -205,17 +231,45 @@ class UserProfileServiceTest {
     @DisplayName("REQ-AUTH-08 - USER-03 회원 탈퇴 - 진행 중인 신청이 없으면 Soft Delete + WITHDRAWN 처리한다")
     void withdraw_정상요청이면_탈퇴처리된다() {
         User user = buildUser("encoded-pw");
-        given(userRepository.findByIdAndDeletedFalse(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(passwordEncoder.matches("correct-pw", "encoded-pw")).willReturn(true);
-        given(
-                activityApplicationRepository
-                        .existsBlockingWithdrawalParticipation(USER_ID)
-        ).willReturn(false);
+        // [수정] existsBlockingWithdrawalParticipation으로 교체
+        given(activityApplicationRepository.existsBlockingWithdrawalParticipation((USER_ID)))
+                .willReturn(false);
 
         userProfileService.withdraw(USER_ID, new WithdrawRequest("correct-pw"));
 
         assertThat(user.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
         assertThat(user.getDeleted()).isTrue();
         assertThat(user.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-08 - USER-03 회원 탈퇴 - 탈퇴/삭제된 계정이면 USER_NOT_FOUND (락 조회에서도 동일하게 걸러짐)")
+    void withdraw_이미_탈퇴한_계정이면_예외를_던진다() {
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userProfileService.withdraw(USER_ID, new WithdrawRequest("any-pw")))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    @DisplayName("REQ-AUTH-06 - USER-03 회원 탈퇴 - INSTITUTION 계정이면 FORBIDDEN")
+    void withdraw_INSTITUTION계정이면_예외를_던진다() {
+        User user = buildUser("encoded-pw");
+        ReflectionTestUtils.setField(user, "role", UserRole.INSTITUTION);
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userProfileService.withdraw(USER_ID, new WithdrawRequest("any-pw")))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+
+        // Role 검증에서 막혔으므로 비밀번호 확인·참여 확인은 진행되지 않아야 한다.
+        verify(passwordEncoder, never()).matches(any(), any());
     }
 }

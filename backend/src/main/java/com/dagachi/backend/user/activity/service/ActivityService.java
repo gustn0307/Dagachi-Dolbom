@@ -318,6 +318,19 @@ public class ActivityService {
 
     // ---- ACT-02, ACT-03은 기존 그대로 ----
 
+    /**
+     * [수정] ACT-02 상세 조회.
+     *
+     * 기존에는 findByActivity_IdAndUser_Id()로 신청 상태를 그대로 반환해,
+     * CANCELED된 신청도 "CANCELED"로 노출됐다.
+     *
+     * 반면 ACT-01 목록 조회(getMyApplicationStatusMap)는 CANCELED를
+     * "신청 안 한 것"과 동일하게 취급해 제외하고 있어, 같은 활동을
+     * 목록에서 볼 때와 상세에서 볼 때 myApplicationStatus 값이
+     * 서로 달라지는 불일치가 있었다.
+     *
+     * CANCELED는 목록과 동일하게 필터링해 null로 처리하도록 통일했다.
+     */
     public ActivityDetailResponse getActivityDetail(Long activityId, Long userId) {
         CareActivity activity = findActivity(activityId);
 
@@ -331,6 +344,8 @@ public class ActivityService {
 
         String myApplicationStatus = activityApplicationRepository
                 .findByActivity_IdAndUser_Id(activityId, userId)
+                // [수정] CANCELED는 ACT-01과 동일하게 "신청 안 한 것"으로 취급한다.
+                .filter(application -> application.getStatus() != ApplicationStatus.CANCELED)
                 .map(application -> application.getStatus().name())
                 .orElse(null);
 

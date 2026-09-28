@@ -14,6 +14,7 @@ import com.dagachi.backend.domain.enums.ApplicationType;
 import com.dagachi.backend.domain.enums.ConsentStatus;
 import com.dagachi.backend.domain.enums.GenderCondition;
 import com.dagachi.backend.domain.enums.UserGender;
+import com.dagachi.backend.domain.enums.UserStatus;
 import com.dagachi.backend.domain.repository.ActivityApplicationRepository;
 import com.dagachi.backend.domain.repository.ActivityRecordRepository;
 import com.dagachi.backend.domain.repository.CareActivityRepository;
@@ -52,6 +53,15 @@ import static org.mockito.Mockito.verify;
  *
  * DB나 Spring Context 없이 Repository를 모두 Mock 처리한다.
  * 요구사항 정의서의 REQ-ID와 직접 대응하는 테스트는 @DisplayName에 REQ-ID를 표기한다.
+ *
+ * [동시성 보완] applyDirect/applyAuto의 User 조회는 findById가 아니라
+ * findByIdAndDeletedFalseForUpdate(PESSIMISTIC_WRITE 락)를 사용한다.
+ * (회원 탈퇴 withdraw()와 동일한 User row 락 전략으로 TOCTOU 방지)
+ * filterValidAutoMatchCandidates(자동배정 후보 조회, 읽기 전용)는
+ * 락 대상이 아니므로 기존 findById를 그대로 사용한다.
+ *
+ * [신규] cancelApplication()도 application.getUser()로 로드된 User의
+ * 계정 상태(정지/탈퇴)를 검증하므로, 관련 테스트를 APP-05 섹션에 추가했다.
  */
 @ExtendWith(MockitoExtension.class)
 class ActivityApplicationServiceTest {
@@ -81,6 +91,14 @@ class ActivityApplicationServiceTest {
                 "닉네임" + id, "010-0000-0000", gender
         );
         ReflectionTestUtils.setField(user, "id", id);
+        return user;
+    }
+
+    // [동시성 보완] WITHDRAWN/SUSPENDED 재검증 테스트용 헬퍼.
+    // User.create()는 항상 status=ACTIVE로 생성하므로, 필요 시 강제로 바꿔준다.
+    private User buildUserWithStatus(long id, UserGender gender, UserStatus status) {
+        User user = buildUser(id, gender);
+        ReflectionTestUtils.setField(user, "status", status);
         return user;
     }
 
@@ -127,7 +145,7 @@ class ActivityApplicationServiceTest {
         User user = buildUser(USER_ID, UserGender.MALE);
 
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
                 .willReturn(Optional.empty());
         given(activityApplicationRepository.save(any(ActivityApplication.class)))
@@ -177,12 +195,69 @@ class ActivityApplicationServiceTest {
         CareRecipient recipient = buildRecipient(null, null, null);
         CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.empty());
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.applyDirect(ACTIVITY_ID, USER_ID))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    // [동시성 보완 신규] 락 조회는 deleted=false 조건이 있어 탈퇴 계정은
+    // Optional.empty()로 걸러진다. 락 획득 시점에 이미 탈퇴가 완료된 케이스.
+    @Test
+    @DisplayName("[동시성 보완] APP-01 직접 신청 - 이미 탈퇴(deleted=true)된 계정이면 USER_NOT_FOUND")
+    void applyDirect_이미_탈퇴한_계정이면_USER_NOT_FOUND() {
+        CareRecipient recipient = buildRecipient(null, null, null);
+        CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
+        given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.applyDirect(ACTIVITY_ID, USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+
+        verify(activityApplicationRepository, never()).save(any());
+    }
+
+    // [동시성 보완 신규] deleted=false이지만 status가 WITHDRAWN인 케이스
+    // (예: 락 경합 사이 미세한 타이밍 차, 또는 데이터 정합성이 어긋난 방어적 케이스)
+    @Test
+    @DisplayName("[동시성 보완] APP-01 직접 신청 - status가 WITHDRAWN이면 ACCOUNT_WITHDRAWN")
+    void applyDirect_status가_WITHDRAWN이면_예외를_던진다() {
+        CareRecipient recipient = buildRecipient(null, null, null);
+        CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
+        User user = buildUserWithStatus(USER_ID, UserGender.MALE, UserStatus.WITHDRAWN);
+
+        given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.applyDirect(ACTIVITY_ID, USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.ACCOUNT_WITHDRAWN);
+
+        verify(activityApplicationRepository, never()).save(any());
+    }
+
+    // [동시성 보완 신규] 정지 계정은 신청 불가 (기존에 막혀있지 않던 갭)
+    @Test
+    @DisplayName("[동시성 보완] APP-01 직접 신청 - status가 SUSPENDED이면 ACCOUNT_SUSPENDED")
+    void applyDirect_status가_SUSPENDED면_예외를_던진다() {
+        CareRecipient recipient = buildRecipient(null, null, null);
+        CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
+        User user = buildUserWithStatus(USER_ID, UserGender.MALE, UserStatus.SUSPENDED);
+
+        given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.applyDirect(ACTIVITY_ID, USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.ACCOUNT_SUSPENDED);
+
+        verify(activityApplicationRepository, never()).save(any());
     }
 
     @Test
@@ -196,7 +271,7 @@ class ActivityApplicationServiceTest {
         );
 
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
                 .willReturn(Optional.of(existing));
 
@@ -217,7 +292,7 @@ class ActivityApplicationServiceTest {
         );
 
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
                 .willReturn(Optional.of(existing));
         given(activityApplicationRepository.save(any(ActivityApplication.class)))
@@ -244,7 +319,7 @@ class ActivityApplicationServiceTest {
         );
 
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
                 .willReturn(Optional.of(existing));
         given(activityApplicationRepository.save(any(ActivityApplication.class)))
@@ -258,6 +333,10 @@ class ActivityApplicationServiceTest {
 
     // ---------------------------------------------------------------
     // APP-02 자동배정
+    //
+    // 아래 getAutoMatchCandidate 관련 테스트들은 filterValidAutoMatchCandidates
+    // (읽기 전용, @Transactional(readOnly = true)) 경로를 사용하므로
+    // userRepository.findById를 그대로 유지한다 (락 대상 아님).
     // ---------------------------------------------------------------
 
     @Test
@@ -290,217 +369,64 @@ class ActivityApplicationServiceTest {
         BigDecimal userLat = new BigDecimal("37.5665");
         BigDecimal userLng = new BigDecimal("126.9780");
 
-        // A: 사용자와 매우 가깝고, 안부확인도 오래됨 -> 두 지표 모두 우세
         CareRecipient recipientA =
-                buildRecipient(
-                        userLat,
-                        userLng,
-                        LocalDateTime.now().minusDays(30)
-                );
-
+                buildRecipient(userLat, userLng, LocalDateTime.now().minusDays(30));
         CareActivity activityA =
-                buildActivity(
-                        1L,
-                        ActivityStatus.RECRUITING,
-                        2,
-                        recipientA
-                );
+                buildActivity(1L, ActivityStatus.RECRUITING, 2, recipientA);
 
-        // B: 멀리 떨어져 있고, 최근에 안부확인함 -> 두 지표 모두 열세
         CareRecipient recipientB =
-                buildRecipient(
-                        new BigDecimal("35.1796"),
-                        new BigDecimal("129.0756"),
-                        LocalDateTime.now().minusDays(1)
-                );
-
+                buildRecipient(new BigDecimal("35.1796"), new BigDecimal("129.0756"), LocalDateTime.now().minusDays(1));
         CareActivity activityB =
-                buildActivity(
-                        2L,
-                        ActivityStatus.RECRUITING,
-                        2,
-                        recipientB
-                );
+                buildActivity(2L, ActivityStatus.RECRUITING, 2, recipientB);
 
-        // REQ-ACT-17 유효 후보 필터에서 로그인 사용자의 성별을 확인한다.
-        User user =
-                buildUser(
-                        USER_ID,
-                        UserGender.MALE
-                );
+        User user = buildUser(USER_ID, UserGender.MALE);
 
-        given(
-                careActivityRepository.findAutoMatchCandidates(
-                        eq(USER_ID),
-                        anyList()
-                )
-        ).willReturn(
-                List.of(activityA, activityB)
-        );
+        given(careActivityRepository.findAutoMatchCandidates(eq(USER_ID), anyList()))
+                .willReturn(List.of(activityA, activityB));
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(activityApplicationRepository.countApprovedMap(eq(List.of(1L, 2L))))
+                .willReturn(Map.of());
+        given(activityApplicationRepository.countApprovedSameGenderMap(eq(List.of(1L, 2L))))
+                .willReturn(Map.of());
+        given(activityApplicationRepository.countApprovedMap(eq(List.of(1L))))
+                .willReturn(Map.of(1L, 1L));
+        given(activityApplicationRepository.findActiveApplicationsByActivityIds(eq(List.of(1L))))
+                .willReturn(List.of());
 
-        given(
-                userRepository.findById(USER_ID)
-        ).willReturn(
-                Optional.of(user)
-        );
+        var response = service.getAutoMatchCandidate(USER_ID, userLat, userLng, null);
 
-        // 유효 후보 필터에서 후보 전체의 현재 승인 인원을 배치 조회한다.
-        given(
-                activityApplicationRepository.countApprovedMap(
-                        eq(List.of(1L, 2L))
-                )
-        ).willReturn(
-                Map.of()
-        );
-
-        // 현재 두 활동은 GenderCondition.NONE이지만,
-        // 공통 필터의 배치 조회 흐름을 그대로 준비한다.
-        given(
-                activityApplicationRepository.countApprovedSameGenderMap(
-                        eq(List.of(1L, 2L))
-                )
-        ).willReturn(
-                Map.of()
-        );
-
-        // 최종 선택된 활동의 응답용 승인 인원 조회
-        given(
-                activityApplicationRepository.countApprovedMap(
-                        eq(List.of(1L))
-                )
-        ).willReturn(
-                Map.of(1L, 1L)
-        );
-
-        given(
-                activityApplicationRepository.findActiveApplicationsByActivityIds(
-                        eq(List.of(1L))
-                )
-        ).willReturn(
-                List.of()
-        );
-
-        var response =
-                service.getAutoMatchCandidate(
-                        USER_ID,
-                        userLat,
-                        userLng,
-                        null
-                );
-
-        assertThat(response.activityId())
-                .isEqualTo(1L);
-
-        assertThat(response.myApplicationStatus())
-                .isNull();
-
-        assertThat(response.approvedCount())
-                .isEqualTo(1L);
-
-        assertThat(response.applicantCount())
-                .isEqualTo(0L);
+        assertThat(response.activityId()).isEqualTo(1L);
+        assertThat(response.myApplicationStatus()).isNull();
+        assertThat(response.approvedCount()).isEqualTo(1L);
+        assertThat(response.applicantCount()).isEqualTo(0L);
     }
 
     @Test
     @DisplayName("REQ-ACT-16, REQ-ACT-17 - APP-02 자동배정 후보 조회 - 좌표가 없으면 안부확인이 오래된 순으로 후보를 고른다")
     void getAutoMatchCandidate_좌표가_없으면_안부경과만으로_후보를_고른다() {
+        CareRecipient recipientOld = buildRecipient(null, null, LocalDateTime.now().minusDays(60));
+        CareActivity activityOld = buildActivity(1L, ActivityStatus.RECRUITING, 2, recipientOld);
 
-        CareRecipient recipientOld =
-                buildRecipient(
-                        null,
-                        null,
-                        LocalDateTime.now().minusDays(60)
-                );
+        CareRecipient recipientRecent = buildRecipient(null, null, LocalDateTime.now().minusDays(1));
+        CareActivity activityRecent = buildActivity(2L, ActivityStatus.RECRUITING, 2, recipientRecent);
 
-        CareActivity activityOld =
-                buildActivity(
-                        1L,
-                        ActivityStatus.RECRUITING,
-                        2,
-                        recipientOld
-                );
+        User user = buildUser(USER_ID, UserGender.MALE);
 
-        CareRecipient recipientRecent =
-                buildRecipient(
-                        null,
-                        null,
-                        LocalDateTime.now().minusDays(1)
-                );
+        given(careActivityRepository.findAutoMatchCandidates(eq(USER_ID), anyList()))
+                .willReturn(List.of(activityOld, activityRecent));
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(activityApplicationRepository.countApprovedMap(eq(List.of(1L, 2L))))
+                .willReturn(Map.of());
+        given(activityApplicationRepository.countApprovedSameGenderMap(eq(List.of(1L, 2L))))
+                .willReturn(Map.of());
+        given(activityApplicationRepository.countApprovedMap(eq(List.of(1L))))
+                .willReturn(Map.of());
+        given(activityApplicationRepository.findActiveApplicationsByActivityIds(eq(List.of(1L))))
+                .willReturn(List.of());
 
-        CareActivity activityRecent =
-                buildActivity(
-                        2L,
-                        ActivityStatus.RECRUITING,
-                        2,
-                        recipientRecent
-                );
+        var response = service.getAutoMatchCandidate(USER_ID, null, null, null);
 
-        // REQ-ACT-17 유효 후보 필터에서 로그인 사용자의 성별을 확인한다.
-        User user =
-                buildUser(
-                        USER_ID,
-                        UserGender.MALE
-                );
-
-        given(
-                careActivityRepository.findAutoMatchCandidates(
-                        eq(USER_ID),
-                        anyList()
-                )
-        ).willReturn(
-                List.of(activityOld, activityRecent)
-        );
-
-        given(
-                userRepository.findById(USER_ID)
-        ).willReturn(
-                Optional.of(user)
-        );
-
-        // 유효 후보 필터에서 후보 전체 승인 인원을 한 번에 확인한다.
-        given(
-                activityApplicationRepository.countApprovedMap(
-                        eq(List.of(1L, 2L))
-                )
-        ).willReturn(
-                Map.of()
-        );
-
-        given(
-                activityApplicationRepository.countApprovedSameGenderMap(
-                        eq(List.of(1L, 2L))
-                )
-        ).willReturn(
-                Map.of()
-        );
-
-        // 최종 선택된 활동의 응답용 승인 인원
-        given(
-                activityApplicationRepository.countApprovedMap(
-                        eq(List.of(1L))
-                )
-        ).willReturn(
-                Map.of()
-        );
-
-        given(
-                activityApplicationRepository.findActiveApplicationsByActivityIds(
-                        eq(List.of(1L))
-                )
-        ).willReturn(
-                List.of()
-        );
-
-        var response =
-                service.getAutoMatchCandidate(
-                        USER_ID,
-                        null,
-                        null,
-                        null
-                );
-
-        assertThat(response.activityId())
-                .isEqualTo(1L);
+        assertThat(response.activityId()).isEqualTo(1L);
     }
 
     @Test
@@ -511,7 +437,7 @@ class ActivityApplicationServiceTest {
         User user = buildUser(USER_ID, UserGender.MALE);
 
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
                 .willReturn(Optional.empty());
         given(activityApplicationRepository.save(any(ActivityApplication.class)))
@@ -547,7 +473,7 @@ class ActivityApplicationServiceTest {
         );
 
         given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
         given(activityApplicationRepository.findByActivity_IdAndUser_Id(ACTIVITY_ID, USER_ID))
                 .willReturn(Optional.of(existing));
 
@@ -555,6 +481,25 @@ class ActivityApplicationServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.APPLICATION_ALREADY_EXISTS);
+    }
+
+    // [동시성 보완 신규] applyAuto도 applyDirect와 동일한 재검증을 거친다.
+    @Test
+    @DisplayName("[동시성 보완] APP-02 자동배정 신청 확정 - status가 WITHDRAWN이면 ACCOUNT_WITHDRAWN")
+    void applyAuto_status가_WITHDRAWN이면_예외를_던진다() {
+        CareRecipient recipient = buildRecipient(null, null, null);
+        CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
+        User user = buildUserWithStatus(USER_ID, UserGender.MALE, UserStatus.WITHDRAWN);
+
+        given(careActivityRepository.findDetailById(ACTIVITY_ID)).willReturn(Optional.of(activity));
+        given(userRepository.findByIdAndDeletedFalseForUpdate(USER_ID)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.applyAuto(ACTIVITY_ID, USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.ACCOUNT_WITHDRAWN);
+
+        verify(activityApplicationRepository, never()).save(any());
     }
 
     // ---------------------------------------------------------------
@@ -566,107 +511,41 @@ class ActivityApplicationServiceTest {
     void getMyApplications_전체조회시_모든신청상태를_반환한다() {
 
         Pageable pageable = PageRequest.of(0, 20);
+        CareRecipient recipient = buildRecipient(null, null, null);
+        User user = buildUser(USER_ID, UserGender.MALE);
 
-        CareRecipient recipient =
-                buildRecipient(null, null, null);
+        ActivityApplication pending = buildExistingApplication(
+                1L, buildActivity(21L, ActivityStatus.RECRUITING, 2, recipient),
+                user, ApplicationType.DIRECT, ApplicationStatus.PENDING
+        );
+        ActivityApplication approved = buildExistingApplication(
+                2L, buildActivity(22L, ActivityStatus.READY, 2, recipient),
+                user, ApplicationType.DIRECT, ApplicationStatus.APPROVED
+        );
+        ActivityApplication rejected = buildExistingApplication(
+                3L, buildActivity(23L, ActivityStatus.RECRUITING, 2, recipient),
+                user, ApplicationType.DIRECT, ApplicationStatus.REJECTED
+        );
+        ActivityApplication canceled = buildExistingApplication(
+                4L, buildActivity(24L, ActivityStatus.RECRUITING, 2, recipient),
+                user, ApplicationType.DIRECT, ApplicationStatus.CANCELED
+        );
 
-        User user =
-                buildUser(USER_ID, UserGender.MALE);
+        Page<ActivityApplication> page = new PageImpl<>(
+                List.of(pending, approved, rejected, canceled), pageable, 4
+        );
 
-        ActivityApplication pending =
-                buildExistingApplication(
-                        1L,
-                        buildActivity(
-                                21L,
-                                ActivityStatus.RECRUITING,
-                                2,
-                                recipient
-                        ),
-                        user,
-                        ApplicationType.DIRECT,
-                        ApplicationStatus.PENDING
-                );
+        given(activityApplicationRepository.findMyApplications(
+                eq(USER_ID), eq(false), isNull(), eq(false), isNull(), eq(pageable)
+        )).willReturn(page);
 
-        ActivityApplication approved =
-                buildExistingApplication(
-                        2L,
-                        buildActivity(
-                                22L,
-                                ActivityStatus.READY,
-                                2,
-                                recipient
-                        ),
-                        user,
-                        ApplicationType.DIRECT,
-                        ApplicationStatus.APPROVED
-                );
-
-        ActivityApplication rejected =
-                buildExistingApplication(
-                        3L,
-                        buildActivity(
-                                23L,
-                                ActivityStatus.RECRUITING,
-                                2,
-                                recipient
-                        ),
-                        user,
-                        ApplicationType.DIRECT,
-                        ApplicationStatus.REJECTED
-                );
-
-        ActivityApplication canceled =
-                buildExistingApplication(
-                        4L,
-                        buildActivity(
-                                24L,
-                                ActivityStatus.RECRUITING,
-                                2,
-                                recipient
-                        ),
-                        user,
-                        ApplicationType.DIRECT,
-                        ApplicationStatus.CANCELED
-                );
-
-        Page<ActivityApplication> page =
-                new PageImpl<>(
-                        List.of(
-                                pending,
-                                approved,
-                                rejected,
-                                canceled
-                        ),
-                        pageable,
-                        4
-                );
-
-        given(
-                activityApplicationRepository.findMyApplications(
-                        eq(USER_ID),
-                        eq(false),
-                        isNull(),
-                        eq(false),
-                        isNull(),
-                        eq(pageable)
-                )
-        ).willReturn(page);
-
-        PageResponse<ApplicationResponse> response =
-                service.getMyApplications(
-                        USER_ID,
-                        null,
-                        null,
-                        pageable
-                );
+        PageResponse<ApplicationResponse> response = service.getMyApplications(USER_ID, null, null, pageable);
 
         assertThat(response.content())
                 .extracting(ApplicationResponse::status)
                 .containsExactly(
-                        ApplicationStatus.PENDING,
-                        ApplicationStatus.APPROVED,
-                        ApplicationStatus.REJECTED,
-                        ApplicationStatus.CANCELED
+                        ApplicationStatus.PENDING, ApplicationStatus.APPROVED,
+                        ApplicationStatus.REJECTED, ApplicationStatus.CANCELED
                 );
     }
 
@@ -711,92 +590,37 @@ class ActivityApplicationServiceTest {
     void getMyActivities_APPROVED된_예정_진행활동을_반환한다() {
 
         Pageable pageable = PageRequest.of(0, 20);
+        CareRecipient recipient = buildRecipient(null, null, null);
+        User user = buildUser(USER_ID, UserGender.MALE);
 
-        CareRecipient recipient =
-                buildRecipient(null, null, null);
+        CareActivity readyActivity = buildActivity(31L, ActivityStatus.READY, 2, recipient);
+        CareActivity inProgressActivity = buildActivity(32L, ActivityStatus.IN_PROGRESS, 2, recipient);
 
-        User user =
-                buildUser(USER_ID, UserGender.MALE);
+        ActivityApplication readyApplication = buildExistingApplication(
+                1L, readyActivity, user, ApplicationType.DIRECT, ApplicationStatus.APPROVED
+        );
+        ActivityApplication inProgressApplication = buildExistingApplication(
+                2L, inProgressActivity, user, ApplicationType.AUTO, ApplicationStatus.APPROVED
+        );
 
-        CareActivity readyActivity =
-                buildActivity(
-                        31L,
-                        ActivityStatus.READY,
-                        2,
-                        recipient
-                );
+        Page<ActivityApplication> page = new PageImpl<>(
+                List.of(readyApplication, inProgressApplication), pageable, 2
+        );
 
-        CareActivity inProgressActivity =
-                buildActivity(
-                        32L,
-                        ActivityStatus.IN_PROGRESS,
-                        2,
-                        recipient
-                );
+        given(activityApplicationRepository.findMyActivities(eq(USER_ID), eq(false), isNull(), eq(pageable)))
+                .willReturn(page);
+        given(activityRecordRepository.findByActivity_IdIn(eq(List.of(31L, 32L))))
+                .willReturn(List.of());
 
-        ActivityApplication readyApplication =
-                buildExistingApplication(
-                        1L,
-                        readyActivity,
-                        user,
-                        ApplicationType.DIRECT,
-                        ApplicationStatus.APPROVED
-                );
+        PageResponse<ApplicationResponse> response = service.getMyActivities(USER_ID, null, pageable);
 
-        ActivityApplication inProgressApplication =
-                buildExistingApplication(
-                        2L,
-                        inProgressActivity,
-                        user,
-                        ApplicationType.AUTO,
-                        ApplicationStatus.APPROVED
-                );
-
-        Page<ActivityApplication> page =
-                new PageImpl<>(
-                        List.of(
-                                readyApplication,
-                                inProgressApplication
-                        ),
-                        pageable,
-                        2
-                );
-
-        given(
-                activityApplicationRepository.findMyActivities(
-                        eq(USER_ID),
-                        eq(false),
-                        isNull(),
-                        eq(pageable)
-                )
-        ).willReturn(page);
-
-        given(
-                activityRecordRepository.findByActivity_IdIn(
-                        eq(List.of(31L, 32L))
-                )
-        ).willReturn(List.of());
-
-        PageResponse<ApplicationResponse> response =
-                service.getMyActivities(
-                        USER_ID,
-                        null,
-                        pageable
-                );
-
-        assertThat(response.content())
-                .hasSize(2);
-
+        assertThat(response.content()).hasSize(2);
         assertThat(response.content())
                 .extracting(ApplicationResponse::status)
                 .containsOnly(ApplicationStatus.APPROVED);
-
         assertThat(response.content())
                 .extracting(ApplicationResponse::activityStatus)
-                .containsExactly(
-                        ActivityStatus.READY,
-                        ActivityStatus.IN_PROGRESS
-                );
+                .containsExactly(ActivityStatus.READY, ActivityStatus.IN_PROGRESS);
     }
 
     @Test
@@ -870,6 +694,51 @@ class ActivityApplicationServiceTest {
                 .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
+    // [신규] cancelApplication()에 추가된 계정 상태 검증 회귀 테스트.
+    // application.getUser()로 이미 로드된 User의 status를 그대로 확인하므로
+    // userRepository는 별도로 stub할 필요가 없다.
+    @Test
+    @DisplayName("[신규] APP-05 신청 취소 - 신청자 계정이 SUSPENDED이면 ACCOUNT_SUSPENDED")
+    void cancelApplication_신청자가_SUSPENDED면_예외를_던진다() {
+        CareRecipient recipient = buildRecipient(null, null, null);
+        CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
+        User suspendedUser = buildUserWithStatus(USER_ID, UserGender.MALE, UserStatus.SUSPENDED);
+        ActivityApplication application = buildExistingApplication(
+                1L, activity, suspendedUser, ApplicationType.DIRECT, ApplicationStatus.PENDING
+        );
+
+        given(activityApplicationRepository.findById(1L)).willReturn(Optional.of(application));
+
+        assertThatThrownBy(() -> service.cancelApplication(1L, USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.ACCOUNT_SUSPENDED);
+
+        // 상태 검증에서 막혔으므로 신청 상태는 그대로 PENDING이어야 한다.
+        assertThat(application.getStatus()).isEqualTo(ApplicationStatus.PENDING);
+        verify(careActivityRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    @DisplayName("[신규] APP-05 신청 취소 - 신청자 계정이 WITHDRAWN이면 ACCOUNT_WITHDRAWN")
+    void cancelApplication_신청자가_WITHDRAWN이면_예외를_던진다() {
+        CareRecipient recipient = buildRecipient(null, null, null);
+        CareActivity activity = buildActivity(ACTIVITY_ID, ActivityStatus.RECRUITING, 2, recipient);
+        User withdrawnUser = buildUserWithStatus(USER_ID, UserGender.MALE, UserStatus.WITHDRAWN);
+        ActivityApplication application = buildExistingApplication(
+                1L, activity, withdrawnUser, ApplicationType.DIRECT, ApplicationStatus.PENDING
+        );
+
+        given(activityApplicationRepository.findById(1L)).willReturn(Optional.of(application));
+
+        assertThatThrownBy(() -> service.cancelApplication(1L, USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.ACCOUNT_WITHDRAWN);
+
+        assertThat(application.getStatus()).isEqualTo(ApplicationStatus.PENDING);
+    }
+
     @Test
     @DisplayName("REQ-ACT-14 - APP-05 신청 취소 - PENDING 신청은 CareActivity 조회 없이 바로 취소된다")
     void cancelApplication_PENDING이면_바로_취소된다() {
@@ -900,7 +769,6 @@ class ActivityApplicationServiceTest {
 
         given(activityApplicationRepository.findById(1L)).willReturn(Optional.of(application));
         given(careActivityRepository.findByIdForUpdate(ACTIVITY_ID)).willReturn(Optional.of(activity));
-        // 취소 이후 남은 승인 인원이 1명(정원 2명 미달)이라고 가정
         given(activityApplicationRepository.countApprovedMap(eq(List.of(ACTIVITY_ID))))
                 .willReturn(Map.of(ACTIVITY_ID, 1L));
 
@@ -949,7 +817,6 @@ class ActivityApplicationServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.APPLICATION_NOT_CANCELABLE);
 
-        // 활동이 시작된 이후이므로 신청 상태는 그대로 APPROVED로 남아야 한다
         assertThat(application.getStatus()).isEqualTo(ApplicationStatus.APPROVED);
     }
 
