@@ -240,10 +240,7 @@ function InstitutionSidebar() {
           )}
         </NavLink>
 
-        <NavLink to="/institution/statistics">
-          <Icon>⌁</Icon>
-          <span>통계</span>
-        </NavLink>
+        
       </nav>
 
       <div className="institution-help">

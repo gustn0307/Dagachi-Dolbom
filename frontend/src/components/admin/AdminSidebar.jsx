@@ -11,15 +11,6 @@ function AdminSidebar() {
         </div>
       </div>
       <nav>
-        <NavLink to="/admin/users">
-          <i>♙</i>
-          <span>일반 사용자</span>
-        </NavLink>
-        <NavLink to="/admin/institutions">
-          <i>▣</i>
-          <span>기관 관리</span>
-          <em>3</em>
-        </NavLink>
         <NavLink to="/admin/notices">
           <i>▤</i>
           <span>공지 관리</span>
