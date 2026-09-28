@@ -18,7 +18,7 @@ import CareTargetDetail from "./pages/institution/CareTargetDetail";
 import VolunteerManagement from "./pages/institution/VolunteerManagement";
 import VolunteerDetail from "./pages/institution/VolunteerDetail";
 import ActivityManagement from "./pages/institution/ActivityManagement";
-import InstitutionStatistics from "./pages/institution/Statistics";
+
 import ActivityDetail from "./pages/institution/ActivityDetail";
 import ReportDetail from "./pages/institution/ReportDetail";
 
@@ -113,7 +113,7 @@ function App() {
           <Route path="volunteers/:volunteerId" element={<VolunteerDetail />} />
 
           <Route path="activities" element={<ActivityManagement />} />
-          <Route path="statistics" element={<InstitutionStatistics />} />
+         
 
           <Route path="activities/:activityId" element={<ActivityDetail />} />
         </Route>

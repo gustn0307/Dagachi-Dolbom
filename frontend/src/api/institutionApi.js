@@ -260,18 +260,7 @@ export const requestInstitutionActivityRecordRevision = (
     }),
   );
 
-/* =====================================================
- * 기관 통계 API
- * ===================================================== */
 
-export const getStatistics = (period = "6months") =>
-  unwrapData(
-    api.get("/api/institution/statistics", {
-      params: {
-        period,
-      },
-    }),
-  );
 
 /**
  * 로그인한 담당자 소속 기관 정보 조회.
@@ -332,6 +321,5 @@ export const institutionApi = {
   approveInstitutionActivityRecord,
   requestInstitutionActivityRecordRevision,
 
-  // 통계
-  getStatistics,
+  
 };
