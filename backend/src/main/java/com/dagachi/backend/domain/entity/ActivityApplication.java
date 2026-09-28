@@ -45,6 +45,15 @@ public class ActivityApplication extends BaseTimeEntity {
   return application;
  }
 
+ public static ActivityApplication createAuto(CareActivity activity, User user) {
+  ActivityApplication application = new ActivityApplication();
+  application.activity = activity;
+  application.user = user;
+  application.applicationType = ApplicationType.AUTO;
+  application.status = ApplicationStatus.PENDING;
+  return application;
+ }
+
  public void reactivate() {
   if (this.status != ApplicationStatus.CANCELED) {
    throw new IllegalStateException("CANCELED 상태에서만 재신청할 수 있습니다.");

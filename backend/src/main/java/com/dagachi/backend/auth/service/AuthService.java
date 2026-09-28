@@ -34,7 +34,7 @@ public class AuthService {
     public SignupResponse signup(SignupRequest request) {
 
         // 이메일 중복 확인
-        if (userRepository.existsByEmailAndDeletedFalse(request.email())) {
+        if (userRepository.existsByEmail(request.email())) {
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 

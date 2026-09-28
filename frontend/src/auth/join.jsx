@@ -62,7 +62,7 @@ function Join() {
     <main className="simple-auth-page">
       <form className="simple-auth-card" onSubmit={handleSubmit}>
         <span className="auth-mark">♥</span>
-        <p>이웃을 잇다</p>
+        <p>다같이 돌봄</p>
         <h1>회원가입</h1>
 
         <label>

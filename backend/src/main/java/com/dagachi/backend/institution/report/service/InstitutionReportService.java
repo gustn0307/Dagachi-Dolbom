@@ -7,10 +7,7 @@ import com.dagachi.backend.common.kakao.dto.Coordinate;
 import com.dagachi.backend.common.response.PageResponse;
 import com.dagachi.backend.common.storage.S3StorageService;
 import com.dagachi.backend.common.util.GeoUtils;
-import com.dagachi.backend.domain.entity.CareRecipient;
-import com.dagachi.backend.domain.entity.Institution;
-import com.dagachi.backend.domain.entity.Report;
-import com.dagachi.backend.domain.entity.User;
+import com.dagachi.backend.domain.entity.*;
 import com.dagachi.backend.domain.enums.AIAnalysisType;
 import com.dagachi.backend.domain.enums.AITargetType;
 import com.dagachi.backend.domain.enums.ConsentStatus;
@@ -29,7 +26,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class InstitutionReportService {
@@ -96,10 +95,6 @@ public class InstitutionReportService {
                         toExclusive
                 );
 
-        /*
-         * REPORT-03의 기본 정렬 계약인 createdAt DESC를
-         * 클라이언트의 임의 sort 값과 무관하게 적용합니다.
-         */
         Pageable reportPageable = PageRequest.of(
                 pageable.getPageNumber(),
                 pageable.getPageSize(),
@@ -109,12 +104,28 @@ public class InstitutionReportService {
                 )
         );
 
-        Page<InstitutionReportListItemResponse> responsePage =
+        Page<Report> reportPage =
                 reportRepository.findAll(
-                                specification,
-                                reportPageable
+                        specification,
+                        reportPageable
+                );
+
+        // 현재 페이지에 보이는 reportId만 모아 AI 요약을 batch 조회한다.
+        Map<Long, String> summaryByReportId =
+                findLatestReportSummaries(
+                        reportPage.getContent()
+                                .stream()
+                                .map(Report::getId)
+                                .toList()
+                );
+
+        Page<InstitutionReportListItemResponse> responsePage =
+                reportPage.map(report ->
+                        InstitutionReportListItemResponse.from(
+                                report,
+                                summaryByReportId.get(report.getId())
                         )
-                        .map(InstitutionReportListItemResponse::from);
+                );
 
         return PageResponse.from(responsePage);
     }
@@ -166,12 +177,6 @@ public class InstitutionReportService {
                         )
                 );
 
-        /*
-         * 기관 주소가 등록되어 있으면 요청당 한 번만 Kakao API를 호출합니다.
-         *
-         * 제보마다 기관 주소를 다시 좌표로 변환하지 않고,
-         * 얻은 기관 좌표 하나를 모든 Report 거리 계산에 재사용합니다.
-         */
         Coordinate institutionCoordinate =
                 getInstitutionCoordinate(
                         institution.getAddress()
@@ -188,12 +193,6 @@ public class InstitutionReportService {
                                         )
                                 )
                         )
-                        /*
-                         * 좌표가 있는 제보는 가까운 순으로,
-                         * 거리 계산이 불가능한 제보(null)는 뒤로 보냅니다.
-                         *
-                         * 거리가 동일하면 최신 접수 제보를 먼저 보여줍니다.
-                         */
                         .sorted(
                                 Comparator
                                         .comparing(
@@ -209,13 +208,29 @@ public class InstitutionReportService {
                         )
                         .toList();
 
-        Page<UnassignedReportListItemResponse> responsePage =
+        Page<UnassignedReportListItemResponse> pagedResponse =
                 createPage(
                         sortedReports,
                         pageable
                 );
 
-        return PageResponse.from(responsePage);
+        // 최종 페이지에 포함된 reportId만 AI 요약 batch 조회
+        Map<Long, String> summaryByReportId =
+                findLatestReportSummaries(
+                        pagedResponse.getContent()
+                                .stream()
+                                .map(UnassignedReportListItemResponse::reportId)
+                                .toList()
+                );
+
+        Page<UnassignedReportListItemResponse> withSummaries =
+                pagedResponse.map(item ->
+                        item.withAiSummary(
+                                summaryByReportId.get(item.reportId())
+                        )
+                );
+
+        return PageResponse.from(withSummaries);
     }
 
     /**
@@ -391,6 +406,63 @@ public class InstitutionReportService {
     }
 
     /**
+     * 여러 Report의 최신 REPORT_SUMMARY를 한 번에 조회하여
+     * reportId -> summary 문자열 Map으로 반환합니다.
+     *
+     * summary가 없거나 JSON 구조가 유효하지 않은 경우
+     * 해당 reportId는 Map에 포함되지 않습니다(null로 취급).
+     */
+    private Map<Long, String> findLatestReportSummaries(
+            List<Long> reportIds
+    ) {
+        if (reportIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<AIAnalysis> analyses =
+                aiAnalysisRepository
+                        .findByTargetTypeAndAnalysisTypeAndTargetIdInOrderByTargetIdAscCreatedAtDescIdDesc(
+                                AITargetType.REPORT,
+                                AIAnalysisType.REPORT_TITLE, // 변경: REPORT_SUMMARY -> REPORT_TITLE
+                                reportIds
+                        );
+
+        Map<Long, String> result = new HashMap<>();
+
+        for (AIAnalysis analysis : analyses) {
+            result.putIfAbsent(
+                    analysis.getTargetId(),
+                    extractSummaryOrNull(analysis)
+            );
+        }
+
+        return result;
+    }
+
+    /**
+     * resultJson에서 summary 문자열을 안전하게 추출합니다.
+     * 구조가 유효하지 않거나 비어 있으면 null을 반환합니다.
+     */
+    private String extractSummaryOrNull(
+            AIAnalysis analysis
+    ) {
+        if (analysis.getResultJson() == null
+                || !analysis.getResultJson().has("title") // 변경: summary -> title
+                || !analysis.getResultJson()
+                .get("title")
+                .isTextual()) {
+            return null;
+        }
+
+        String title =
+                analysis.getResultJson()
+                        .get("title")
+                        .asText();
+
+        return title.isBlank() ? null : title;
+    }
+
+    /**
      * 현재 로그인한 기관에 배정된 제보를
      * 같은 기관의 기존 돌봄 대상자와 연결합니다.
      *
@@ -496,20 +568,17 @@ public class InstitutionReportService {
 
         /*
          * 신규 대상자 생성 전에 Report row를 잠급니다.
-         *
-         * 동일 Report에 REPORT-06/07 또는 REPORT-07 두 요청이
-         * 동시에 들어와 고아 CareRecipient가 생성되는 것을 방지합니다.
          */
-        Report report = reportRepository.findWithLockById(reportId)
-                .orElseThrow(
-                        () -> new CustomException(
-                                ErrorCode.RESOURCE_NOT_FOUND
-                        )
-                );
+        Report report =
+                reportRepository.findWithLockById(reportId)
+                        .orElseThrow(
+                                () -> new CustomException(
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                )
+                        );
 
         /*
-         * 미배정 제보나 다른 기관의 제보를 기준으로
-         * 신규 대상자를 만들 수 없습니다.
+         * 미배정 제보이거나 다른 기관에 배정된 제보인지 검사합니다.
          */
         if (report.getInstitution() == null
                 || !report.getInstitution()
@@ -521,11 +590,8 @@ public class InstitutionReportService {
         }
 
         /*
-         * 이미 대상자가 연결된 제보라면
-         * 또 다른 신규 대상자를 생성하지 않습니다.
-         *
-         * 이 검증을 CareRecipient 생성보다 먼저 수행해야
-         * 불필요한 대상자 데이터가 생성되지 않습니다.
+         * 이미 돌봄 대상자가 연결된 제보에는
+         * 신규 대상자를 다시 등록할 수 없습니다.
          */
         if (report.getCareRecipient() != null) {
             throw new CustomException(
@@ -534,12 +600,8 @@ public class InstitutionReportService {
         }
 
         /*
-         * 제보 기반 신규 대상자 등록 시점에는
-         * 아직 동의 여부를 확인하지 않은 PENDING 또는
-         * 이미 동의를 확보한 AGREED만 허용합니다.
-         *
-         * WITHDRAWN은 기존 동의를 철회했다는 의미이므로
-         * 신규 등록 초기 상태로는 허용하지 않습니다.
+         * 신규 대상자의 초기 동의 상태로
+         * WITHDRAWN은 사용할 수 없습니다.
          */
         if (request.consentStatus() == ConsentStatus.WITHDRAWN) {
             throw new CustomException(
@@ -548,8 +610,21 @@ public class InstitutionReportService {
         }
 
         /*
-         * CARE-03과 동일한 입력값을 사용해
-         * 로그인 사용자의 기관 소속 대상자를 생성합니다.
+         * 좌표 변환에는 상세 주소를 제외한 기본 주소만 사용합니다.
+         */
+        String address =
+                request.address().trim();
+
+        /*
+         * Kakao Local API로 주소를 위도·경도로 변환합니다.
+         */
+        Coordinate coordinate =
+                kakaoLocalClient.searchCoordinate(
+                        address
+                );
+
+        /*
+         * 주소와 변환된 위도·경도를 함께 저장합니다.
          */
         CareRecipient careRecipient =
                 CareRecipient.create(
@@ -558,10 +633,10 @@ public class InstitutionReportService {
                         request.gender(),
                         request.birthYear(),
                         normalizeNullableText(request.phone()),
-                        request.address().trim(),
+                        address,
                         normalizeNullableText(request.detailAddress()),
-                        request.latitude(),
-                        request.longitude(),
+                        coordinate.latitude(),
+                        coordinate.longitude(),
                         request.consentStatus()
                 );
 
@@ -571,18 +646,15 @@ public class InstitutionReportService {
                 );
 
         /*
-         * 방금 생성한 대상자를 현재 제보와 연결합니다.
-         *
-         * 이 메서드 전체가 @Transactional이므로
-         * 이후 예외가 발생하면 CareRecipient INSERT도 함께 rollback됩니다.
+         * 생성한 돌봄 대상자를 현재 제보에 연결합니다.
          */
         report.linkCareRecipient(
                 savedCareRecipient
         );
 
         /*
-         * 신규 대상자는 현재 이 Report 한 건과 연결되고,
-         * 아직 활동은 없으므로 각각 1, 0으로 반환합니다.
+         * 현재 제보 1건과 연결되고,
+         * 신규 등록 직후 활동은 0건입니다.
          */
         CareRecipientDetailResponse recipientResponse =
                 CareRecipientDetailResponse.of(

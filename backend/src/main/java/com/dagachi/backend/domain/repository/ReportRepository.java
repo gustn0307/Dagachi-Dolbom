@@ -123,4 +123,43 @@ public interface ReportRepository extends
             @Param("threshold") double threshold,
             @Param("limit") int limit
     );
+
+    /**
+     * 특정 기관에 배정된 제보 중 REPORT_TITLE 분석 결과가
+     * 아직 하나도 없는 제보 ID를 오래된 순으로 조회합니다.
+     */
+    @Query("""
+        SELECT r.id FROM Report r
+        WHERE r.institution.id = :institutionId
+          AND NOT EXISTS (
+              SELECT 1 FROM AIAnalysis a
+              WHERE a.targetType = com.dagachi.backend.domain.enums.AITargetType.REPORT
+                AND a.analysisType = com.dagachi.backend.domain.enums.AIAnalysisType.REPORT_TITLE
+                AND a.targetId = r.id
+          )
+        ORDER BY r.createdAt ASC
+        """)
+    List<Long> findMissingTitleReportIdsByInstitution(
+            @Param("institutionId") Long institutionId,
+            Pageable pageable
+    );
+
+    /**
+     * 아직 어떤 기관에도 배정되지 않은 제보 중
+     * REPORT_TITLE 분석 결과가 없는 제보 ID를 오래된 순으로 조회합니다.
+     */
+    @Query("""
+        SELECT r.id FROM Report r
+        WHERE r.institution IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM AIAnalysis a
+              WHERE a.targetType = com.dagachi.backend.domain.enums.AITargetType.REPORT
+                AND a.analysisType = com.dagachi.backend.domain.enums.AIAnalysisType.REPORT_TITLE
+                AND a.targetId = r.id
+          )
+        ORDER BY r.createdAt ASC
+        """)
+    List<Long> findMissingTitleReportIdsUnassigned(
+            Pageable pageable
+    );
 }

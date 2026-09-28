@@ -11,9 +11,17 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(user);
 
   const logout = () => {
-    // 현재 브라우저 세션의 Access Token을 제거하고
-    // React의 인증 상태도 즉시 비로그인 상태로 변경합니다.
+    // 현재 브라우저 세션의 인증 정보를 제거합니다.
     sessionStorage.removeItem("accessToken");
+
+    // 자동배정 추천은 사용자별 임시 상태이므로,
+    // 로그아웃 시 이전 사용자의 추천 정보가 다음 사용자에게
+    // 복원되지 않도록 함께 제거합니다.
+    sessionStorage.removeItem("autoMatchCandidates");
+    sessionStorage.removeItem("autoMatchCandidateIndex");
+    sessionStorage.removeItem("autoMatchSeenActivityIds");
+
+    // React의 인증 상태도 즉시 비로그인 상태로 변경합니다.
     setUser(null);
   };
 

@@ -35,9 +35,13 @@ public class ActivityController {
      * ACT-01 모집 활동 목록 조회.
      *
      * GET /api/activities
+     *
+     * sortBy=STALE 이면 대상자의 최근 안부 확인일(lastCheckedAt)이 오래된 순으로 정렬한다.
+     * latitude/longitude가 함께 오면 거리순이 우선 적용된다.
      */
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ActivityResponse>>> getActivities(
+            @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) BigDecimal latitude,
             @RequestParam(required = false) BigDecimal longitude,
             @RequestParam(required = false) String region,
@@ -45,13 +49,14 @@ public class ActivityController {
             @RequestParam(required = false) LocalDate dateTo,
             @RequestParam(required = false) List<String> ageGroups,
             @RequestParam(required = false) String gender,
+            @RequestParam(required = false) String sortBy,
             @PageableDefault(page = 0, size = 20, sort = "scheduledAt", direction = Sort.Direction.ASC)
             Pageable pageable
     ) {
         ActivitySearchCondition condition =
-                new ActivitySearchCondition(latitude, longitude, region, dateFrom, dateTo, ageGroups, gender);
+                new ActivitySearchCondition(latitude, longitude, region, dateFrom, dateTo, ageGroups, gender, sortBy);
 
-        PageResponse<ActivityResponse> response = activityService.getActivities(condition, pageable);
+        PageResponse<ActivityResponse> response = activityService.getActivities(condition, pageable, userId);
 
         return ResponseEntity.ok(
                 ApiResponse.success("활동 목록을 조회했습니다.", response)

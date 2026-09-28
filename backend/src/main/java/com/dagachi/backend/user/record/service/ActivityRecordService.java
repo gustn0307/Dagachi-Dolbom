@@ -10,6 +10,7 @@ import com.dagachi.backend.domain.enums.ActivityStatus;
 import com.dagachi.backend.domain.enums.ApplicationStatus;
 import com.dagachi.backend.domain.enums.GenderCondition;
 import com.dagachi.backend.domain.enums.UserGender;
+import com.dagachi.backend.domain.enums.UserStatus;
 import com.dagachi.backend.domain.repository.*;
 import com.dagachi.backend.user.record.dto.ActivityRecordResponse;
 
@@ -42,6 +43,12 @@ import java.util.List;
 
 /**
  * 일반 USER의 활동 시작(RECORD-01)을 담당한다.
+ *
+ * [수정 - 유지훈 담당 범위(RECORD-01)만] startActivity()에 정지(SUSPENDED)·
+ * 탈퇴(WITHDRAWN) 계정 검증을 추가했다. 공용 UserAccessValidator는 아직
+ * 존재하지 않아(강현수 담당, 별도 PR 필요) 여기서는 UserRepository를 직접
+ * 사용하는 로컬 검증으로 처리한다. RECORD-02~05(saveDraft/uploadSignature/
+ * submit/getActivityRecord, 맹동영 담당)는 원본 그대로 되돌렸다.
  */
 @Slf4j
 @Service
@@ -58,7 +65,7 @@ public class ActivityRecordService {
     // RECORD-04 서명 파일 업로드/삭제에 사용합니다.
     private final S3StorageService s3StorageService;
 
-    // RECORD-05 제출자를 조회하는 데 사용합니다.
+    // RECORD-01 계정 상태 검증, RECORD-05 제출자 조회에 사용합니다.
     private final UserRepository userRepository;
 
     public ActivityRecordService(
@@ -79,56 +86,216 @@ public class ActivityRecordService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * [신규 - RECORD-01 전용] 삭제되지 않고, 정지·탈퇴되지 않은 사용자를 조회합니다.
+     *
+     * startActivity()에서만 사용합니다. RECORD-02~05는 맹동영 담당 영역이라
+     * 이 검증을 임의로 추가하지 않았습니다. (공용 UserAccessValidator가
+     * 만들어지면 그때 이 메서드는 제거하고 그쪽으로 교체 예정)
+     */
+    private User findActiveUser(Long userId) {
+        User user = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new CustomException(ErrorCode.ACCOUNT_SUSPENDED);
+        }
+
+        if (user.getStatus() == UserStatus.WITHDRAWN) {
+            throw new CustomException(ErrorCode.ACCOUNT_WITHDRAWN);
+        }
+
+        return user;
+    }
+
     @Transactional
-    public ActivityRecordResponse startActivity(Long activityId, Long userId) {
+    public ActivityRecordResponse startActivity(
+            Long activityId,
+            Long userId
+    ) {
+        // [수정] 활동 시작 전에 계정 상태(정지/탈퇴)를 먼저 검증합니다.
+        findActiveUser(userId);
 
-        // 동시성 방지: 신청 승인/취소와 동일하게 CareActivity를 PESSIMISTIC_WRITE로 잠근다.
-        CareActivity activity = careActivityRepository.findByIdForUpdate(activityId)
-                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        // REQ-REC-01
+        // 활동 시작과 공동 ActivityRecord 생성을 한 트랜잭션에서 처리하기 위해
+        // CareActivity를 PESSIMISTIC_WRITE로 잠급니다.
+        CareActivity activity =
+                careActivityRepository.findByIdForUpdate(activityId)
+                        .orElseThrow(() ->
+                                new CustomException(
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                )
+                        );
 
-        if (activity.getStatus() != ActivityStatus.READY) {
-            throw new CustomException(ErrorCode.ACTIVITY_NOT_READY);
+        // 호출 사용자가 해당 활동의 APPROVED 참여자인지 확인합니다.
+        ActivityApplication myApplication =
+                activityApplicationRepository
+                        .findByActivity_IdAndUser_Id(
+                                activityId,
+                                userId
+                        )
+                        .orElseThrow(() ->
+                                new CustomException(
+                                        ErrorCode.FORBIDDEN
+                                )
+                        );
+
+        if (myApplication.getStatus()
+                != ApplicationStatus.APPROVED) {
+
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN
+            );
         }
 
-        ActivityApplication myApplication = activityApplicationRepository
-                .findByActivity_IdAndUser_Id(activityId, userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.FORBIDDEN));
+        /*
+         * REQ-REC-01 / REQ-REC-02
+         *
+         * 공동 ActivityRecord가 이미 만들어진 활동이라면
+         * 새로운 기록을 만들지 않고 기존 기록을 그대로 사용합니다.
+         *
+         * 다른 APPROVED 참여자가 이미 활동을 시작해
+         * CareActivity가 IN_PROGRESS가 된 경우에도
+         * 동일한 공동 기록을 반환합니다.
+         */
+        var existingRecord =
+                activityRecordRepository
+                        .findByActivity_Id(activityId);
 
-        if (myApplication.getStatus() != ApplicationStatus.APPROVED) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
+        if (existingRecord.isPresent()) {
+
+            ActivityRecord record =
+                    existingRecord.get();
+
+            if (activity.getStatus()
+                    == ActivityStatus.IN_PROGRESS) {
+
+                return ActivityRecordResponse.from(
+                        record
+                );
+            }
+
+            /*
+             * record는 존재하지만 활동 상태가 아직 READY인 경우에도
+             * 공동 기록을 재사용하고 IN_PROGRESS로 전환합니다.
+             */
+            if (activity.getStatus()
+                    == ActivityStatus.READY) {
+
+                activity.changeStatus(
+                        ActivityStatus.IN_PROGRESS
+                );
+
+                return ActivityRecordResponse.from(
+                        record
+                );
+            }
+
+            throw new CustomException(
+                    ErrorCode.ACTIVITY_NOT_READY
+            );
         }
 
-        if (activityRecordRepository.findByActivity_Id(activityId).isPresent()) {
-            throw new CustomException(ErrorCode.ACTIVITY_ALREADY_STARTED);
+        /*
+         * 기존 공동 기록이 없는 최초 시작은
+         * READY 상태에서만 가능합니다.
+         */
+        if (activity.getStatus()
+                != ActivityStatus.READY) {
+
+            throw new CustomException(
+                    ErrorCode.ACTIVITY_NOT_READY
+            );
         }
 
-        // 정원 재검증 (락을 잡은 상태이므로 최신 값 기준)
-        long approvedCount = activityApplicationRepository
-                .countApprovedMap(List.of(activityId))
-                .getOrDefault(activityId, 0L);
+        // REQ-REC-01
+        // 잠금 상태에서 현재 승인 인원이 required_people을 충족하는지 재검증합니다.
+        long approvedCount =
+                activityApplicationRepository
+                        .countApprovedMap(
+                                List.of(activityId)
+                        )
+                        .getOrDefault(
+                                activityId,
+                                0L
+                        );
 
-        if (approvedCount < activity.getRequiredPeople()) {
-            throw new CustomException(ErrorCode.ACTIVITY_NOT_READY);
+        if (approvedCount
+                < activity.getRequiredPeople()) {
+
+            throw new CustomException(
+                    ErrorCode.ACTIVITY_NOT_READY
+            );
         }
 
-        // 성별 조건 재검증
-        if (activity.getGenderCondition() == GenderCondition.SAME_GENDER_ONE) {
-            List<UserGender> genders = activityApplicationRepository.findApprovedUserGenders(activityId);
-            boolean allSameGender = genders.stream().distinct().count() <= 1;
-            if (!allSameGender) {
-                throw new CustomException(ErrorCode.ACTIVITY_GENDER_CONDITION_NOT_MET);
+        /*
+         * REQ-ACT-05 / REQ-REC-01
+         *
+         * SAME_GENDER_ONE은 대상자와 같은 성별의
+         * APPROVED 봉사자가 최소 1명 포함되어야 합니다.
+         */
+        if (activity.getGenderCondition()
+                == GenderCondition.SAME_GENDER_ONE) {
+
+            UserGender recipientGender =
+                    activity.getRecipient()
+                            .getGender();
+
+            List<UserGender> approvedGenders =
+                    activityApplicationRepository
+                            .findApprovedUserGenders(
+                                    activityId
+                            );
+
+            boolean hasSameGenderAsRecipient =
+                    approvedGenders.stream()
+                            .anyMatch(
+                                    gender ->
+                                            gender
+                                                    == recipientGender
+                            );
+
+            if (!hasSameGenderAsRecipient) {
+                throw new CustomException(
+                        ErrorCode.ACTIVITY_GENDER_CONDITION_NOT_MET
+                );
             }
         }
 
-        Integer checklistVersion = checklistItemRepository.findCurrentActiveVersion()
-                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        /*
+         * REQ-REC-05 / REQ-REC-06
+         *
+         * 현재 active 체크리스트의 최신 version을
+         * 새 공동 ActivityRecord에 고정합니다.
+         */
+        Integer checklistVersion =
+                checklistItemRepository
+                        .findCurrentActiveVersion()
+                        .orElseThrow(() ->
+                                new CustomException(
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                )
+                        );
 
-        ActivityRecord record = ActivityRecord.createDraft(activity, checklistVersion, LocalDateTime.now());
-        ActivityRecord saved = activityRecordRepository.save(record);
+        ActivityRecord record =
+                ActivityRecord.createDraft(
+                        activity,
+                        checklistVersion,
+                        LocalDateTime.now()
+                );
 
-        activity.changeStatus(ActivityStatus.IN_PROGRESS);
+        ActivityRecord saved =
+                activityRecordRepository.save(
+                        record
+                );
 
-        return ActivityRecordResponse.from(saved);
+        activity.changeStatus(
+                ActivityStatus.IN_PROGRESS
+        );
+
+        return ActivityRecordResponse.from(
+                saved
+        );
     }
 
     // 현재 사용자가 해당 활동의 APPROVED 참여자인지 확인합니다.
@@ -227,45 +394,102 @@ public class ActivityRecordService {
         return checklistItem;
     }
 
-    // 체크리스트 문항 타입에 맞는 응답값이 입력되었는지 확인합니다.
+    // 체크리스트 문항 타입에 맞는 응답값인지 공통 검증합니다.
+    private void validateChecklistAnswerValues(
+            ChecklistItem checklistItem,
+            String selectedValue,
+            String textValue
+    ) {
+
+        if (checklistItem.getItemType() == null) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+
+        switch (checklistItem.getItemType()) {
+
+            case SINGLE_CHOICE -> {
+
+                // REQ-REC-07
+                if (selectedValue == null
+                        || selectedValue.isBlank()) {
+
+                    throw new CustomException(
+                            ErrorCode.INVALID_INPUT_VALUE
+                    );
+                }
+
+                // SINGLE_CHOICE에서는 textValue를 사용하지 않습니다.
+                if (textValue != null) {
+                    throw new CustomException(
+                            ErrorCode.INVALID_INPUT_VALUE
+                    );
+                }
+
+                if (checklistItem.getOptionsJson() == null
+                        || !checklistItem
+                        .getOptionsJson()
+                        .isArray()) {
+
+                    throw new CustomException(
+                            ErrorCode.INVALID_INPUT_VALUE
+                    );
+                }
+
+                boolean validOption = false;
+
+                for (var option
+                        : checklistItem.getOptionsJson()) {
+
+                    if (selectedValue.equals(
+                            option.asText()
+                    )) {
+                        validOption = true;
+                        break;
+                    }
+                }
+
+                if (!validOption) {
+                    throw new CustomException(
+                            ErrorCode.INVALID_INPUT_VALUE
+                    );
+                }
+            }
+
+            case TEXT -> {
+
+                // REQ-REC-08
+                // TEXT 문항은 selectedValue를 사용하지 않습니다.
+                if (selectedValue != null) {
+                    throw new CustomException(
+                            ErrorCode.INVALID_INPUT_VALUE
+                    );
+                }
+
+                // 응답으로 전달된 TEXT 문항은 실제 내용이 있어야 합니다.
+                if (textValue == null
+                        || textValue.isBlank()) {
+
+                    throw new CustomException(
+                            ErrorCode.INVALID_INPUT_VALUE
+                    );
+                }
+            }
+        }
+    }
+
+
+    // Draft 요청의 체크리스트 답변을 검증합니다.
     private void validateChecklistAnswer(
             ChecklistItem checklistItem,
             ActivityRecordDraftRequest.ChecklistAnswerRequest response
     ) {
-        // v1 체크리스트는 SINGLE_CHOICE 문항만 사용합니다.
-        if (checklistItem.getItemType() != ChecklistItemType.SINGLE_CHOICE) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        // 선택형 문항은 selectedValue가 반드시 있어야 합니다.
-        if (response.selectedValue() == null || response.selectedValue().isBlank()) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        // v1에서는 textValue를 사용하지 않습니다.
-        if (response.textValue() != null) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        // 선택형 문항에는 optionsJson 배열이 존재해야 합니다.
-        if (checklistItem.getOptionsJson() == null
-                || !checklistItem.getOptionsJson().isArray()) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        // selectedValue가 해당 문항의 허용된 선택지인지 확인합니다.
-        boolean validOption = false;
-
-        for (var option : checklistItem.getOptionsJson()) {
-            if (response.selectedValue().equals(option.asText())) {
-                validOption = true;
-                break;
-            }
-        }
-
-        if (!validOption) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
+        validateChecklistAnswerValues(
+                checklistItem,
+                response.selectedValue(),
+                response.textValue()
+        );
     }
 
     // 요청된 체크리스트 응답을 검증하고, 문항 ID별 ChecklistItem을 반환합니다.
@@ -397,12 +621,6 @@ public class ActivityRecordService {
         // DRAFT / NEEDS_REVISION 상태에서만 Draft를 저장할 수 있습니다.
         validateDraftEditableStatus(activityRecord);
 
-        /*
-         * TODO: 완료
-         * DRAFT / NEEDS_REVISION 상태에서만 저장할 수 있도록 검사합니다.
-         * 상태충돌 409 ErrorCode는 팀장 확인 후 추가합니다.
-         */
-
         // 이미 서명이 등록된 MET 기록은 MET 이외의 상태로 변경할 수 없습니다.
         if (activityRecord.getVisitResult() == VisitResult.MET
                 && request.visitResult() != VisitResult.MET
@@ -476,9 +694,20 @@ public class ActivityRecordService {
         );
     }
 
-    // ActivityRecord별 서명 파일 저장용 S3 prefix를 생성합니다.
-    private String buildSignaturePrefix(Long recordId) {
-        return "signatures/activity-records/" + recordId;
+    // 서명 파일명에서 대상자와 ActivityRecord를 식별할 수 있도록 앞부분을 생성합니다.
+    private String buildSignatureFileNamePrefix(
+            ActivityRecord activityRecord
+    ) {
+        String recipientName =
+                activityRecord
+                        .getActivity()
+                        .getRecipient()
+                        .getName();
+
+        return "%s_record-%d".formatted(
+                recipientName,
+                activityRecord.getId()
+        );
     }
 
     // Submit할 활동기록의 시작 시각과 완료 시각이 유효한지 확인합니다.
@@ -680,7 +909,8 @@ public class ActivityRecordService {
         // 새 서명 이미지를 S3에 먼저 업로드합니다.
         String newSignatureKey = s3StorageService.upload(
                 signature,
-                buildSignaturePrefix(recordId)
+                "signatures",
+                buildSignatureFileNamePrefix(activityRecord)
         );
 
         // 이후 DB 트랜잭션이 실패하면 새로 올린 서명을 S3에서 삭제합니다.
@@ -705,53 +935,37 @@ public class ActivityRecordService {
         );
     }
 
-    // Submit할 때 DB에 저장된 체크리스트 응답이 현재 버전과 문항 규칙에 맞는지 다시 확인합니다.
+    // Submit 시 DB에 저장된 체크리스트 응답을 다시 검증합니다.
     private void validateStoredChecklistResponse(
             ActivityRecord activityRecord,
             ChecklistResponse response
     ) {
-        ChecklistItem checklistItem = response.getChecklistItem();
+        ChecklistItem checklistItem =
+                response.getChecklistItem();
 
-        // 현재 ActivityRecord가 사용한 체크리스트 버전의 문항인지 확인합니다.
-        if (!checklistItem.getVersion().equals(activityRecord.getChecklistVersion())) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        // ActivityRecord가 시작할 때 고정한 버전의 문항인지 확인합니다.
+        if (!checklistItem
+                .getVersion()
+                .equals(
+                        activityRecord.getChecklistVersion()
+                )) {
+
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT_VALUE
+            );
         }
 
-        // v1에서는 SINGLE_CHOICE 문항만 사용합니다.
-        if (checklistItem.getItemType() != ChecklistItemType.SINGLE_CHOICE) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        // 선택형 문항은 selectedValue가 반드시 있어야 합니다.
-        if (response.getSelectedValue() == null
-                || response.getSelectedValue().isBlank()) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        // v1에서는 textValue를 사용하지 않습니다.
-        if (response.getTextValue() != null) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        // 선택 가능한 optionsJson 배열이 정상적으로 존재해야 합니다.
-        if (checklistItem.getOptionsJson() == null
-                || !checklistItem.getOptionsJson().isArray()) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        boolean validOption = false;
-
-        for (var option : checklistItem.getOptionsJson()) {
-            if (response.getSelectedValue().equals(option.asText())) {
-                validOption = true;
-                break;
-            }
-        }
-
-        // 저장된 값이 해당 문항의 허용된 선택지가 아니면 제출할 수 없습니다.
-        if (!validOption) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
+        /*
+         * REQ-REC-07 / REQ-REC-08
+         *
+         * SINGLE_CHOICE와 TEXT 각각의 저장 규칙을
+         * Submit 시에도 동일하게 다시 검증합니다.
+         */
+        validateChecklistAnswerValues(
+                checklistItem,
+                response.getSelectedValue(),
+                response.getTextValue()
+        );
     }
 
     // MET 제출 시 필수 체크리스트 응답과 서명 등록 여부를 확인합니다.

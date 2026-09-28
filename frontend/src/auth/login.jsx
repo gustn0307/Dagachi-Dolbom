@@ -77,7 +77,7 @@ function Login() {
     <main className="simple-auth-page">
       <form className="simple-auth-card" onSubmit={handleSubmit}>
         <span className="auth-mark">♥</span>
-        <p>이웃을 잇다</p>
+        <p>다같이 돌봄</p>
         <h1>로그인</h1>
 
         <label>

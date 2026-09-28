@@ -3,10 +3,12 @@ package com.dagachi.backend.institution.report.controller;
 import com.dagachi.backend.common.response.ApiResponse;
 import com.dagachi.backend.common.response.PageResponse;
 import com.dagachi.backend.domain.enums.ReportStatus;
+import com.dagachi.backend.domain.enums.RetryTitleScope;
 import com.dagachi.backend.institution.report.dto.*;
 import com.dagachi.backend.institution.report.service.InstitutionReportService;
 import com.dagachi.backend.institution.report.service.ReportAiAnalysisService;
 import com.dagachi.backend.institution.report.service.ReportDuplicateAnalysisService;
+import com.dagachi.backend.institution.report.service.ReportTitleGenerationService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,15 +27,18 @@ public class InstitutionReportController {
     private final InstitutionReportService institutionReportService;
     private final ReportAiAnalysisService reportAiAnalysisService;
     private final ReportDuplicateAnalysisService reportDuplicateAnalysisService;
+    private final ReportTitleGenerationService reportTitleGenerationService; // 필드 추가
 
     public InstitutionReportController(
             InstitutionReportService institutionReportService,
             ReportAiAnalysisService reportAiAnalysisService,
-            ReportDuplicateAnalysisService reportDuplicateAnalysisService
+            ReportDuplicateAnalysisService reportDuplicateAnalysisService,
+            ReportTitleGenerationService reportTitleGenerationService // 추가
     ) {
         this.institutionReportService = institutionReportService;
         this.reportAiAnalysisService = reportAiAnalysisService;
         this.reportDuplicateAnalysisService = reportDuplicateAnalysisService;
+        this.reportTitleGenerationService = reportTitleGenerationService; // 추가
     }
 
     /**
@@ -264,6 +269,29 @@ public class InstitutionReportController {
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "최신 유사 제보 분석 결과를 조회했습니다.",
+                        response
+                )
+        );
+    }
+
+    /**
+     * 아직 AI 제목(REPORT_TITLE)이 없는 제보만 골라 일괄 생성합니다.
+     * scope=MY_INSTITUTION: 로그인 담당자의 소속 기관 전체 중 누락 건
+     * scope=UNASSIGNED: 미배정 제보 전체 중 누락 건
+     * 필터·현재 페이지 무관, 1회 최대 100건(초과 시 hasMore=true).
+     */
+    @PostMapping("/ai-titles/retry-missing")
+    public ResponseEntity<ApiResponse<RetryMissingTitleResponse>>
+    retryMissingTitles(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam RetryTitleScope scope
+    ) {
+        RetryMissingTitleResponse response =
+                reportTitleGenerationService.retryMissingTitles(userId, scope);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "AI 제목 재생성을 처리했습니다.",
                         response
                 )
         );

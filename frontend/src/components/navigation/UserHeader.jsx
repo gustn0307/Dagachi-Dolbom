@@ -15,7 +15,7 @@ function UserHeader() {
 
   const navigate = useNavigate();
 
-  const { isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const homePath = isAuthenticated ? "/home" : "/";
 
@@ -24,14 +24,17 @@ function UserHeader() {
     navigate("/login", { replace: true });
   };
 
+  // 닉네임이 없으면(선택 입력 필드) 이름으로 대체
+  const displayName = user?.nickname || user?.name || "회원";
+
   return (
     <header className="topbar">
-      <Link to={homePath} className="brand" aria-label="다함께 돌봄 홈">
+      <Link to={homePath} className="brand" aria-label="다같이 돌봄 홈">
         <span className="brand-symbol" aria-hidden="true">
           ♥
         </span>
         <span>
-          <b>다함께 돌봄</b>
+          <b>다같이 돌봄</b>
           <small>함께 만드는 따뜻한 우리 동네</small>
         </span>
       </Link>
@@ -63,19 +66,24 @@ function UserHeader() {
         })}
       </nav>
       <div className="header-tools">
-        <button
-          className="font-control"
-          type="button"
-          aria-label="큰 글씨 사용"
-        >
-          글자 크기 <i />
-          <b>A</b>
-        </button>
-
         {isAuthenticated ? (
-          <button type="button" className="login" onClick={handleLogout}>
-            로그아웃
-          </button>
+          <>
+            <div className="user-chip">
+              <span className="user-chip-avatar" aria-hidden="true">
+                {displayName.charAt(0)}
+              </span>
+              <span className="user-chip-text">
+                <strong className="user-chip-name">{displayName}</strong>
+                {user?.nickname && user?.name && (
+                  <small className="user-chip-fullname">{user.name}</small>
+                )}
+              </span>
+            </div>
+
+            <button type="button" className="login" onClick={handleLogout}>
+              로그아웃
+            </button>
+          </>
         ) : (
           <>
             <Link to="/login" className="login">

@@ -56,20 +56,26 @@ public class S3StorageService {
         }
     }
 
-    // 사진, 서명 업로드 메서드
+    // 기존 사진 업로드는 기존 파일명 규칙을 그대로 사용합니다.
     public String upload(
             MultipartFile file,
             String prefix
     ) {
-        /*
-         * 빈 파일, 크기, 클라이언트 MIME 타입뿐 아니라
-         * 실제 파일의 magic byte까지 확인합니다.
-         */
+        return upload(file, prefix, null);
+    }
+
+    // 파일명 앞부분이 필요한 업로드에 사용합니다.
+    // 예: 한재호_record-19_UUID.png
+    public String upload(
+            MultipartFile file,
+            String prefix,
+            String fileNamePrefix
+    ) {
         ImageFormat imageFormat = validateFile(file);
 
-        // 검증된 실제 이미지 형식을 기준으로 Object Key를 생성합니다.
         String key = createObjectKey(
                 prefix,
+                fileNamePrefix,
                 imageFormat
         );
 
@@ -78,10 +84,6 @@ public class S3StorageService {
                     PutObjectRequest.builder()
                             .bucket(bucket)
                             .key(key)
-                            /*
-                             * 클라이언트가 전달한 Content-Type을 그대로 사용하지 않고
-                             * 실제 파일 검증 결과를 사용합니다.
-                             */
                             .contentType(imageFormat.contentType)
                             .contentLength(file.getSize())
                             .build();
@@ -169,16 +171,39 @@ public class S3StorageService {
 
     private String createObjectKey(
             String prefix,
+            String fileNamePrefix,
             ImageFormat imageFormat
     ) {
         LocalDate now = LocalDate.now();
 
-        return "%s/%d/%02d/%s.%s".formatted(
+        String uuid = UUID.randomUUID().toString();
+
+        String fileName;
+
+        if (fileNamePrefix == null || fileNamePrefix.isBlank()) {
+            fileName = "%s.%s".formatted(
+                    uuid,
+                    imageFormat.extension
+            );
+        } else {
+            String safeFileNamePrefix =
+                    fileNamePrefix
+                            .trim()
+                            .replace("/", "_")
+                            .replace("\\", "_");
+
+            fileName = "%s_%s.%s".formatted(
+                    safeFileNamePrefix,
+                    uuid,
+                    imageFormat.extension
+            );
+        }
+
+        return "%s/%d/%02d/%s".formatted(
                 prefix,
                 now.getYear(),
                 now.getMonthValue(),
-                UUID.randomUUID(),
-                imageFormat.extension
+                fileName
         );
     }
 

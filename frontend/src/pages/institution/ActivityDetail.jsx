@@ -1,10 +1,8 @@
-import { useEffect, useState } from "react";
-import {
-  useNavigate,
-  useParams,
-} from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { institutionApi } from "../../api/institutionApi";
+import { usePolling } from "../../hooks/usePolling";
 
 const STATUS_LABELS = {
   RECRUITING: "모집 중",
@@ -49,105 +47,60 @@ function formatDateTime(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleString(
-    "ko-KR",
-    {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  );
+  return new Date(value).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-function getErrorMessage(
-  error,
-  fallbackMessage,
-) {
-  return (
-    error?.response?.data?.message ||
-    error?.message ||
-    fallbackMessage
-  );
+function getErrorMessage(error, fallbackMessage) {
+  return error?.response?.data?.message || error?.message || fallbackMessage;
 }
 
 function ActivityDetail() {
   const navigate = useNavigate();
   const { activityId } = useParams();
 
-  const [activity, setActivity] =
-    useState(null);
+  const [activity, setActivity] = useState(null);
 
-  const [activityRecord, setActivityRecord] =
-    useState(null);
+  const [activityRecord, setActivityRecord] = useState(null);
 
-  const [applications, setApplications] =
-    useState([]);
+  const [applications, setApplications] = useState([]);
 
-  const [
-    applicationPage,
-    setApplicationPage,
-  ] = useState(0);
+  const [applicationPage, setApplicationPage] = useState(0);
 
-  const [
-    applicationTotalPages,
-    setApplicationTotalPages,
-  ] = useState(0);
+  const [applicationTotalPages, setApplicationTotalPages] = useState(0);
 
-  const [
-    applicationStatus,
-    setApplicationStatus,
-  ] = useState("");
+  const [applicationStatus, setApplicationStatus] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [
-    recordLoading,
-    setRecordLoading,
-  ] = useState(false);
+  const [recordLoading, setRecordLoading] = useState(false);
 
-  const [
-    applicationsLoading,
-    setApplicationsLoading,
-  ] = useState(true);
+  const [applicationsLoading, setApplicationsLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [actionError, setActionError] =
-    useState("");
+  const [actionError, setActionError] = useState("");
 
-  const [processing, setProcessing] =
-    useState(false);
+  const [processing, setProcessing] = useState(false);
 
-  const [
-    recordProcessing,
-    setRecordProcessing,
-  ] = useState(false);
+  const [recordProcessing, setRecordProcessing] = useState(false);
 
-  const [
-    processingApplicationId,
-    setProcessingApplicationId,
-  ] = useState(null);
+  const [processingApplicationId, setProcessingApplicationId] = useState(null);
 
-  const [
-    showEditForm,
-    setShowEditForm,
-  ] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
 
-  const [editForm, setEditForm] =
-    useState({
-      scheduledAt: "",
-      requiredPeople: 2,
-    });
+  const [editForm, setEditForm] = useState({
+    scheduledAt: "",
+    requiredPeople: 2,
+  });
 
   const loadActivity = async () => {
-    const response =
-      await institutionApi.getActivity(
-        activityId,
-      );
+    const response = await institutionApi.getActivity(activityId);
 
     setActivity(response);
 
@@ -159,25 +112,17 @@ function ActivityDetail() {
 
     try {
       const response =
-        await institutionApi
-          .getInstitutionActivityRecord(
-            activityId,
-          );
+        await institutionApi.getInstitutionActivityRecord(activityId);
 
       setActivityRecord(response);
     } catch (requestError) {
-      if (
-        requestError?.response?.status === 404
-      ) {
+      if (requestError?.response?.status === 404) {
         setActivityRecord(null);
         return;
       }
 
       setActionError(
-        getErrorMessage(
-          requestError,
-          "활동기록을 불러오지 못했습니다.",
-        ),
+        getErrorMessage(requestError, "활동기록을 불러오지 못했습니다."),
       );
     } finally {
       setRecordLoading(false);
@@ -188,34 +133,21 @@ function ActivityDetail() {
     setApplicationsLoading(true);
 
     try {
-      const response =
-        await institutionApi
-          .getActivityApplications(
-            activityId,
-            {
-              page: applicationPage,
-              size: 20,
-              status:
-                applicationStatus ||
-                undefined,
-            },
-          );
-
-      setApplications(
-        Array.isArray(response?.content)
-          ? response.content
-          : [],
+      const response = await institutionApi.getActivityApplications(
+        activityId,
+        {
+          page: applicationPage,
+          size: 20,
+          status: applicationStatus || undefined,
+        },
       );
 
-      setApplicationTotalPages(
-        response?.totalPages ?? 0,
-      );
+      setApplications(Array.isArray(response?.content) ? response.content : []);
+
+      setApplicationTotalPages(response?.totalPages ?? 0);
     } catch (requestError) {
       setActionError(
-        getErrorMessage(
-          requestError,
-          "신청자 목록을 불러오지 못했습니다.",
-        ),
+        getErrorMessage(requestError, "신청자 목록을 불러오지 못했습니다."),
       );
     } finally {
       setApplicationsLoading(false);
@@ -230,10 +162,7 @@ function ActivityDetail() {
       setError("");
 
       try {
-        const response =
-          await institutionApi.getActivity(
-            activityId,
-          );
+        const response = await institutionApi.getActivity(activityId);
 
         if (!ignore) {
           setActivity(response);
@@ -241,10 +170,7 @@ function ActivityDetail() {
       } catch (requestError) {
         if (!ignore) {
           setError(
-            getErrorMessage(
-              requestError,
-              "활동 정보를 불러오지 못했습니다.",
-            ),
+            getErrorMessage(requestError, "활동 정보를 불러오지 못했습니다."),
           );
         }
       } finally {
@@ -268,72 +194,98 @@ function ActivityDetail() {
     }
 
     loadActivityRecord();
-  }, [
-    activityId,
-    activity?.hasRecord,
-  ]);
+  }, [activityId, activity?.hasRecord]);
 
   useEffect(() => {
     loadApplications();
-  }, [
-    activityId,
-    applicationPage,
-    applicationStatus,
-  ]);
+  }, [activityId, applicationPage, applicationStatus]);
 
-  const reloadAfterApplicationProcess =
-    async () => {
-      const [
-        activityResponse,
-        applicationResponse,
-      ] = await Promise.all([
-        institutionApi.getActivity(
-          activityId,
-        ),
+  /*
+   * 활동 상세 정보와 신청자 목록을 함께 갱신합니다.
+   *
+   * 폴링 실패 시 현재 화면을 유지하며,
+   * 반복적인 오류 메시지나 로딩 화면을 표시하지 않습니다.
+   */
+  const pollActivityDetail = useCallback(async () => {
+    try {
+      const [activityResponse, applicationResponse] = await Promise.all([
+        institutionApi.getActivity(activityId),
 
-        institutionApi
-          .getActivityApplications(
-            activityId,
-            {
-              page: applicationPage,
-              size: 20,
-              status:
-                applicationStatus ||
-                undefined,
-            },
-          ),
+        institutionApi.getActivityApplications(activityId, {
+          page: applicationPage,
+          size: 20,
+          status: applicationStatus || undefined,
+        }),
       ]);
 
       setActivity(activityResponse);
 
       setApplications(
-        Array.isArray(
-          applicationResponse?.content,
-        )
+        Array.isArray(applicationResponse?.content)
           ? applicationResponse.content
           : [],
       );
 
-      setApplicationTotalPages(
-        applicationResponse?.totalPages ??
-          0,
-      );
-    };
+      setApplicationTotalPages(applicationResponse?.totalPages ?? 0);
+    } catch {
+      /*
+       * 폴링 실패 시 기존 데이터를 유지합니다.
+       * 다음 주기의 폴링에서 다시 시도합니다.
+       */
+    }
+  }, [activityId, applicationPage, applicationStatus]);
+
+  /*
+   * 사용자가 수정·승인·반려 등의 작업을 수행하지 않을 때만
+   * 5초마다 활동 상세와 신청자 목록을 갱신합니다.
+   */
+  usePolling(pollActivityDetail, {
+    interval: 5000,
+
+    enabled:
+      Boolean(activityId) &&
+      !loading &&
+      !error &&
+      !processing &&
+      !recordProcessing &&
+      processingApplicationId === null &&
+      !showEditForm,
+
+    immediate: false,
+    refreshOnFocus: true,
+  });
+
+  const reloadAfterApplicationProcess = async () => {
+    const [activityResponse, applicationResponse] = await Promise.all([
+      institutionApi.getActivity(activityId),
+
+      institutionApi.getActivityApplications(activityId, {
+        page: applicationPage,
+        size: 20,
+        status: applicationStatus || undefined,
+      }),
+    ]);
+
+    setActivity(activityResponse);
+
+    setApplications(
+      Array.isArray(applicationResponse?.content)
+        ? applicationResponse.content
+        : [],
+    );
+
+    setApplicationTotalPages(applicationResponse?.totalPages ?? 0);
+  };
 
   const openEditForm = () => {
     setActionError("");
 
     setEditForm({
-      scheduledAt:
-        activity.scheduledAt
-          ? activity.scheduledAt.slice(
-              0,
-              16,
-            )
-          : "",
+      scheduledAt: activity.scheduledAt
+        ? activity.scheduledAt.slice(0, 16)
+        : "",
 
-      requiredPeople:
-        activity.requiredPeople,
+      requiredPeople: activity.requiredPeople,
     });
 
     setShowEditForm(true);
@@ -348,8 +300,7 @@ function ActivityDetail() {
   };
 
   const handleEditChange = (event) => {
-    const { name, value } =
-      event.target;
+    const { name, value } = event.target;
 
     setEditForm((current) => ({
       ...current,
@@ -357,49 +308,32 @@ function ActivityDetail() {
     }));
   };
 
-  const handleUpdate = async (
-    event,
-  ) => {
+  const handleUpdate = async (event) => {
     event.preventDefault();
 
     setProcessing(true);
     setActionError("");
 
     try {
-      const response =
-        await institutionApi
-          .updateActivity(
-            activityId,
-            {
-              scheduledAt:
-                editForm.scheduledAt,
+      const response = await institutionApi.updateActivity(activityId, {
+        scheduledAt: editForm.scheduledAt,
 
-              requiredPeople: Number(
-                editForm.requiredPeople,
-              ),
-            },
-          );
+        requiredPeople: Number(editForm.requiredPeople),
+      });
 
       setActivity(response);
       setShowEditForm(false);
     } catch (requestError) {
       setActionError(
-        getErrorMessage(
-          requestError,
-          "활동 정보 수정에 실패했습니다.",
-        ),
+        getErrorMessage(requestError, "활동 정보 수정에 실패했습니다."),
       );
     } finally {
       setProcessing(false);
     }
   };
 
-  const handleStatusChange = async (
-    newStatus,
-  ) => {
-    const statusLabel =
-      STATUS_LABELS[newStatus] ??
-      newStatus;
+  const handleStatusChange = async (newStatus) => {
+    const statusLabel = STATUS_LABELS[newStatus] ?? newStatus;
 
     const confirmed = window.confirm(
       `활동 상태를 '${statusLabel}' 상태로 변경하시겠습니까?`,
@@ -413,217 +347,164 @@ function ActivityDetail() {
     setActionError("");
 
     try {
-      const response =
-        await institutionApi
-          .updateActivityStatus(
-            activityId,
-            newStatus,
-          );
+      const response = await institutionApi.updateActivityStatus(
+        activityId,
+        newStatus,
+      );
 
       setActivity(response);
     } catch (requestError) {
       setActionError(
-        getErrorMessage(
-          requestError,
-          "활동 상태 변경에 실패했습니다.",
-        ),
+        getErrorMessage(requestError, "활동 상태 변경에 실패했습니다."),
       );
     } finally {
       setProcessing(false);
     }
   };
 
-  const handleApproveApplication =
-    async (application) => {
-      const confirmed = window.confirm(
-        `${application.name}님의 봉사 신청을 승인하시겠습니까?`,
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      setProcessingApplicationId(
-        application.applicationId,
-      );
-
-      setActionError("");
-
-      try {
-        await institutionApi
-          .approveActivityApplication(
-            activityId,
-            application.applicationId,
-          );
-
-        await reloadAfterApplicationProcess();
-      } catch (requestError) {
-        setActionError(
-          getErrorMessage(
-            requestError,
-            "봉사 신청 승인에 실패했습니다.",
-          ),
-        );
-      } finally {
-        setProcessingApplicationId(
-          null,
-        );
-      }
-    };
-
-  const handleRejectApplication =
-    async (application) => {
-      const reason = window.prompt(
-        `${application.name}님의 신청을 반려하는 이유를 입력하세요.`,
-      );
-
-      if (reason === null) {
-        return;
-      }
-
-      if (!reason.trim()) {
-        setActionError(
-          "반려 사유를 입력해야 합니다.",
-        );
-        return;
-      }
-
-      setProcessingApplicationId(
-        application.applicationId,
-      );
-
-      setActionError("");
-
-      try {
-        await institutionApi
-          .rejectActivityApplication(
-            activityId,
-            application.applicationId,
-            reason.trim(),
-          );
-
-        await reloadAfterApplicationProcess();
-      } catch (requestError) {
-        setActionError(
-          getErrorMessage(
-            requestError,
-            "봉사 신청 반려에 실패했습니다.",
-          ),
-        );
-      } finally {
-        setProcessingApplicationId(
-          null,
-        );
-      }
-    };
-
-  const handleApproveRecord =
-    async () => {
-      const confirmed = window.confirm(
-        "제출된 체크리스트를 승인하고 활동을 완료하시겠습니까?",
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      setRecordProcessing(true);
-      setActionError("");
-
-      try {
-        const response =
-          await institutionApi
-            .approveInstitutionActivityRecord(
-              activityId,
-            );
-
-        setActivityRecord(response);
-
-        const activityResponse =
-          await loadActivity();
-
-        setActivity(activityResponse);
-
-        window.alert(
-          "활동기록을 승인하고 활동을 완료했습니다.",
-        );
-      } catch (requestError) {
-        setActionError(
-          getErrorMessage(
-            requestError,
-            "활동기록 승인에 실패했습니다.",
-          ),
-        );
-      } finally {
-        setRecordProcessing(false);
-      }
-    };
-
-  const handleRequestRevision =
-    async () => {
-      const reviewNote = window.prompt(
-        "봉사자에게 전달할 보완 요청 내용을 입력하세요.",
-      );
-
-      if (reviewNote === null) {
-        return;
-      }
-
-      if (!reviewNote.trim()) {
-        setActionError(
-          "보완 요청 내용을 입력해야 합니다.",
-        );
-        return;
-      }
-
-      if (
-        reviewNote.trim().length > 500
-      ) {
-        setActionError(
-          "보완 요청 내용은 500자 이하여야 합니다.",
-        );
-        return;
-      }
-
-      setRecordProcessing(true);
-      setActionError("");
-
-      try {
-        const response =
-          await institutionApi
-            .requestInstitutionActivityRecordRevision(
-              activityId,
-              reviewNote.trim(),
-            );
-
-        setActivityRecord(response);
-
-        const activityResponse =
-          await loadActivity();
-
-        setActivity(activityResponse);
-
-        window.alert(
-          "봉사자에게 보완을 요청했습니다.",
-        );
-      } catch (requestError) {
-        setActionError(
-          getErrorMessage(
-            requestError,
-            "활동기록 보완 요청에 실패했습니다.",
-          ),
-        );
-      } finally {
-        setRecordProcessing(false);
-      }
-    };
-
-  const handleApplicationStatusChange = (
-    event,
-  ) => {
-    setApplicationStatus(
-      event.target.value,
+  const handleApproveApplication = async (application) => {
+    const confirmed = window.confirm(
+      `${application.name}님의 봉사 신청을 승인하시겠습니까?`,
     );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setProcessingApplicationId(application.applicationId);
+
+    setActionError("");
+
+    try {
+      await institutionApi.approveActivityApplication(
+        activityId,
+        application.applicationId,
+      );
+
+      await reloadAfterApplicationProcess();
+    } catch (requestError) {
+      setActionError(
+        getErrorMessage(requestError, "봉사 신청 승인에 실패했습니다."),
+      );
+    } finally {
+      setProcessingApplicationId(null);
+    }
+  };
+
+  const handleRejectApplication = async (application) => {
+    const reason = window.prompt(
+      `${application.name}님의 신청을 반려하는 이유를 입력하세요.`,
+    );
+
+    if (reason === null) {
+      return;
+    }
+
+    if (!reason.trim()) {
+      setActionError("반려 사유를 입력해야 합니다.");
+      return;
+    }
+
+    setProcessingApplicationId(application.applicationId);
+
+    setActionError("");
+
+    try {
+      await institutionApi.rejectActivityApplication(
+        activityId,
+        application.applicationId,
+        reason.trim(),
+      );
+
+      await reloadAfterApplicationProcess();
+    } catch (requestError) {
+      setActionError(
+        getErrorMessage(requestError, "봉사 신청 반려에 실패했습니다."),
+      );
+    } finally {
+      setProcessingApplicationId(null);
+    }
+  };
+
+  const handleApproveRecord = async () => {
+    const confirmed = window.confirm(
+      "제출된 체크리스트를 승인하고 활동을 완료하시겠습니까?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setRecordProcessing(true);
+    setActionError("");
+
+    try {
+      const response =
+        await institutionApi.approveInstitutionActivityRecord(activityId);
+
+      setActivityRecord(response);
+
+      const activityResponse = await loadActivity();
+
+      setActivity(activityResponse);
+
+      window.alert("활동기록을 승인하고 활동을 완료했습니다.");
+    } catch (requestError) {
+      setActionError(
+        getErrorMessage(requestError, "활동기록 승인에 실패했습니다."),
+      );
+    } finally {
+      setRecordProcessing(false);
+    }
+  };
+
+  const handleRequestRevision = async () => {
+    const reviewNote = window.prompt(
+      "봉사자에게 전달할 보완 요청 내용을 입력하세요.",
+    );
+
+    if (reviewNote === null) {
+      return;
+    }
+
+    if (!reviewNote.trim()) {
+      setActionError("보완 요청 내용을 입력해야 합니다.");
+      return;
+    }
+
+    if (reviewNote.trim().length > 500) {
+      setActionError("보완 요청 내용은 500자 이하여야 합니다.");
+      return;
+    }
+
+    setRecordProcessing(true);
+    setActionError("");
+
+    try {
+      const response =
+        await institutionApi.requestInstitutionActivityRecordRevision(
+          activityId,
+          reviewNote.trim(),
+        );
+
+      setActivityRecord(response);
+
+      const activityResponse = await loadActivity();
+
+      setActivity(activityResponse);
+
+      window.alert("봉사자에게 보완을 요청했습니다.");
+    } catch (requestError) {
+      setActionError(
+        getErrorMessage(requestError, "활동기록 보완 요청에 실패했습니다."),
+      );
+    } finally {
+      setRecordProcessing(false);
+    }
+  };
+
+  const handleApplicationStatusChange = (event) => {
+    setApplicationStatus(event.target.value);
 
     setApplicationPage(0);
   };
@@ -631,9 +512,7 @@ function ActivityDetail() {
   if (loading) {
     return (
       <div className="institution-page">
-        <div className="data-state">
-          활동 정보를 불러오고 있습니다.
-        </div>
+        <div className="data-state">활동 정보를 불러오고 있습니다.</div>
       </div>
     );
   }
@@ -644,42 +523,29 @@ function ActivityDetail() {
         <button
           type="button"
           className="detail-back"
-          onClick={() =>
-            navigate(
-              "/institution/activities",
-            )
-          }
+          onClick={() => navigate("/institution/activities")}
         >
           ← 활동 목록
         </button>
 
         <div className="data-state error">
-          {error ||
-            "활동 정보를 찾을 수 없습니다."}
+          {error || "활동 정보를 찾을 수 없습니다."}
         </div>
       </div>
     );
   }
 
   const canEdit =
-    activity.status === "RECRUITING" ||
-    activity.status === "READY";
+    activity.status === "RECRUITING" || activity.status === "READY";
 
-  
-  const canReviewRecord =
-    activityRecord?.reviewStatus ===
-    "SUBMITTED";
+  const canReviewRecord = activityRecord?.reviewStatus === "SUBMITTED";
 
   return (
     <div className="institution-page care-detail-page">
       <button
         type="button"
         className="detail-back"
-        onClick={() =>
-          navigate(
-            "/institution/activities",
-          )
-        }
+        onClick={() => navigate("/institution/activities")}
       >
         ← 활동 목록
       </button>
@@ -688,14 +554,9 @@ function ActivityDetail() {
         <div>
           <p>활동 상세</p>
 
-          <h1>
-            {activity.recipientName} 돌봄 활동
-          </h1>
+          <h1>{activity.recipientName} 돌봄 활동</h1>
 
-          <span>
-            활동 정보와 신청자, 제출된
-            활동기록을 확인합니다.
-          </span>
+          <span>활동 정보와 신청자, 제출된 활동기록을 확인합니다.</span>
         </div>
 
         <div className="detail-title-actions">
@@ -710,34 +571,24 @@ function ActivityDetail() {
             </button>
           )}
 
-          {activity.status ===
-            "RECRUITING" && (
+          {activity.status === "RECRUITING" && (
             <button
               type="button"
               className="care-form-cancel"
               disabled={processing}
-              onClick={() =>
-                handleStatusChange(
-                  "CANCELED",
-                )
-              }
+              onClick={() => handleStatusChange("CANCELED")}
             >
               활동 취소
             </button>
           )}
 
-          {activity.status ===
-            "READY" && (
+          {activity.status === "READY" && (
             <>
               <button
                 type="button"
                 className="care-form-cancel"
                 disabled={processing}
-                onClick={() =>
-                  handleStatusChange(
-                    "RECRUITING",
-                  )
-                }
+                onClick={() => handleStatusChange("RECRUITING")}
               >
                 다시 모집
               </button>
@@ -746,11 +597,7 @@ function ActivityDetail() {
                 type="button"
                 className="care-form-cancel"
                 disabled={processing}
-                onClick={() =>
-                  handleStatusChange(
-                    "CANCELED",
-                  )
-                }
+                onClick={() => handleStatusChange("CANCELED")}
               >
                 활동 취소
               </button>
@@ -759,37 +606,25 @@ function ActivityDetail() {
         </div>
       </div>
 
-      {actionError && (
-        <div className="care-form-error">
-          {actionError}
-        </div>
-      )}
+      {actionError && <div className="care-form-error">{actionError}</div>}
 
       <section className="detail-summary-grid">
         <article>
           <span>현재 상태</span>
 
-          <strong>
-            {STATUS_LABELS[
-              activity.status
-            ] ?? activity.status}
-          </strong>
+          <strong>{STATUS_LABELS[activity.status] ?? activity.status}</strong>
         </article>
 
         <article>
           <span>필요 인원</span>
 
-          <strong>
-            {activity.requiredPeople}명
-          </strong>
+          <strong>{activity.requiredPeople}명</strong>
         </article>
 
         <article>
           <span>승인 인원</span>
 
-          <strong>
-            {activity.approvedCount}명
-          </strong>
+          <strong>{activity.approvedCount}명</strong>
         </article>
 
         <article>
@@ -797,10 +632,8 @@ function ActivityDetail() {
 
           <strong>
             {activity.hasRecord
-              ? REVIEW_STATUS_LABELS[
-                  activity.reviewStatus
-                ] ??
-                activity.reviewStatus
+              ? (REVIEW_STATUS_LABELS[activity.reviewStatus] ??
+                activity.reviewStatus)
               : "기록 없음"}
           </strong>
         </article>
@@ -823,47 +656,33 @@ function ActivityDetail() {
 
             <div>
               <dt>활동 예정일</dt>
-              <dd>
-                {formatDateTime(
-                  activity.scheduledAt,
-                )}
-              </dd>
+              <dd>{formatDateTime(activity.scheduledAt)}</dd>
             </div>
 
             <div>
               <dt>성별 조건</dt>
               <dd>
-                {GENDER_CONDITION_LABELS[
-                  activity.genderCondition
-                ] ??
+                {GENDER_CONDITION_LABELS[activity.genderCondition] ??
                   activity.genderCondition}
               </dd>
             </div>
 
             <div>
               <dt>등록 담당자</dt>
-              <dd>
-                {activity.createdByName}
-              </dd>
+              <dd>{activity.createdByName}</dd>
             </div>
 
             <div>
               <dt>등록일</dt>
-              <dd>
-                {formatDateTime(
-                  activity.createdAt,
-                )}
-              </dd>
+              <dd>{formatDateTime(activity.createdAt)}</dd>
             </div>
 
             <div>
               <dt>활동 결과</dt>
               <dd>
                 {activity.hasRecord
-                  ? REVIEW_STATUS_LABELS[
-                      activity.reviewStatus
-                    ] ??
-                    activity.reviewStatus
+                  ? (REVIEW_STATUS_LABELS[activity.reviewStatus] ??
+                    activity.reviewStatus)
                   : "결과 없음"}
               </dd>
             </div>
@@ -881,33 +700,24 @@ function ActivityDetail() {
           <dl className="detail-info-list">
             <div>
               <dt>대상자 번호</dt>
-              <dd>
-                {activity.recipientId}
-              </dd>
+              <dd>{activity.recipientId}</dd>
             </div>
 
             <div>
               <dt>이름</dt>
-              <dd>
-                {activity.recipientName}
-              </dd>
+              <dd>{activity.recipientName}</dd>
             </div>
 
             <div>
               <dt>전화번호</dt>
-              <dd>
-                {activity.recipientPhone ||
-                  "-"}
-              </dd>
+              <dd>{activity.recipientPhone || "-"}</dd>
             </div>
 
             <div>
               <dt>주소</dt>
               <dd>
-                {activity.recipientAddress ||
-                  "-"}{" "}
-                {activity.recipientDetailAddress ||
-                  ""}
+                {activity.recipientAddress || "-"}{" "}
+                {activity.recipientDetailAddress || ""}
               </dd>
             </div>
           </dl>
@@ -917,140 +727,88 @@ function ActivityDetail() {
           <div className="panel-title activity-title">
             <div>
               <h2>활동 신청자</h2>
-              <p>
-                활동을 신청한 봉사자를
-                확인합니다.
-              </p>
+              <p>활동을 신청한 봉사자를 확인합니다.</p>
             </div>
 
             <select
               value={applicationStatus}
               aria-label="신청 상태 선택"
-              onChange={
-                handleApplicationStatusChange
-              }
+              onChange={handleApplicationStatusChange}
             >
-              <option value="">
-                전체 상태
-              </option>
+              <option value="">전체 상태</option>
 
-              <option value="PENDING">
-                승인 대기
-              </option>
+              <option value="PENDING">승인 대기</option>
 
-              <option value="APPROVED">
-                승인
-              </option>
+              <option value="APPROVED">승인</option>
 
-              <option value="REJECTED">
-                반려
-              </option>
+              <option value="REJECTED">반려</option>
 
-              <option value="CANCELED">
-                신청 취소
-              </option>
+              <option value="CANCELED">신청 취소</option>
             </select>
           </div>
 
           <div className="activity-list">
             {applicationsLoading ? (
-              <div className="data-state">
-                신청자를 불러오고 있습니다.
-              </div>
-            ) : applications.length ===
-              0 ? (
-              <div className="data-state">
-                신청자가 없습니다.
-              </div>
+              <div className="data-state">신청자를 불러오고 있습니다.</div>
+            ) : applications.length === 0 ? (
+              <div className="data-state">신청자가 없습니다.</div>
             ) : (
-              applications.map(
-                (
-                  application,
-                  index,
-                ) => (
-                  <article
-                    key={
-                      application.applicationId
-                    }
-                  >
-                    <span
-                      className={`activity-dot dot-${
-                        index % 4
-                      }`}
-                    >
-                      {application.name?.[0] ??
-                        "봉"}
-                    </span>
+              applications.map((application, index) => (
+                <article key={application.applicationId}>
+                  <span className={`activity-dot dot-${index % 4}`}>
+                    {application.name?.[0] ?? "봉"}
+                  </span>
 
-                    <div>
-                      <h3>
-                        {application.name}
-                        {" · "}
-                        {application.nickname ||
-                          "닉네임 없음"}
-                      </h3>
+                  <div>
+                    <h3>
+                      {application.name}
+                      {" · "}
+                      {application.nickname || "닉네임 없음"}
+                    </h3>
 
-                      <p>
-                        {application.phone}
-                        {" · "}
-                        {GENDER_LABELS[
-                          application.gender
-                        ] ??
-                          application.gender}
-                        {" · 신청 "}
-                        {formatDateTime(
-                          application.appliedAt,
-                        )}
-                      </p>
-                    </div>
+                    <p>
+                      {application.phone}
+                      {" · "}
+                      {GENDER_LABELS[application.gender] ?? application.gender}
+                      {" · 신청 "}
+                      {formatDateTime(application.appliedAt)}
+                    </p>
+                  </div>
 
-                    <i className="table-status">
-                      {APPLICATION_STATUS_LABELS[
-                        application.status
-                      ] ??
-                        application.status}
-                    </i>
+                  <i className="table-status">
+                    {APPLICATION_STATUS_LABELS[application.status] ??
+                      application.status}
+                  </i>
 
-                    {application.status ===
-                      "PENDING" &&
-                      activity.status ===
-                        "RECRUITING" && (
-                        <div className="application-actions">
-                          <button
-                            type="button"
-                            disabled={
-                              processingApplicationId ===
-                              application.applicationId
-                            }
-                            onClick={() =>
-                              handleApproveApplication(
-                                application,
-                              )
-                            }
-                          >
-                            승인
-                          </button>
+                  {application.status === "PENDING" &&
+                    activity.status === "RECRUITING" && (
+                      <div className="application-actions">
+                        <button
+                          type="button"
+                          disabled={
+                            processingApplicationId ===
+                            application.applicationId
+                          }
+                          onClick={() => handleApproveApplication(application)}
+                        >
+                          승인
+                        </button>
 
-                          <button
-                            type="button"
-                            className="reject"
-                            disabled={
-                              processingApplicationId ===
-                              application.applicationId
-                            }
-                            onClick={() =>
-                              handleRejectApplication(
-                                application,
-                              )
-                            }
-                          >
-                            반려
-                          </button>
-                        </div>
-                      )}
-                  </article>
-                ),
-              )
+                        <button
+                          type="button"
+                          className="reject"
+                          disabled={
+                            processingApplicationId ===
+                            application.applicationId
+                          }
+                          onClick={() => handleRejectApplication(application)}
+                        >
+                          반려
+                        </button>
+                      </div>
+                    )}
+                </article>
+              ))
             )}
           </div>
 
@@ -1058,17 +816,9 @@ function ActivityDetail() {
             <div className="table-pagination">
               <button
                 type="button"
-                disabled={
-                  applicationPage === 0
-                }
+                disabled={applicationPage === 0}
                 onClick={() =>
-                  setApplicationPage(
-                    (current) =>
-                      Math.max(
-                        current - 1,
-                        0,
-                      ),
-                  )
+                  setApplicationPage((current) => Math.max(current - 1, 0))
                 }
               >
                 이전
@@ -1082,16 +832,8 @@ function ActivityDetail() {
 
               <button
                 type="button"
-                disabled={
-                  applicationPage + 1 >=
-                  applicationTotalPages
-                }
-                onClick={() =>
-                  setApplicationPage(
-                    (current) =>
-                      current + 1,
-                  )
-                }
+                disabled={applicationPage + 1 >= applicationTotalPages}
+                onClick={() => setApplicationPage((current) => current + 1)}
               >
                 다음
               </button>
@@ -1104,56 +846,42 @@ function ActivityDetail() {
             <div>
               <h2>활동 인증</h2>
 
-              <p>
-                봉사자가 제출한 활동 결과와
-                체크리스트를 확인하세요.
-              </p>
+              <p>봉사자가 제출한 활동 결과와 체크리스트를 확인하세요.</p>
             </div>
 
             {activityRecord && (
               <i className="table-status">
-                {REVIEW_STATUS_LABELS[
-                  activityRecord.reviewStatus
-                ] ??
+                {REVIEW_STATUS_LABELS[activityRecord.reviewStatus] ??
                   activityRecord.reviewStatus}
               </i>
             )}
           </div>
 
           {recordLoading ? (
+            <div className="data-state">활동기록을 불러오고 있습니다.</div>
+          ) : !activity.hasRecord || !activityRecord ? (
             <div className="data-state">
-              활동기록을 불러오고 있습니다.
-            </div>
-          ) : !activity.hasRecord ||
-            !activityRecord ? (
-            <div className="data-state">
-              아직 봉사자가 제출한
-              활동기록이 없습니다.
+              아직 봉사자가 제출한 활동기록이 없습니다.
             </div>
           ) : (
             <>
               <dl className="detail-info-list">
                 <div>
                   <dt>기록 번호</dt>
-                  <dd>
-                    {activityRecord.recordId}
-                  </dd>
+                  <dd>{activityRecord.recordId}</dd>
                 </div>
 
                 <div>
                   <dt>제출자</dt>
                   <dd>
-                    {activityRecord.submittedByName ||
-                      "아직 제출되지 않음"}
+                    {activityRecord.submittedByName || "아직 제출되지 않음"}
                   </dd>
                 </div>
 
                 <div>
                   <dt>방문 결과</dt>
                   <dd>
-                    {VISIT_RESULT_LABELS[
-                      activityRecord.visitResult
-                    ] ??
+                    {VISIT_RESULT_LABELS[activityRecord.visitResult] ??
                       activityRecord.visitResult ??
                       "-"}
                   </dd>
@@ -1161,20 +889,12 @@ function ActivityDetail() {
 
                 <div>
                   <dt>활동 시작</dt>
-                  <dd>
-                    {formatDateTime(
-                      activityRecord.startedAt,
-                    )}
-                  </dd>
+                  <dd>{formatDateTime(activityRecord.startedAt)}</dd>
                 </div>
 
                 <div>
                   <dt>활동 완료</dt>
-                  <dd>
-                    {formatDateTime(
-                      activityRecord.completedAt,
-                    )}
-                  </dd>
+                  <dd>{formatDateTime(activityRecord.completedAt)}</dd>
                 </div>
 
                 <div>
@@ -1188,34 +908,23 @@ function ActivityDetail() {
 
                 <div>
                   <dt>특이사항</dt>
-                  <dd>
-                    {activityRecord.specialNote ||
-                      "특이사항 없음"}
-                  </dd>
+                  <dd>{activityRecord.specialNote || "특이사항 없음"}</dd>
                 </div>
 
                 <div>
                   <dt>검토 담당자</dt>
-                  <dd>
-                    {activityRecord.reviewedByName ||
-                      "-"}
-                  </dd>
+                  <dd>{activityRecord.reviewedByName || "-"}</dd>
                 </div>
 
                 <div>
                   <dt>검토 일시</dt>
-                  <dd>
-                    {formatDateTime(
-                      activityRecord.reviewedAt,
-                    )}
-                  </dd>
+                  <dd>{formatDateTime(activityRecord.reviewedAt)}</dd>
                 </div>
               </dl>
 
               {activityRecord.reviewNote && (
                 <div className="care-form-error">
-                  보완 요청 내용:{" "}
-                  {activityRecord.reviewNote}
+                  보완 요청 내용: {activityRecord.reviewNote}
                 </div>
               )}
 
@@ -1223,47 +932,31 @@ function ActivityDetail() {
                 <div className="panel-title">
                   <div>
                     <h2>안부 체크리스트</h2>
-                    <p>
-                      봉사자가 제출한 답변입니다.
-                    </p>
+                    <p>봉사자가 제출한 답변입니다.</p>
                   </div>
                 </div>
 
-                {Array.isArray(
-                  activityRecord.responses,
-                ) &&
-                activityRecord.responses.length >
-                  0 ? (
-                  activityRecord.responses.map(
-                    (response, index) => (
-                      <article
-                        key={
-                          response.checklistItemId
-                        }
-                      >
-                        <span className="activity-dot">
-                          {index + 1}
-                        </span>
+                {Array.isArray(activityRecord.responses) &&
+                activityRecord.responses.length > 0 ? (
+                  activityRecord.responses.map((response, index) => (
+                    <article key={response.checklistItemId}>
+                      <span className="activity-dot">{index + 1}</span>
 
-                        <div>
-                          <h3>
-                            {response.question}
-                          </h3>
+                      <div>
+                        <h3>{response.question}</h3>
 
-                          <p>
-                            답변:{" "}
-                            {response.selectedValue ||
-                              response.textValue ||
-                              "응답 없음"}
-                          </p>
-                        </div>
-                      </article>
-                    ),
-                  )
+                        <p>
+                          답변:{" "}
+                          {response.selectedValue ||
+                            response.textValue ||
+                            "응답 없음"}
+                        </p>
+                      </div>
+                    </article>
+                  ))
                 ) : (
                   <div className="data-state">
-                    저장된 체크리스트 답변이
-                    없습니다.
+                    저장된 체크리스트 답변이 없습니다.
                   </div>
                 )}
               </div>
@@ -1274,51 +967,37 @@ function ActivityDetail() {
                     type="button"
                     className="care-form-cancel"
                     disabled={recordProcessing}
-                    onClick={
-                      handleRequestRevision
-                    }
+                    onClick={handleRequestRevision}
                   >
-                    {recordProcessing
-                      ? "처리 중..."
-                      : "보완 요청"}
+                    {recordProcessing ? "처리 중..." : "보완 요청"}
                   </button>
 
                   <button
                     type="button"
                     className="orange-action"
                     disabled={recordProcessing}
-                    onClick={
-                      handleApproveRecord
-                    }
+                    onClick={handleApproveRecord}
                   >
-                    {recordProcessing
-                      ? "처리 중..."
-                      : "활동 인증"}
+                    {recordProcessing ? "처리 중..." : "활동 인증"}
                   </button>
                 </div>
               )}
 
-              {activityRecord.reviewStatus ===
-                "APPROVED" && (
+              {activityRecord.reviewStatus === "APPROVED" && (
                 <div className="data-state">
-                  기관에서 인증을 완료한
-                  활동입니다.
+                  기관에서 인증을 완료한 활동입니다.
                 </div>
               )}
 
-              {activityRecord.reviewStatus ===
-                "NEEDS_REVISION" && (
+              {activityRecord.reviewStatus === "NEEDS_REVISION" && (
                 <div className="data-state">
-                  봉사자의 수정 및 재제출을
-                  기다리고 있습니다.
+                  봉사자의 수정 및 재제출을 기다리고 있습니다.
                 </div>
               )}
 
-              {activityRecord.reviewStatus ===
-                "DRAFT" && (
+              {activityRecord.reviewStatus === "DRAFT" && (
                 <div className="data-state">
-                  봉사자가 활동기록을 작성
-                  중입니다.
+                  봉사자가 활동기록을 작성 중입니다.
                 </div>
               )}
             </>
@@ -1331,10 +1010,7 @@ function ActivityDetail() {
           className="care-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
+            if (event.target === event.currentTarget) {
               closeEditForm();
             }
           }}
@@ -1349,9 +1025,7 @@ function ActivityDetail() {
               <div>
                 <p>활동 관리</p>
 
-                <h2 id="activity-edit-title">
-                  활동 정보 수정
-                </h2>
+                <h2 id="activity-edit-title">활동 정보 수정</h2>
               </div>
 
               <button
@@ -1365,32 +1039,21 @@ function ActivityDetail() {
             </div>
 
             {actionError && (
-              <div className="care-form-error">
-                {actionError}
-              </div>
+              <div className="care-form-error">{actionError}</div>
             )}
 
-            <form
-              className="care-recipient-form"
-              onSubmit={handleUpdate}
-            >
+            <form className="care-recipient-form" onSubmit={handleUpdate}>
               <div className="care-form-grid">
                 <label>
-                  <span>
-                    활동 예정 일시
-                  </span>
+                  <span>활동 예정 일시</span>
 
                   <input
                     type="datetime-local"
                     name="scheduledAt"
-                    value={
-                      editForm.scheduledAt
-                    }
+                    value={editForm.scheduledAt}
                     disabled={processing}
                     required
-                    onChange={
-                      handleEditChange
-                    }
+                    onChange={handleEditChange}
                   />
                 </label>
 
@@ -1400,18 +1063,11 @@ function ActivityDetail() {
                   <input
                     type="number"
                     name="requiredPeople"
-                    value={
-                      editForm.requiredPeople
-                    }
-                    min={Math.max(
-                      activity.approvedCount,
-                      2,
-                    )}
+                    value={editForm.requiredPeople}
+                    min={Math.max(activity.approvedCount, 2)}
                     disabled={processing}
                     required
-                    onChange={
-                      handleEditChange
-                    }
+                    onChange={handleEditChange}
                   />
                 </label>
               </div>
@@ -1431,9 +1087,7 @@ function ActivityDetail() {
                   className="orange-action"
                   disabled={processing}
                 >
-                  {processing
-                    ? "수정 중..."
-                    : "수정 저장"}
+                  {processing ? "수정 중..." : "수정 저장"}
                 </button>
               </div>
             </form>

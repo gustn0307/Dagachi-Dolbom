@@ -161,6 +161,17 @@ public class CareRecipient extends BaseTimeEntity {
    }
   }
  }
+
+ /**
+  * 승인된 대면 활동의 완료 시각을
+  * 마지막 안부 확인 시간으로 기록한다.
+  */
+ public void updateLastCheckedAt(
+         LocalDateTime checkedAt
+ ) {
+  this.lastCheckedAt = checkedAt;
+ }
+
  /**
   * CARE-06 돌봄 대상자 관리를 종료한다.
   *

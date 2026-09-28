@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext";
 import PageHeader from "../../components/common/PageHeader";
 import {
   getMyReports,
@@ -7,6 +8,7 @@ import {
   updateMyProfile,
   changePassword,
   withdrawUser,
+  getMyActivityStatistics,
 } from "../../api/userApi";
 
 const STATUS_LABELS = {
@@ -36,6 +38,7 @@ const overlayStyle = {
 
 function MyPage() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   // ---- 최근 제보 ----
   const [reports, setReports] = useState([]);
@@ -67,6 +70,10 @@ function MyPage() {
   const [withdrawError, setWithdrawError] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
 
+  // ---- 내 활동 통계 (STAT-01) ----
+  const [stats, setStats] = useState(null);
+  const [statsError, setStatsError] = useState("");
+
   useEffect(() => {
     const loadReports = async () => {
       try {
@@ -84,7 +91,7 @@ function MyPage() {
       } catch (requestError) {
         setError(
           requestError?.response?.data?.message ??
-            "제보 내역을 불러오지 못했습니다.",
+          "제보 내역을 불러오지 못했습니다.",
         );
       } finally {
         setLoading(false);
@@ -101,15 +108,31 @@ function MyPage() {
       } catch (requestError) {
         setProfileError(
           requestError?.response?.data?.message ??
-            "내 정보를 불러오지 못했습니다.",
+          "내 정보를 불러오지 못했습니다.",
         );
       } finally {
         setProfileLoading(false);
       }
     };
 
+    // STAT-01: 완료한 안부 확인 / 함께한 이웃 통계를 조회합니다.
+    const loadStatistics = async () => {
+      try {
+        setStatsError("");
+
+        const data = await getMyActivityStatistics();
+        setStats(data);
+      } catch (requestError) {
+        setStatsError(
+          requestError?.response?.data?.message ??
+          "활동 통계를 불러오지 못했습니다.",
+        );
+      }
+    };
+
     loadReports();
     loadProfile();
+    loadStatistics();
   }, []);
 
   // ---- 내 정보 수정 핸들러 ----
@@ -201,7 +224,7 @@ function MyPage() {
       } else {
         setPasswordError(
           requestError?.response?.data?.message ??
-            "비밀번호 변경에 실패했습니다.",
+          "비밀번호 변경에 실패했습니다.",
         );
       }
     } finally {
@@ -232,9 +255,18 @@ function MyPage() {
 
       await withdrawUser(withdrawPassword);
 
-      // 탈퇴 완료 후 로그인 화면으로 이동합니다.
-      // 실제 로그아웃(토큰 제거)은 프로젝트의 AuthContext.logout()과
-      // 연결해 주세요.
+      /*
+       * 회원 탈퇴가 성공하면 서버의 계정은 더 이상 유효한 로그인 계정이 아닙니다.
+       *
+       * 기존 Access Token을 브라우저에 남겨 두면 Axios interceptor가
+       * 로그인/공지/비회원 제보 같은 공개 API에도 탈퇴 전 JWT를 계속 첨부할 수 있습니다.
+       *
+       * AuthContext.logout()을 호출하여
+       * 1. sessionStorage의 Access Token을 제거하고
+       * 2. React의 user 상태도 null로 변경한 뒤
+       * 로그인 화면으로 이동합니다.
+       */
+      logout();
       navigate("/login", { replace: true });
     } catch (requestError) {
       const code = requestError?.response?.data?.code;
@@ -242,14 +274,14 @@ function MyPage() {
       if (code === "USER_409_WITHDRAWAL_BLOCKED") {
         setWithdrawError(
           "대기중이거나 승인된 신청/활동이 있어 탈퇴할 수 없어요. " +
-            "봉사 참여 > 내 신청 현황에서 먼저 취소해 주세요.",
+          "봉사 참여 > 내 신청 현황에서 먼저 취소해 주세요.",
         );
       } else if (code === "USER_400_PASSWORD_MISMATCH") {
         setWithdrawError("비밀번호가 일치하지 않습니다.");
       } else {
         setWithdrawError(
           requestError?.response?.data?.message ??
-            "탈퇴 처리 중 오류가 발생했습니다.",
+          "탈퇴 처리 중 오류가 발생했습니다.",
         );
       }
     } finally {
@@ -261,7 +293,7 @@ function MyPage() {
     <>
       <PageHeader
         eyebrow="마이페이지"
-        title="반가워요"
+        title={profile?.nickname ? `${profile.nickname}님 반가워요` : "반가워요"}
         text="당신의 관심을 통해 이웃의 오늘이 더 안전해지고 있어요."
       />
 
@@ -430,7 +462,7 @@ function MyPage() {
               />
               {passwordForm.newPasswordConfirm &&
                 passwordForm.newPassword !==
-                  passwordForm.newPasswordConfirm && (
+                passwordForm.newPasswordConfirm && (
                   <span className="auth-error">
                     비밀번호가 일치하지 않습니다.
                   </span>
@@ -457,27 +489,55 @@ function MyPage() {
         </div>
       )}
 
-      {/* ---- 마일리지/통계 (기존 그대로 - 이번 범위 아님) ---- */}
-      <section className="profile-grid">
-        <article className="mileage">
-          <span>✦</span>
-          <p>나의 마일리지</p>
-          <strong>
-            - <small>점</small>
-          </strong>
-          <button type="button">내역 보기 ›</button>
-        </article>
-
-        <article className="profile-stat">
-          <strong>
-            -<span>회</span>
+      {/* ---- 내 활동 통계 (STAT-01) - 마일리지 카드 삭제, 실데이터 연동 ---- */}
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "15px",
+          width: "100%",
+          maxWidth: "816px",
+          margin: "0 auto",
+          boxSizing: "border-box",
+        }}
+      >
+        <article
+          className="profile-stat"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            background: "white",
+            border: "1px solid #eee7df",
+            borderRadius: "16px",
+            padding: "24px",
+          }}
+        >
+          <strong
+            aria-label={`완료한 안부 확인 ${stats?.completedCareCheckCount ?? "-"
+              }회`}
+          >
+            {statsError ? "-" : (stats?.completedCareCheckCount ?? "-")}
+            <span>회</span>
           </strong>
           <p>완료한 안부 확인</p>
         </article>
 
-        <article className="profile-stat">
-          <strong>
-            -<span>명</span>
+        <article
+          className="profile-stat"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            background: "white",
+            border: "1px solid #eee7df",
+            borderRadius: "16px",
+            padding: "24px",
+          }}
+        >
+          <strong
+            aria-label={`함께한 이웃 ${stats?.careRecipientCount ?? "-"}명`}
+          >
+            {statsError ? "-" : (stats?.careRecipientCount ?? "-")}
+            <span>명</span>
           </strong>
           <p>함께한 이웃</p>
         </article>
