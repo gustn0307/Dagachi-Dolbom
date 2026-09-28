@@ -24,8 +24,6 @@ import ReportDetail from "./pages/institution/ReportDetail";
 
 import ActivityRecord from "./pages/activity/ActivityRecord";
 
-import UserManagement from "./pages/admin/UserManagement";
-import InstitutionManagement from "./pages/admin/InstitutionManagement";
 import NoticeManagement from "./pages/admin/NoticeManagement";
 
 import Login from "./auth/login";
@@ -113,7 +111,6 @@ function App() {
           <Route path="volunteers/:volunteerId" element={<VolunteerDetail />} />
 
           <Route path="activities" element={<ActivityManagement />} />
-         
 
           <Route path="activities/:activityId" element={<ActivityDetail />} />
         </Route>
@@ -127,10 +124,9 @@ function App() {
             </RequireRole>
           }
         >
-          <Route index element={<Navigate to="users" replace />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="institutions" element={<InstitutionManagement />} />
+          <Route index element={<Navigate to="notices" replace />} />
           <Route path="notices" element={<NoticeManagement />} />
+          <Route path="*" element={<Navigate to="/admin/notices" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
